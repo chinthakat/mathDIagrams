@@ -4,10 +4,17 @@ import { ObjectRegistry, getCategories } from '../registry/objectRegistry';
 import CanvasEditor2D from './CanvasEditor2D';
 import PropertiesPanel from './PropertiesPanel';
 import TabBar from './TabBar';
+import AIMapGeneratorModal from './AIMapGeneratorModal';
 
 export default function MapEditor() {
   const [mapTheme, setMapTheme] = useState('paper');
   const [snapToGrid, setSnapToGrid] = useState(true);
+
+  // AI Generator States
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const [aiQuestion, setAiQuestion] = useState('');
+  const [aiAnswer, setAiAnswer] = useState('');
+  const [showAnswer, setShowAnswer] = useState(false);
 
   // Tab / Document Management State
   const [documents, setDocuments] = useState(() => {
@@ -228,6 +235,25 @@ export default function MapEditor() {
     }
   };
 
+  const handleAddQuestionToCanvas = () => {
+    if (!aiQuestion) return;
+    const newId = 'ai-text-' + Date.now();
+    const textFill = ['blueprint', 'dark'].includes(mapTheme) ? '#ffffff' : '#1e293b';
+    const newShape = {
+      id: newId,
+      type: 'text',
+      x: 60,
+      y: 60,
+      text: `Question: ${aiQuestion}\nAnswer: ${aiAnswer}`,
+      fontSize: 13,
+      fill: textFill,
+      fontFamily: 'Inter',
+      rotation: 0
+    };
+    setShapes([...shapes, newShape]);
+    setSelectedId(newId);
+  };
+
   const categories = getCategories();
   const mapElements = categories['Map Elements'] || [];
 
@@ -255,7 +281,25 @@ export default function MapEditor() {
         
         {/* Workspace controls */}
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button 
+              className="btn"
+              onClick={() => setIsAIModalOpen(true)}
+              style={{ 
+                padding: '6px 12px', 
+                fontSize: '12px', 
+                background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', 
+                border: 'none', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px', 
+                color: 'white',
+                fontWeight: '600'
+              }}
+            >
+              <Sparkles size={14} /> AI Generate Map ✨
+            </button>
+
             <button className="btn-icon" onClick={handleUndo} title="Undo (Ctrl+Z)" disabled={!activeDoc?.history?.length}>
               <Undo size={18} />
             </button>
@@ -268,6 +312,8 @@ export default function MapEditor() {
                 if (window.confirm("Are you sure you want to clear this map?")) {
                   setShapes([]);
                   setSelectedId(null);
+                  setAiQuestion('');
+                  setAiAnswer('');
                 }
               }}
               style={{ padding: '6px 12px', fontSize: '12px' }}
@@ -444,6 +490,81 @@ export default function MapEditor() {
             setMapTheme={updateDocTheme}
             hideLocalControls={true}
           />
+
+          {/* Floating AI Question Card */}
+          {aiQuestion && (
+            <div 
+              style={{
+                position: 'absolute',
+                bottom: '24px',
+                left: '24px',
+                width: '380px',
+                background: 'rgba(15, 23, 42, 0.85)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+                padding: '16px',
+                color: 'white',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                zIndex: 100
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+                <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#10b981', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Sparkles size={12} /> AI Math Question
+                </span>
+                <button 
+                  onClick={() => { setAiQuestion(''); setAiAnswer(''); }}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div style={{ fontSize: '12.5px', lineHeight: 1.5, color: '#f8fafc' }}>
+                {aiQuestion}
+              </div>
+
+              {/* Show/Hide Answer */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <button 
+                  onClick={() => setShowAnswer(!showAnswer)}
+                  style={{ background: 'none', border: 'none', color: '#60a5fa', fontSize: '11px', cursor: 'pointer', textAlign: 'left', outline: 'none' }}
+                >
+                  {showAnswer ? 'Hide Answer' : 'Show Answer'}
+                </button>
+                {showAnswer && (
+                  <div style={{ fontSize: '12px', padding: '6px 10px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#a7f3d0', borderRadius: '4px' }}>
+                    <strong>Answer:</strong> {aiAnswer}
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Actions */}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => {
+                    navigator.clipboard.writeText(aiQuestion);
+                    alert("Question text copied to clipboard!");
+                  }}
+                  style={{ flex: 1, padding: '6px', fontSize: '11px' }}
+                >
+                  Copy Text
+                </button>
+                <button 
+                  className="btn" 
+                  onClick={handleAddQuestionToCanvas}
+                  style={{ flex: 1, padding: '6px', fontSize: '11px', background: '#10b981' }}
+                >
+                  Insert on Map
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -455,8 +576,21 @@ export default function MapEditor() {
         reorderShape={reorderShape}
         mode="Map"
         openIconPicker={(currentIconName, callback) => {
-          // Fallback if icon picker requested, since map has icons
           alert("Map elements can customize text labels and colors in the properties input.");
+        }}
+      />
+
+      {/* AI Map Generator Modal */}
+      <AIMapGeneratorModal
+        isOpen={isAIModalOpen}
+        onClose={() => setIsAIModalOpen(false)}
+        onGenerate={(data) => {
+          setAiQuestion(data.question);
+          setAiAnswer(data.answer);
+          setShowAnswer(false);
+          updateDocTheme(data.theme);
+          setShapes(data.shapes);
+          setSelectedId(null);
         }}
       />
     </div>
