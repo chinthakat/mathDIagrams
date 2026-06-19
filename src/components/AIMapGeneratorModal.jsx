@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles, AlertCircle, Play, Key } from 'lucide-react';
+import { X, Sparkles, AlertCircle, Play, Key, Terminal, Clipboard, Check } from 'lucide-react';
 
 export default function AIMapGeneratorModal({ isOpen, onClose, onGenerate }) {
   const [gradeLevel, setGradeLevel] = useState('Grade 3');
@@ -8,6 +8,9 @@ export default function AIMapGeneratorModal({ isOpen, onClose, onGenerate }) {
   const [useDemo, setUseDemo] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showDebug, setShowDebug] = useState(true);
+  const [debugRequest, setDebugRequest] = useState(null);
+  const [debugResponse, setDebugResponse] = useState(null);
 
   // Load saved API key from localStorage
   useEffect(() => {
@@ -144,12 +147,34 @@ export default function AIMapGeneratorModal({ isOpen, onClose, onGenerate }) {
     // 1. Sandbox / Mock generation
     if (useDemo) {
       setLoading(true);
+      const mockData = sandboxMaps[gradeLevel] || sandboxMaps['Grade 3'];
+      
+      setDebugRequest({
+        url: "DEMO_SANDBOX_MODE (Bypassed API call)",
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: {
+          mode: "sandbox",
+          gradeLevel: gradeLevel,
+          themeHint: themePrompt || "None",
+          selectedPreBakedMap: `Pre-baked template for ${gradeLevel}`
+        }
+      });
+
       setTimeout(() => {
-        const mockData = sandboxMaps[gradeLevel] || sandboxMaps['Grade 3'];
         const result = assignUniqueIds(mockData);
+        setDebugResponse({
+          status: 200,
+          statusText: "OK",
+          data: result
+        });
         onGenerate(result);
         setLoading(false);
-        onClose();
+        if (!showDebug) {
+          onClose();
+        }
       }, 1000);
       return;
     }
@@ -166,19 +191,7 @@ export default function AIMapGeneratorModal({ isOpen, onClose, onGenerate }) {
     setLoading(true);
     setError('');
 
-    try {
-      const response = await fetch('https://api.deepseek.com/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [
-            {
-              role: 'system',
-              content: `You are an AI mathematical map diagram generator. Return ONLY a valid JSON object. Do not wrap the JSON output in markdown \`\`\`json code blocks.
+    const systemPromptContent = `You are an AI mathematical map diagram generator. Return ONLY a valid JSON object. Do not wrap the JSON output in markdown \`\`\`json code blocks.
 The JSON must match the following schema:
 {
   "question": "A clear, mathematically rich navigation, direction, or bearing math question suitable for ${gradeLevel} with the requested theme/topic.",
@@ -245,6 +258,16 @@ Use this mode if the question is based on distances (in meters/kilometers), comp
   4. Buildings ('mapBuilding') and Markers ('mapMarker') should be placed at clean coordinates, separated by at least 100px so they don't overlap, and labelled clearly.
   5. Trees and Mountain peaks should be placed as decorative clusters or key points in the question.
 
+CRITICAL SHAPES REQUIREMENT:
+- The 'shapes' array must NEVER be empty. For every single location, landmark (e.g. School, Library), route, and distance path mentioned in the question text, you MUST generate matching canvas shapes with correct positions so the map matches the question.
+- For example, if the question is "In a town, the library is 300 meters east and 400 meters north of the school. What is the straight-line distance from the school to the library?":
+  1. Set the School at x: 200, y: 450 (using type 'mapBuilding', label 'School', iconName: 'School').
+  2. The Library is 300m East and 400m North. Under a scale of 1px = 1m, the library should be at x: 200+300 = 500, y: 450-400 = 50 (using type 'mapBuilding', label 'Library', iconName: 'Library').
+  3. Draw a 'footpath' or 'road' shape connecting the school and library (e.g., horizontal footpath from (200, 450) to (500, 450), and vertical footpath from (500, 450) to (500, 50)).
+  4. Include a 'scaleBar' showing '100m' scale.
+  5. Include a 'compassRose'.
+- You must always visualize the full scenario described in the question. Do NOT leave the canvas blank or the 'shapes' array empty under any circumstances.
+
 Mathematical Graded Complexity Expectations:
 - Grade 2: Simple directions (N, S, E, W), simple paths.
 - Grade 3: Summing straight line path lengths (e.g. "Walk 200m East, then 150m North. Total distance?").
@@ -273,23 +296,57 @@ Available Shape Types and Their Exact Properties:
 15. sunDirection: { type: 'sunDirection', x, y, radius, color, label }
 16. flag: { type: 'flag', x, y, radius, color, label, showLabel }
 17. compassRose: { type: 'compassRose', x, y, radius, color, fill }
-18. scaleBar: { type: 'scaleBar', x, y, width, height, color, unitText }`
-            },
-            {
-              role: 'user',
-              content: `Generate a high quality map math question with the theme/topic: "${themePrompt || 'Town navigation'}" for ${gradeLevel}.`
-            }
-          ],
-          response_format: { type: 'json_object' },
-          temperature: 0.3
-        })
+18. scaleBar: { type: 'scaleBar', x, y, width, height, color, unitText }`;
+
+    const userPromptContent = `Generate a high quality map math question with the theme/topic: "${themePrompt || 'Town navigation'}" for ${gradeLevel}.`;
+
+    try {
+      const requestPayload = {
+        model: 'deepseek-chat',
+        messages: [
+          { role: 'system', content: systemPromptContent },
+          { role: 'user', content: userPromptContent }
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.3
+      };
+
+      setDebugRequest({
+        url: 'https://api.deepseek.com/chat/completions',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey.slice(0, 8)}...[HIDDEN]`
+        },
+        body: requestPayload
+      });
+
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(requestPayload)
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        setDebugResponse({
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
         throw new Error(`API error: ${response.statusText} (${response.status})`);
       }
 
       const rawData = await response.json();
+      setDebugResponse({
+        status: response.status,
+        statusText: response.statusText,
+        data: rawData
+      });
+
       let cleanContent = rawData.choices[0].message.content.trim();
       
       // Clean potential LLM markdown tags
@@ -305,7 +362,9 @@ Available Shape Types and Their Exact Properties:
       const mappedResult = assignUniqueIds(result);
 
       onGenerate(mappedResult);
-      onClose();
+      if (!showDebug) {
+        onClose();
+      }
     } catch (err) {
       console.error(err);
       setError(err.message || 'Failed to call DeepSeek API.');
@@ -316,114 +375,249 @@ Available Shape Types and Their Exact Properties:
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content" style={{ width: '480px', animation: 'slideUp 0.3s ease-out' }}>
+      <div 
+        className="modal-content" 
+        style={{ 
+          width: showDebug ? '960px' : '480px', 
+          maxWidth: '95vw',
+          maxHeight: '90vh',
+          transition: 'width 0.3s ease-in-out',
+          animation: 'slideUp 0.3s ease-out'
+        }}
+      >
         <div className="modal-header">
           <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981' }}>
             <Sparkles size={20} /> AI Map & Question Generator
           </h2>
-          <button className="close-btn" onClick={onClose} disabled={loading}>
-            <X size={20} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button 
+              onClick={() => setShowDebug(!showDebug)}
+              style={{
+                background: 'transparent',
+                border: '1px solid ' + (showDebug ? '#10b981' : 'var(--border-color)'),
+                color: showDebug ? '#10b981' : 'var(--text-muted)',
+                padding: '4px 10px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <Terminal size={12} /> {showDebug ? "Hide Debug Console" : "Show Debug Console"}
+            </button>
+            <button className="close-btn" onClick={onClose} disabled={loading}>
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
-        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {error && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '10px', borderRadius: '6px', fontSize: '13px' }}>
-              <AlertCircle size={16} />
-              <span>{error}</span>
-            </div>
-          )}
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          {/* Left Column: Form Controls */}
+          <div 
+            className="modal-body" 
+            style={{ 
+              width: showDebug ? '50%' : '100%', 
+              padding: '20px', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '16px', 
+              overflowY: 'auto' 
+            }}
+          >
+            {error && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '10px', borderRadius: '6px', fontSize: '13px' }}>
+                <AlertCircle size={16} />
+                <span>{error}</span>
+              </div>
+            )}
 
-          {/* Input: Grade Level */}
-          <div className="input-group">
-            <label style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600 }}>Grade Level</label>
-            <select
-              value={gradeLevel}
-              onChange={e => setGradeLevel(e.target.value)}
-              disabled={loading}
-              style={{ width: '100%', padding: '10px', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '6px', marginTop: '4px', outline: 'none' }}
-            >
-              <option value="Grade 2">Grade 2 (Simple Directions)</option>
-              <option value="Grade 3">Grade 3 (Directions & Distances)</option>
-              <option value="Grade 4">Grade 4 (Compass Bearings & W/E/N/S)</option>
-              <option value="Grade 5">Grade 5 (Grid Scales & Complex Path Maths)</option>
-              <option value="Grade 6">Grade 6 (Pythagoras & Bearings in Degrees)</option>
-            </select>
-          </div>
-
-          {/* Input: Topic prompt hint */}
-          <div className="input-group">
-            <label style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600 }}>Theme / Topic Hint (Optional)</label>
-            <input
-              type="text"
-              placeholder="e.g. Treasure Island, Zoo Navigation, Space Grid"
-              value={themePrompt}
-              onChange={e => setThemePrompt(e.target.value)}
-              disabled={loading}
-              style={{ width: '100%', padding: '10px', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '6px', marginTop: '4px', outline: 'none' }}
-            />
-          </div>
-
-          {/* Option: Sandbox Demo vs Live */}
-          <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: 'white', userSelect: 'none' }}>
-              <input
-                type="checkbox"
-                checked={useDemo}
-                onChange={e => setUseDemo(e.target.checked)}
+            {/* Input: Grade Level */}
+            <div className="input-group">
+              <label style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600 }}>Grade Level</label>
+              <select
+                value={gradeLevel}
+                onChange={e => setGradeLevel(e.target.value)}
                 disabled={loading}
-                style={{ accentColor: '#10b981' }}
-              />
-              Use Demo Sandbox Mode (Free, Instant)
-            </label>
-            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', paddingLeft: '20px' }}>
-              Renders pre-baked high-quality assessment maps without calling DeepSeek API.
-            </p>
-          </div>
+                style={{ width: '100%', padding: '10px', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '6px', marginTop: '4px', outline: 'none' }}
+              >
+                <option value="Grade 2">Grade 2 (Simple Directions)</option>
+                <option value="Grade 3">Grade 3 (Directions & Distances)</option>
+                <option value="Grade 4">Grade 4 (Compass Bearings & W/E/N/S)</option>
+                <option value="Grade 5">Grade 5 (Grid Scales & Complex Path Maths)</option>
+                <option value="Grade 6">Grade 6 (Pythagoras & Bearings in Degrees)</option>
+              </select>
+            </div>
 
-          {/* DeepSeek API Key input */}
-          {!useDemo && (
-            <div className="input-group" style={{ animation: 'fadeIn 0.2s' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600 }}>
-                <Key size={14} /> DeepSeek API Key
-              </label>
+            {/* Input: Topic prompt hint */}
+            <div className="input-group">
+              <label style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600 }}>Theme / Topic Hint (Optional)</label>
               <input
-                type="password"
-                placeholder="sk-..."
-                value={apiKey}
-                onChange={e => setApiKey(e.target.value)}
+                type="text"
+                placeholder="e.g. Treasure Island, Zoo Navigation, Space Grid"
+                value={themePrompt}
+                onChange={e => setThemePrompt(e.target.value)}
                 disabled={loading}
                 style={{ width: '100%', padding: '10px', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '6px', marginTop: '4px', outline: 'none' }}
               />
             </div>
-          )}
 
-          {/* Action button */}
-          <button
-            className="btn"
-            onClick={handleGenerate}
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '12px',
-              background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-              border: 'none',
-              fontWeight: '600',
-              marginTop: '8px',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            {loading ? (
-              <span>Generating Map...</span>
-            ) : (
-              <>
-                <Sparkles size={16} /> Generate AI Map & Question
-              </>
+            {/* Option: Sandbox Demo vs Live */}
+            <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: 'white', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={useDemo}
+                  onChange={e => setUseDemo(e.target.checked)}
+                  disabled={loading}
+                  style={{ accentColor: '#10b981' }}
+                />
+                Use Demo Sandbox Mode (Free, Instant)
+              </label>
+              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', paddingLeft: '20px' }}>
+                Renders pre-baked high-quality assessment maps without calling DeepSeek API.
+              </p>
+            </div>
+
+            {/* DeepSeek API Key input */}
+            {!useDemo && (
+              <div className="input-group" style={{ animation: 'fadeIn 0.2s' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600 }}>
+                  <Key size={14} /> DeepSeek API Key
+                </label>
+                <input
+                  type="password"
+                  placeholder="sk-..."
+                  value={apiKey}
+                  onChange={e => setApiKey(e.target.value)}
+                  disabled={loading}
+                  style={{ width: '100%', padding: '10px', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '6px', marginTop: '4px', outline: 'none' }}
+                />
+              </div>
             )}
-          </button>
+
+            {/* Action button */}
+            <button
+              className="btn"
+              onClick={handleGenerate}
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                border: 'none',
+                fontWeight: '600',
+                marginTop: '8px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              {loading ? (
+                <span>Generating Map...</span>
+              ) : (
+                <>
+                  <Sparkles size={16} /> Generate AI Map & Question
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Right Column: AI Request/Response Debug Panel */}
+          {showDebug && (
+            <div 
+              style={{ 
+                width: '50%', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                borderLeft: '1px solid var(--border-color)', 
+                background: 'rgba(0,0,0,0.15)',
+                overflow: 'hidden'
+              }}
+            >
+              <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-dark)' }}>
+                <div style={{ padding: '8px 16px', fontSize: '12px', color: '#10b981', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Terminal size={14} /> AI Request/Response Logs
+                </div>
+              </div>
+
+              <div style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto' }}>
+                {/* 1. Sent Prompt Request */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold', textTransform: 'uppercase' }}>Sent Request Details:</span>
+                    {debugRequest && (
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(JSON.stringify(debugRequest, null, 2));
+                          alert("Copied Request Payload!");
+                        }}
+                        style={{ background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <Clipboard size={12} /> Copy Request
+                      </button>
+                    )}
+                  </div>
+                  <pre 
+                    style={{ 
+                      margin: 0, 
+                      padding: '10px', 
+                      background: '#090d16', 
+                      border: '1px solid #1e293b', 
+                      color: '#a5b4fc', 
+                      borderRadius: '6px', 
+                      fontFamily: 'monospace', 
+                      fontSize: '11px', 
+                      maxHeight: '180px', 
+                      overflow: 'auto', 
+                      whiteSpace: 'pre-wrap' 
+                    }}
+                  >
+                    {debugRequest ? JSON.stringify(debugRequest, null, 2) : "No request logged yet. Click 'Generate' to see logs."}
+                  </pre>
+                </div>
+
+                {/* 2. Received Response */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold', textTransform: 'uppercase' }}>Received Response Details:</span>
+                    {debugResponse && (
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(JSON.stringify(debugResponse, null, 2));
+                          alert("Copied Response Payload!");
+                        }}
+                        style={{ background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <Clipboard size={12} /> Copy Response
+                      </button>
+                    )}
+                  </div>
+                  <pre 
+                    style={{ 
+                      margin: 0, 
+                      padding: '10px', 
+                      background: '#090d16', 
+                      border: '1px solid #1e293b', 
+                      color: '#38bdf8', 
+                      borderRadius: '6px', 
+                      fontFamily: 'monospace', 
+                      fontSize: '11px', 
+                      flex: 1, 
+                      maxHeight: '300px',
+                      overflow: 'auto', 
+                      whiteSpace: 'pre-wrap' 
+                    }}
+                  >
+                    {debugResponse ? JSON.stringify(debugResponse, null, 2) : "No response logged yet."}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
