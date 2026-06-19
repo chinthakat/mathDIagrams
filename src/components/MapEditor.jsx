@@ -1,0 +1,464 @@
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Sparkles, Undo, Redo, Download, Compass, Plus, X, Grid, Sliders, Layout, Monitor } from 'lucide-react';
+import { ObjectRegistry, getCategories } from '../registry/objectRegistry';
+import CanvasEditor2D from './CanvasEditor2D';
+import PropertiesPanel from './PropertiesPanel';
+import TabBar from './TabBar';
+
+export default function MapEditor() {
+  const [mapTheme, setMapTheme] = useState('paper');
+  const [snapToGrid, setSnapToGrid] = useState(true);
+
+  // Tab / Document Management State
+  const [documents, setDocuments] = useState(() => {
+    const saved = localStorage.getItem('mapMakerDocs');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved map documents");
+      }
+    }
+    return [{ id: 'map-' + Date.now(), name: 'Map Diagram 1', shapes: [], theme: 'paper' }];
+  });
+
+  const [activeDocId, setActiveDocId] = useState(() => {
+    const savedId = localStorage.getItem('mapMakerActiveDoc');
+    return savedId || documents[0]?.id;
+  });
+
+  const activeDoc = documents.find(d => d.id === activeDocId) || documents[0];
+  const shapes = activeDoc?.shapes || [];
+
+  const [selectedId, setSelectedId] = useState(null);
+  const stageRef = useRef(null);
+
+  // Validate and correct activeDocId if it gets out of sync (e.g. storage inconsistencies)
+  useEffect(() => {
+    if (documents.length > 0 && !documents.some(d => d.id === activeDocId)) {
+      setActiveDocId(documents[0].id);
+    }
+  }, [documents, activeDocId]);
+
+  // Sync background theme with the active document's saved theme
+  useEffect(() => {
+    if (activeDoc && activeDoc.theme) {
+      setMapTheme(activeDoc.theme);
+    }
+  }, [activeDocId]);
+
+  // Auto-Save Effect
+  useEffect(() => {
+    localStorage.setItem('mapMakerDocs', JSON.stringify(documents));
+    localStorage.setItem('mapMakerActiveDoc', activeDocId);
+  }, [documents, activeDocId]);
+
+  // Document actions
+  const createDoc = () => {
+    const newId = 'map-' + Date.now();
+    const newName = `Map Diagram ${documents.length + 1}`;
+    setDocuments([...documents, { id: newId, name: newName, shapes: [], theme: 'paper' }]);
+    setActiveDocId(newId);
+    setSelectedId(null);
+  };
+
+  const deleteDoc = (id) => {
+    if (documents.length <= 1) return;
+    const newDocs = documents.filter(d => d.id !== id);
+    setDocuments(newDocs);
+    if (activeDocId === id) {
+      setActiveDocId(newDocs[0].id);
+      setSelectedId(null);
+    }
+  };
+
+  const renameDoc = (id, newName) => {
+    setDocuments(documents.map(d => d.id === id ? { ...d, name: newName } : d));
+  };
+
+  const updateDocTheme = (theme) => {
+    setMapTheme(theme);
+    setDocuments(documents.map(d => d.id === activeDocId ? { ...d, theme } : d));
+  };
+
+  // State update helper with Undo/Redo tracking
+  const setShapes = useCallback((newShapes, skipHistory = false) => {
+    setDocuments(prevDocs => prevDocs.map(doc => {
+      if (doc.id === activeDocId) {
+        let newHistory = doc.history || [];
+        let newFuture = doc.future || [];
+        
+        if (!skipHistory) {
+          newHistory = [...newHistory, doc.shapes || []].slice(-20);
+          newFuture = [];
+        }
+        
+        return { 
+          ...doc, 
+          shapes: newShapes,
+          history: newHistory,
+          future: newFuture
+        };
+      }
+      return doc;
+    }));
+  }, [activeDocId]);
+
+  const addShape = (type) => {
+    const newId = Date.now().toString();
+    const regObj = ObjectRegistry[type];
+    const baseProps = { id: newId, type, x: 250, y: 250 };
+    const newShape = { ...baseProps, ...(regObj?.defaultProps || {}) };
+    setShapes([...shapes, newShape]);
+    setSelectedId(newId);
+  };
+
+  const updateShape = (id, newProps) => {
+    setShapes(shapes.map(s => s.id === id ? { ...s, ...newProps } : s));
+  };
+
+  const deleteShape = (id) => {
+    setShapes(shapes.filter(s => s.id !== id));
+    if (selectedId === id) setSelectedId(null);
+  };
+
+  const reorderShape = (id, direction) => {
+    const index = shapes.findIndex(s => s.id === id);
+    if (index === -1) return;
+    
+    const newShapes = [...shapes];
+    const shape = newShapes.splice(index, 1)[0];
+    
+    if (direction === 'up') {
+      newShapes.push(shape); // Move to front
+    } else {
+      newShapes.unshift(shape); // Move to back
+    }
+    setShapes(newShapes);
+  };
+
+  // Undo / Redo logic
+  const handleUndo = useCallback(() => {
+    const doc = activeDoc;
+    if (!doc.history || doc.history.length === 0) return;
+    
+    const previousShapes = doc.history[doc.history.length - 1];
+    const newHistory = doc.history.slice(0, -1);
+    const newFuture = [doc.shapes || [], ...(doc.future || [])];
+    
+    setDocuments(prevDocs => prevDocs.map(d => d.id === activeDocId ? {
+      ...d,
+      shapes: previousShapes,
+      history: newHistory,
+      future: newFuture
+    } : d));
+    setSelectedId(null);
+  }, [activeDoc, activeDocId]);
+
+  const handleRedo = useCallback(() => {
+    const doc = activeDoc;
+    if (!doc.future || doc.future.length === 0) return;
+    
+    const nextShapes = doc.future[0];
+    const newFuture = doc.future.slice(1);
+    const newHistory = [...(doc.history || []), doc.shapes || []];
+    
+    setDocuments(prevDocs => prevDocs.map(d => d.id === activeDocId ? {
+      ...d,
+      shapes: nextShapes,
+      history: newHistory,
+      future: newFuture
+    } : d));
+    setSelectedId(null);
+  }, [activeDoc, activeDocId]);
+
+  // Keyboard Shortcuts (Delete, Undo/Redo)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.target.tagName.toLowerCase() === 'input' || e.target.tagName.toLowerCase() === 'textarea') return;
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedId) {
+          deleteShape(selectedId);
+        }
+      }
+
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) handleRedo();
+          else handleUndo();
+        }
+        if (e.key === 'y') {
+          e.preventDefault();
+          handleRedo();
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [shapes, selectedId, activeDocId, handleUndo, handleRedo]);
+
+  // High resolution PNG and vector exports
+  const handleExport = (format) => {
+    if (stageRef.current) {
+      if (format === 'png') {
+        const uri = stageRef.current.toDataURL({ pixelRatio: 3 });
+        const link = document.createElement('a');
+        link.download = `${activeDoc.name}.png`;
+        link.href = uri;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else if (format === 'svg') {
+        alert('SVG export is only supported in main vector mode. Download as PNG for high resolution print.');
+      } else if (format === 'json') {
+        const jsonData = JSON.stringify(activeDoc, null, 2);
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = `${activeDoc.name}.json`;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+    }
+  };
+
+  const categories = getCategories();
+  const mapElements = categories['Map Elements'] || [];
+
+  // Background selection list swatches definitions
+  const backgroundLibrary = [
+    { id: 'paper', name: 'Standard Paper', bg: '#fcfaf7', border: '#e6dcb9', isDark: false },
+    { id: 'parchment', name: 'Vintage Parchment', bg: '#f4ebd0', border: '#c3ae84', isDark: false },
+    { id: 'blueprint', name: 'Draft Blueprint', bg: '#0b1d3a', border: '#1e4888', isDark: true },
+    { id: 'topography', name: 'Topographic Chart', bg: '#faf8f2', border: '#d9cbaf', isDark: false },
+    { id: 'grassland', name: 'Grassland Meadow', bg: '#f0fdf4', border: '#86efac', isDark: false },
+    { id: 'desert', name: 'Golden Desert', bg: '#fffbeb', border: '#fef08a', isDark: false },
+    { id: 'ocean', name: 'Ocean Waves', bg: '#f0f9ff', border: '#7dd3fc', isDark: false },
+    { id: 'dark', name: 'Modern Dark', bg: '#0f172a', border: '#1e293b', isDark: true }
+  ];
+
+  const selectedShape = shapes.find(s => s.id === selectedId);
+
+  return (
+    <div className="app-container">
+      {/* Top bar header */}
+      <div className="topbar">
+        <div className="topbar-logo" style={{ color: '#10b981' }}>
+          <Compass className="animate-spin-slow" /> SimplyMaths Map Maker
+        </div>
+        
+        {/* Workspace controls */}
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="btn-icon" onClick={handleUndo} title="Undo (Ctrl+Z)" disabled={!activeDoc?.history?.length}>
+              <Undo size={18} />
+            </button>
+            <button className="btn-icon" onClick={handleRedo} title="Redo (Ctrl+Y)" disabled={!activeDoc?.future?.length}>
+              <Redo size={18} />
+            </button>
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => {
+                if (window.confirm("Are you sure you want to clear this map?")) {
+                  setShapes([]);
+                  setSelectedId(null);
+                }
+              }}
+              style={{ padding: '6px 12px', fontSize: '12px' }}
+            >
+              Clear Canvas
+            </button>
+          </div>
+          
+          <button 
+            className="btn btn-secondary"
+            onClick={() => window.open('/', '_blank')}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', borderColor: '#3b82f6', color: '#60a5fa' }}
+          >
+            <Monitor size={14} /> Open Math Diagrams ↗
+          </button>
+        </div>
+      </div>
+
+      {/* Left Sidebar */}
+      <div className="sidebar" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', padding: '16px' }}>
+        <div style={{ flex: 1 }}>
+          
+          {/* Section: Map Grid Configuration */}
+          <div className="shape-grid-section" style={{ marginBottom: '20px' }}>
+            <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
+              <Sliders size={12} /> Grid & Alignment
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'var(--bg-dark)', padding: '12px', borderRadius: '6px', border: '1px solid var(--border-color)', marginTop: '8px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', color: 'white' }}>
+                <input 
+                  type="checkbox" 
+                  checked={snapToGrid} 
+                  onChange={e => setSnapToGrid(e.target.checked)} 
+                  style={{ accentColor: '#10b981' }}
+                />
+                Snap to Grid (20px)
+              </label>
+            </div>
+          </div>
+
+          {/* Section: Selectable Map Background Library */}
+          <div className="shape-grid-section" style={{ marginBottom: '24px' }}>
+            <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              <Layout size={12} /> Map Background Library
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
+              {backgroundLibrary.map(item => (
+                <div
+                  key={item.id}
+                  onClick={() => updateDocTheme(item.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-dark)',
+                    border: mapTheme === item.id ? '2px solid #10b981' : '1px solid var(--border-color)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    boxShadow: mapTheme === item.id ? '0 0 10px rgba(16, 185, 129, 0.2)' : 'none'
+                  }}
+                  className="bg-theme-card"
+                >
+                  {/* Miniature swatch preview */}
+                  <div
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '4px',
+                      background: item.bg,
+                      border: `1px solid ${item.border}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '8px',
+                      color: item.isDark ? '#fff' : '#000',
+                      fontWeight: 'bold',
+                      flexShrink: 0
+                    }}
+                  >
+                    G
+                  </div>
+                  <span style={{ fontSize: '12px', color: 'white', fontWeight: mapTheme === item.id ? 600 : 400 }}>
+                    {item.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+
+        </div>
+
+        {/* Export Palette */}
+        <div style={{ flexShrink: 0, marginTop: '20px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
+          <div className="section-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px' }}>Export Map</div>
+          <button className="btn" style={{ width: '100%', marginBottom: '6px', display: 'flex', justifyContent: 'center', gap: '8px', padding: '8px', background: '#10b981' }} onClick={() => handleExport('png')}>
+            <Download size={16} /> Export High-Res PNG
+          </button>
+          <button className="btn btn-secondary" style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '8px', padding: '8px' }} onClick={() => handleExport('json')}>
+            <Download size={16} /> Save Document JSON
+          </button>
+        </div>
+      </div>
+
+      {/* Main Canvas Area */}
+      <div className="canvas-area" style={{ flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start' }}>
+        <TabBar 
+          documents={documents}
+          activeDocId={activeDocId}
+          setActiveDocId={setActiveDocId}
+          createDoc={createDoc}
+          deleteDoc={deleteDoc}
+          renameDoc={renameDoc}
+        />
+        
+        {/* Map Elements Horizontal Toolbar */}
+        <div 
+          className="map-elements-toolbar no-scrollbar" 
+          style={{ 
+            display: 'flex', 
+            gap: '8px', 
+            alignItems: 'center', 
+            padding: '8px 16px', 
+            background: 'var(--bg-panel)', 
+            borderBottom: '1px solid var(--border-color)',
+            overflowX: 'auto',
+            width: '100%',
+            scrollbarWidth: 'none'
+          }}
+        >
+          <span style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 'bold', marginRight: '6px', whiteSpace: 'nowrap' }}>
+            Toolbar:
+          </span>
+          {mapElements.map(shape => (
+            <button
+              key={shape.id}
+              onClick={() => addShape(shape.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'var(--bg-dark)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                color: 'white',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                whiteSpace: 'nowrap'
+              }}
+              title={`Add ${shape.name}`}
+            >
+              <span style={{ color: '#10b981', display: 'flex', alignItems: 'center' }}>
+                {shape.icon}
+              </span>
+              <span style={{ fontSize: '11px', fontWeight: 500 }}>{shape.name}</span>
+            </button>
+          ))}
+        </div>
+
+        <div style={{ flex: 1, position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+          <CanvasEditor2D 
+            shapes={shapes} 
+            setShapes={(newShapes) => setShapes(newShapes)} 
+            selectedId={selectedId} 
+            setSelectedId={setSelectedId}
+            stageRef={stageRef}
+            showGrid={true}
+            mapTheme={mapTheme}
+            setMapTheme={updateDocTheme}
+            hideLocalControls={true}
+          />
+        </div>
+      </div>
+
+      {/* Right Properties Panel */}
+      <PropertiesPanel 
+        selectedShape={selectedShape}
+        updateShape={updateShape}
+        deleteShape={deleteShape}
+        reorderShape={reorderShape}
+        mode="Map"
+        openIconPicker={(currentIconName, callback) => {
+          // Fallback if icon picker requested, since map has icons
+          alert("Map elements can customize text labels and colors in the properties input.");
+        }}
+      />
+    </div>
+  );
+}

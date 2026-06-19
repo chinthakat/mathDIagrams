@@ -1,0 +1,869 @@
+
+# MathDiagram AI - 2D Mathematics Diagram Engine Requirements
+
+## Purpose
+
+Build a professional 2D mathematics diagram creation platform capable of generating diagrams required for:
+
+* ICAS Mathematics
+* NAPLAN Numeracy
+* ACER Scholarship Tests
+* Selective School Entrance Exams
+* Opportunity Class (OC) Tests
+* Primary School Mathematics Assessments
+* Middle School Mathematics Assessments
+
+Target coverage:
+
+* Years 2–8
+* 95%+ of all mathematics diagrams appearing in assessments
+
+---
+
+# Product Goals
+
+## Primary Goal
+
+Allow teachers, tutors, content creators, and AI systems to create publication-quality mathematics diagrams within seconds.
+
+## Secondary Goal
+
+Support AI-driven diagram generation from natural language prompts.
+
+Example:
+
+> Draw an isosceles triangle ABC where AB = AC and angle A = 40°.
+
+---
+
+# Architecture Overview
+
+## Core Components
+
+### 1. Canvas Engine
+
+Features:
+
+* Infinite zoom
+* Pan
+* Snap to grid
+* Undo / Redo
+* Multi-select
+* Layer management
+* Object grouping
+* Lock/unlock objects
+* Copy/paste
+* Keyboard shortcuts
+
+---
+
+### 2. Object Library
+
+All mathematical objects available through drag-and-drop.
+
+---
+
+### 3. Properties Panel
+
+Every object must expose editable properties.
+
+Examples:
+
+* Position
+* Rotation
+* Stroke
+* Fill
+* Labels
+* Mathematical properties
+
+---
+
+### 4. AI Diagram Generator
+
+Natural language → diagram objects
+
+---
+
+### 5. Export Engine
+
+Supported formats:
+
+* PNG
+* SVG
+* PDF
+* JSON
+* Clipboard copy
+
+---
+
+# Object Library
+
+---
+
+# Category A – Basic Shapes
+
+## Rectangle
+
+Properties
+
+* Width
+* Height
+* Fill colour
+* Border colour
+* Border thickness
+
+---
+
+## Square
+
+Properties
+
+* Side length
+
+---
+
+## Circle
+
+Properties
+
+* Radius
+* Diameter
+
+---
+
+## Ellipse
+
+Properties
+
+* Major axis
+* Minor axis
+
+---
+
+## Triangle
+
+Properties
+
+* Freeform vertices
+* Side labels
+* Angle labels
+
+---
+
+## Polygon
+
+Properties
+
+* Number of sides
+* Vertex editing
+
+Supported:
+
+* Pentagon
+* Hexagon
+* Heptagon
+* Octagon
+
+---
+
+## Line Segment
+
+Properties
+
+* Length
+* Arrowheads
+* Labels
+
+---
+
+## Ray
+
+Properties
+
+* Origin
+* Direction
+
+---
+
+## Infinite Line
+
+Properties
+
+* Direction
+* Style
+
+---
+
+# Category B – Geometry Objects
+
+## Point
+
+Features
+
+* Draggable
+* Auto naming
+
+Examples
+
+A, B, C, D
+
+---
+
+## Midpoint Marker
+
+---
+
+## Parallel Marker
+
+Visual:
+
+||
+
+---
+
+## Double Parallel Marker
+
+Visual:
+
+||||
+
+---
+
+## Perpendicular Marker
+
+Visual:
+
+⊥
+
+---
+
+## Angle Object
+
+Properties
+
+* Angle value
+* Radius
+* Label
+
+---
+
+## Angle Marker
+
+Styles:
+
+* Single arc
+* Double arc
+* Triple arc
+
+---
+
+## Right Angle Marker
+
+Visual square indicator
+
+---
+
+## Congruent Side Markers
+
+Styles:
+
+* Single tick
+* Double tick
+* Triple tick
+
+---
+
+## Compass Arc
+
+Properties
+
+* Radius
+* Arc angle
+
+---
+
+# Category C – Triangle Library
+
+## Generic Triangle
+
+## Right Triangle
+
+## Isosceles Triangle
+
+## Equilateral Triangle
+
+## Scalene Triangle
+
+Features
+
+* Auto side labels
+* Auto angle labels
+
+---
+
+# Category D – Circle Geometry
+
+## Circle with Centre
+
+## Radius
+
+## Diameter
+
+## Chord
+
+## Arc
+
+## Sector
+
+## Segment
+
+## Tangent
+
+## Secant
+
+## Inscribed Angle
+
+## Central Angle
+
+---
+
+# Category E – Fraction Models
+
+Critical for Years 2–6.
+
+---
+
+## Fraction Rectangle
+
+Properties
+
+* Rows
+* Columns
+* Shaded cells
+
+---
+
+## Fraction Circle
+
+Properties
+
+* Number of sectors
+* Shaded sectors
+
+---
+
+## Fraction Bar
+
+Properties
+
+* Number of partitions
+* Shaded partitions
+
+---
+
+## Ratio Bar Model
+
+Properties
+
+* Number of units
+* Labels
+
+Examples
+
+Singapore Maths style bar models.
+
+---
+
+# Category F – Number Objects
+
+## Number Line
+
+Properties
+
+* Start value
+* End value
+* Interval
+
+---
+
+## Fraction Number Line
+
+---
+
+## Decimal Number Line
+
+---
+
+## Negative Number Line
+
+---
+
+## Open Number Line
+
+---
+
+## Jump Number Line
+
+Features
+
+* Arrows
+* Jump labels
+
+---
+
+# Category G – Measurement Objects
+
+## Ruler
+
+Properties
+
+* Metric
+* Imperial
+
+---
+
+## Length Marker
+
+Visual:
+
+<---- 5 cm ---->
+
+---
+
+## Area Grid
+
+Properties
+
+* Rows
+* Columns
+
+---
+
+## Perimeter Highlight
+
+---
+
+## Measuring Tape
+
+---
+
+## Thermometer
+
+Properties
+
+* Temperature range
+
+---
+
+## Analogue Clock
+
+Properties
+
+* Hour hand
+* Minute hand
+
+---
+
+## Calendar Grid
+
+---
+
+## Money Objects
+
+Australian:
+
+* 5c
+* 10c
+* 20c
+* 50c
+* $1
+* $2
+* Notes
+
+---
+
+## Weighing Scale
+
+---
+
+# Category H – Graphs & Data
+
+Essential for NAPLAN.
+
+---
+
+## Table
+
+---
+
+## Frequency Table
+
+---
+
+## Tally Table
+
+---
+
+## Bar Graph
+
+---
+
+## Double Bar Graph
+
+---
+
+## Column Graph
+
+---
+
+## Picture Graph
+
+---
+
+## Line Graph
+
+---
+
+## Pie Chart
+
+---
+
+## Dot Plot
+
+---
+
+## Stem-and-Leaf Plot
+
+---
+
+## Scatter Plot
+
+---
+
+## Histogram
+
+Optional
+
+---
+
+# Category I – Coordinate Geometry
+
+## Cartesian Plane
+
+Properties
+
+* Axis labels
+* Scale
+
+---
+
+## Point Plotter
+
+---
+
+## Coordinate Label
+
+Example
+
+(3,4)
+
+---
+
+## Reflection Line
+
+---
+
+## Translation Tool
+
+---
+
+## Rotation Tool
+
+---
+
+## Enlargement Tool
+
+---
+
+# Category J – Symmetry
+
+## Line Symmetry Tool
+
+---
+
+## Reflection Builder
+
+---
+
+## Rotational Symmetry Marker
+
+---
+
+# Category K – Spatial Reasoning
+
+Highly used in scholarship exams.
+
+---
+
+## Isometric Dot Grid
+
+---
+
+## Cube Stack
+
+---
+
+## Block Structure
+
+---
+
+## Top View Generator
+
+---
+
+## Front View Generator
+
+---
+
+## Side View Generator
+
+---
+
+## Tessellation Pattern
+
+---
+
+## Shape Pattern Generator
+
+---
+
+## Growing Pattern Generator
+
+---
+
+# Category L – Logic & Problem Solving
+
+## Venn Diagram
+
+2-set
+
+3-set
+
+---
+
+## Carroll Diagram
+
+---
+
+## Tree Diagram
+
+---
+
+## Balance Scale
+
+---
+
+## Number Pyramid
+
+---
+
+## Magic Square
+
+---
+
+## Flow Chart
+
+---
+
+## Path Puzzle Grid
+
+---
+
+# Category M – Text & Annotation
+
+## Plain Text
+
+---
+
+## Mathematical Text
+
+Support:
+
+* Fractions
+* Superscripts
+* Subscripts
+* Square roots
+* Pi
+* Degree symbol
+
+---
+
+## Equation Object
+
+Examples
+
+x + 5 = 12
+
+3/4
+
+√25
+
+---
+
+## Auto Labels
+
+### Point Labels
+
+A, B, C...
+
+### Side Labels
+
+a, b, c...
+
+### Angle Labels
+
+∠ABC
+
+---
+
+# Category N – Templates
+
+Provide prebuilt templates.
+
+## Geometry Templates
+
+* Triangle
+* Circle theorems
+* Angles
+
+---
+
+## Fraction Templates
+
+* Fraction bars
+* Fraction circles
+
+---
+
+## Graph Templates
+
+* Bar graph
+* Pie chart
+
+---
+
+## Coordinate Templates
+
+* Cartesian plane
+
+---
+
+## Scholarship Templates
+
+Common ACER-style diagrams
+
+---
+
+# AI Generation Requirements
+
+## Prompt Examples
+
+Create a fraction circle showing 5/8.
+
+Draw a right triangle ABC with angle B = 90°.
+
+Create a Year 5 ICAS-style number line.
+
+Generate a coordinate grid with points A(2,3), B(5,1), C(6,4).
+
+---
+
+## AI Output Requirements
+
+Must generate:
+
+* Diagram objects
+* Labels
+* Styling
+* Layout
+
+Output format:
+
+JSON scene graph.
+
+---
+
+# Export Requirements
+
+## PNG
+
+Minimum 300 DPI
+
+---
+
+## SVG
+
+Editable vectors
+
+---
+
+## PDF
+
+Publication quality
+
+---
+
+## JSON
+
+Native save format
+
+---
+
+# Accessibility
+
+* Keyboard navigation
+* Screen reader labels
+* High contrast mode
+
+---
+
+# Future Phase (Out of Scope)
+
+## 3D Builder
+
+* Cubes
+* Prisms
+* Nets
+* Surface area models
+* Volume models
+
+## Algebra Visualisation
+
+* Function graphs
+* Coordinate transformations
+
+---
+
+# MVP Coverage Goal
+
+The MVP must support:
+
+* Geometry
+* Fractions
+* Number lines
+* Measurement
+* Data & graphs
+* Coordinate geometry
+
+This should cover approximately 80–90% of diagrams appearing in ICAS, NAPLAN and Scholarship mathematics assessments for Years 2–8.
+
+# Success Criteria
+
+A content creator should be able to reproduce any diagram from:
+
+* ICAS Mathematics Years 2–8
+* NAPLAN Numeracy Years 3, 5, 7
+* ACER Scholarship Tests
+* Selective School Mathematics Tests
+
+without requiring external drawing software.
