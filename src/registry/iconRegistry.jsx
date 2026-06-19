@@ -44,6 +44,7 @@ export const ICON_CATEGORIES = {
     { name: 'Coffee', component: Coffee },
     { name: 'Restaurant', component: Utensils },
     { name: 'Library', component: BookOpenCheck },
+    { name: 'School', component: School },
     { name: 'Mailbox', component: Mailbox }
   ],
   'Patterns & Nature': [

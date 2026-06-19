@@ -23,74 +23,121 @@ export default function AIMapGeneratorModal({ isOpen, onClose, onGenerate }) {
   // Static high-fidelity pre-baked sandbox maps database
   const sandboxMaps = {
     'Grade 2': {
-      question: "Emma is standing at the Sandbox (B2). If she walks 2 squares North to the Slide, and then 1 square East to the Swings, what grid coordinate is she at?",
-      answer: "C4 (or Swings at C4)",
+      question: "Emma starts at the Sandbox (B3). She walks 2 blocks North to the Slide, and then 1 block East to the Swings. What coordinate is she at now, and how many blocks did she travel in total?",
+      answer: "Coordinate C1, and she traveled 3 blocks total.",
       theme: "grassland",
       shapes: [
-        { id: 'sb-1', type: 'playground', x: 250, y: 300, width: 80, height: 80, color: '#10b981', label: 'Playground Base' },
-        { id: 'sb-2', type: 'mapMarker', x: 250, y: 300, radius: 20, color: '#3b82f6', label: 'Sandbox (B2)', iconName: 'MapPin' },
-        { id: 'sb-3', type: 'mapMarker', x: 250, y: 150, radius: 20, color: '#eab308', label: 'Slide (B4)', iconName: 'Flag' },
-        { id: 'sb-4', type: 'flag', x: 350, y: 150, radius: 20, color: '#ef4444', label: 'Swings (C4)', showLabel: true },
-        { id: 'sb-5', type: 'tree', x: 150, y: 150, canopyColor: '#15803d', trunkColor: '#78350f', canopyRadius: 18 },
-        { id: 'sb-6', type: 'tree', x: 450, y: 300, canopyColor: '#16a34a', trunkColor: '#78350f', canopyRadius: 22 },
-        { id: 'sb-7', type: 'compassRose', x: 650, y: 100, radius: 45 },
-        { id: 'sb-8', type: 'scaleBar', x: 400, y: 480, width: 120, unitText: '50m' }
+        {
+          type: 'gridMap',
+          x: 400,
+          y: 260,
+          width: 420,
+          height: 420,
+          rows: 4,
+          cols: 4,
+          showCompass: true,
+          scaleText: "1 square = 1 block",
+          stroke: "#94a3b8",
+          landmarks: [
+            { id: 'lm1', row: 3, col: 2, label: 'Sandbox (B3)', icon: 'MapPin', color: '#3b82f6' },
+            { id: 'lm2', row: 1, col: 2, label: 'Slide (B1)', icon: 'Flag', color: '#eab308' },
+            { id: 'lm3', row: 1, col: 3, label: 'Swings (C1)', icon: 'Flag', color: '#ef4444' }
+          ],
+          routes: [
+            { id: 'rt1', path: 'B3-B1-C1', color: '#ef4444' }
+          ]
+        }
       ]
     },
     'Grade 3': {
-      question: "Start at the School (A2). Walk 300 meters East along High Street, and then turn North. Walk 200 meters to reach the Library. How many total meters did you walk?",
-      answer: "500 meters",
+      question: "Start at the School (A3). Walk 3 squares East to D3, and then 2 squares North to reach the Library. If each square on the map represents 100 meters, what is the library's coordinate and what is the total distance you walked?",
+      answer: "Coordinate D1, total distance of 500 meters (300m East + 200m North).",
       theme: "paper",
       shapes: [
-        { id: 't-1', type: 'mapBuilding', x: 180, y: 320, width: 70, height: 50, fill: '#3b82f6', stroke: '#1d4ed8', label: 'School (A2)', iconName: 'School' },
-        { id: 't-2', type: 'road', x: 340, y: 320, width: 250, height: 32, fill: '#475569', lineColor: '#fbbf24', rotation: 0 },
-        { id: 't-3', type: 'mapBuilding', x: 500, y: 160, width: 70, height: 50, fill: '#10b981', stroke: '#047857', label: 'Library (D4)', iconName: 'Building' },
-        { id: 't-4', type: 'road', x: 500, y: 240, width: 32, height: 130, fill: '#475569', lineColor: '#fbbf24', rotation: 90 },
-        { id: 't-5', type: 'tree', x: 320, y: 220, canopyColor: '#16a34a', canopyRadius: 20 },
-        { id: 't-6', type: 'tree', x: 360, y: 240, canopyColor: '#15803d', canopyRadius: 16 },
-        { id: 't-7', type: 'compassRose', x: 650, y: 100, radius: 45 },
-        { id: 't-8', type: 'scaleBar', x: 400, y: 480, width: 150, unitText: '100m' }
+        {
+          type: 'gridMap',
+          x: 400,
+          y: 260,
+          width: 420,
+          height: 420,
+          rows: 4,
+          cols: 4,
+          showCompass: true,
+          scaleText: "1 square = 100m",
+          stroke: "#94a3b8",
+          landmarks: [
+            { id: 'lm1', row: 3, col: 1, label: 'School (A3)', icon: 'School', color: '#3b82f6' },
+            { id: 'lm2', row: 1, col: 4, label: 'Library (D1)', icon: 'Library', color: '#10b981' }
+          ],
+          routes: [
+            { id: 'rt1', path: 'A3-D3-D1', color: '#f59e0b' }
+          ]
+        }
       ]
     },
     'Grade 4': {
-      question: "Pirate Jack landed at the Harbor Port (B1). He walked East across the Bridge over the River, and then headed South to the Mountain peaks. In what direction must he travel to return to his ship at the Port?",
+      question: "Pirate Jack landed at the Harbor Port. He walked East across the Bridge over the River, and then headed South to the Mountain peaks. In what compass direction must he travel from the Mountains to return directly to his ship at the Port?",
       answer: "North-West (NW)",
       theme: "parchment",
       shapes: [
-        { id: 'p-1', type: 'port', x: 180, y: 180, width: 100, height: 70, color: '#38bdf8', stroke: '#0284c7', label: 'Port (B1)' },
-        { id: 'p-2', type: 'bridge', x: 340, y: 180, length: 110, width: 24, color: '#f59e0b', stroke: '#b45309', rotation: 0 },
-        { id: 'p-3', type: 'river', x: 340, y: 320, length: 300, width: 24, color: '#38bdf8', rotation: 90 },
-        { id: 'p-4', type: 'mountain', x: 520, y: 380, width: 90, height: 70, color: '#64748b', stroke: '#334155' },
-        { id: 'p-5', type: 'flag', x: 520, y: 340, radius: 18, color: '#ef4444', label: 'Treasure Base' },
-        { id: 'p-6', type: 'compassRose', x: 660, y: 110, radius: 50 },
-        { id: 'p-7', type: 'scaleBar', x: 400, y: 480, width: 150, unitText: '200m' }
+        { type: 'port', x: 200, y: 200, width: 90, height: 60, color: '#38bdf8', stroke: '#0284c7', label: 'Harbor Port' },
+        { type: 'bridge', x: 350, y: 200, length: 120, width: 24, color: '#f59e0b', stroke: '#b45309', rotation: 0 },
+        { type: 'river', x: 350, y: 300, length: 400, width: 30, color: '#38bdf8', rotation: 90 },
+        { type: 'mountain', x: 550, y: 400, width: 90, height: 70, color: '#64748b', stroke: '#334155' },
+        { type: 'flag', x: 550, y: 345, radius: 18, color: '#ef4444', label: 'Treasure Chest', showLabel: true },
+        { type: 'compassRose', x: 650, y: 100, radius: 45 },
+        { type: 'scaleBar', x: 400, y: 480, width: 150, unitText: '200m' }
       ]
     },
     'Grade 5': {
-      question: "A search plane takes off from the Airport runway heading East. If it flies for 4 kilometers (Scale: 1 bar = 1km) and then makes a 90 degree turn to the left (North), which harbor port does it fly directly over?",
-      answer: "The Harbor Port (D4)",
+      question: "A search helicopter takes off from the Airport runway heading East. If it flies for 4 kilometers (Scale: 1 bar = 1km) and then makes a 90 degree turn to the left (North) flying for 2 kilometers, which harbor port does it fly directly over?",
+      answer: "East Port (located 4km East and 2km North of the Airport)",
       theme: "ocean",
       shapes: [
-        { id: 'a-1', type: 'airport', x: 200, y: 380, width: 130, height: 80, color: '#475569', label: 'Airport (B2)' },
-        { id: 'a-2', type: 'port', x: 600, y: 150, width: 100, height: 70, color: '#38bdf8', label: 'Harbor (D4)' },
-        { id: 'a-3', type: 'sea', x: 600, y: 250, width: 180, height: 120, color: '#0284c7' },
-        { id: 'a-4', type: 'compassRose', x: 680, y: 80, radius: 45 },
-        { id: 'a-5', type: 'scaleBar', x: 400, y: 480, width: 160, unitText: '1 km' }
+        { type: 'airport', x: 200, y: 350, width: 120, height: 70, color: '#475569', label: 'Airport' },
+        { type: 'port', x: 600, y: 150, width: 90, height: 60, color: '#38bdf8', label: 'East Port' },
+        { type: 'sea', x: 600, y: 250, width: 200, height: 150, color: '#0284c7' },
+        { type: 'compassRose', x: 680, y: 80, radius: 45 },
+        { type: 'scaleBar', x: 400, y: 480, width: 100, unitText: '1 km' }
       ]
     },
     'Grade 6': {
-      question: "From the Lighthouse (Port at B2), a ship travels on a bearing of 090° (East) for 400 meters, then turns on a bearing of 180° (South) and travels 300 meters to reach the Sun Temple. What is the straight-line distance back to the Lighthouse?",
+      question: "From the Lighthouse (Port at x:200, y:150), a ship travels on a bearing of 090° (East) for 400 meters, then turns on a bearing of 180° (South) and travels 300 meters to reach the Sun Temple. What is the straight line distance back to the Lighthouse?",
       answer: "500 meters (using Pythagoras theorem: 300^2 + 400^2 = 500^2)",
       theme: "topography",
       shapes: [
-        { id: 'g6-1', type: 'port', x: 200, y: 180, width: 90, height: 60, color: '#38bdf8', label: 'Lighthouse (B2)' },
-        { id: 'g6-2', type: 'sunDirection', x: 600, y: 480, radius: 35, color: '#eab308', label: 'Sun Temple (F6)' },
-        { id: 'g6-3', type: 'footpath', x: 400, y: 180, length: 390, width: 8, color: '#e2e8f0', rotation: 0 },
-        { id: 'g6-4', type: 'footpath', x: 600, y: 330, length: 290, width: 8, color: '#e2e8f0', rotation: 90 },
-        { id: 'g6-5', type: 'compassRose', x: 680, y: 90, radius: 45 },
-        { id: 'g6-6', type: 'scaleBar', x: 400, y: 500, width: 120, unitText: '100m' }
+        { type: 'port', x: 200, y: 150, width: 90, height: 60, color: '#38bdf8', label: 'Lighthouse' },
+        { type: 'sunDirection', x: 600, y: 450, radius: 35, color: '#eab308', label: 'Sun Temple' },
+        { type: 'footpath', x: 400, y: 150, length: 400, width: 8, color: '#e2e8f0', rotation: 0 },
+        { type: 'footpath', x: 600, y: 300, length: 300, width: 8, color: '#e2e8f0', rotation: 90 },
+        { type: 'compassRose', x: 680, y: 80, radius: 45 },
+        { type: 'scaleBar', x: 400, y: 500, width: 100, unitText: '100m' }
       ]
     }
+  };
+
+  const assignUniqueIds = (data) => {
+    return {
+      ...data,
+      shapes: (data.shapes || []).map(s => {
+        const shapeId = `${s.type}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        if (s.type === 'gridMap') {
+          return {
+            ...s,
+            id: shapeId,
+            landmarks: (s.landmarks || []).map((lm, idx) => ({
+              ...lm,
+              id: lm.id || `lm-${idx}-${Date.now()}-${Math.floor(Math.random() * 100)}`
+            })),
+            routes: (s.routes || []).map((rt, idx) => ({
+              ...rt,
+              id: rt.id || `rt-${idx}-${Date.now()}-${Math.floor(Math.random() * 100)}`
+            }))
+          };
+        }
+        return { ...s, id: shapeId };
+      })
+    };
   };
 
   const handleGenerate = async () => {
@@ -99,14 +146,7 @@ export default function AIMapGeneratorModal({ isOpen, onClose, onGenerate }) {
       setLoading(true);
       setTimeout(() => {
         const mockData = sandboxMaps[gradeLevel] || sandboxMaps['Grade 3'];
-        // Generate new random IDs to prevent duplication conflicts on subsequent triggers
-        const result = {
-          ...mockData,
-          shapes: mockData.shapes.map(s => ({
-            ...s,
-            id: `${s.type}-${Date.now()}-${Math.floor(Math.random() * 1000)}`
-          }))
-        };
+        const result = assignUniqueIds(mockData);
         onGenerate(result);
         setLoading(false);
         onClose();
@@ -138,44 +178,102 @@ export default function AIMapGeneratorModal({ isOpen, onClose, onGenerate }) {
           messages: [
             {
               role: 'system',
-              content: `You are an AI mathematical map diagram generator. Return ONLY a valid JSON object. Do not wrap the JSON output in markdown \`\`\`json code blocks. The JSON must match the following schema:
+              content: `You are an AI mathematical map diagram generator. Return ONLY a valid JSON object. Do not wrap the JSON output in markdown \`\`\`json code blocks.
+The JSON must match the following schema:
 {
-  "question": "A clear, descriptive direction, bearing, or navigation math question suitable for ${gradeLevel} (e.g. 'Start at the school (B2). Go 2 blocks East and 1 block North...').",
-  "answer": "The numerical or short text answer.",
+  "question": "A clear, mathematically rich navigation, direction, or bearing math question suitable for ${gradeLevel} with the requested theme/topic.",
+  "answer": "The numerical or short text answer with a brief description of the steps.",
   "theme": "one of: paper, parchment, blueprint, topography, grassland, desert, ocean, dark",
   "shapes": [
-    {
-      "type": "mapMarker",
-      "x": 200,
-      "y": 150,
-      "color": "#ef4444",
-      "label": "Start",
-      "iconName": "MapPin"
-    }
+    ...shapes to render...
   ]
 }
-Important:
-1. Available shape types: mapMarker, mapBuilding, road, tree, river, lake, sea, mountain, bridge, footpath, playground, airport, port, sunDirection, flag, compassRose, scaleBar.
-2. Coordinates (x, y) should sit between X: 100 to 700 and Y: 100 to 500.
-3. Colors must be hex codes.
-4. Default properties for shapes:
-   - mapMarker: { radius, color, label, iconName } (iconName from MapPin, Flag, Compass, Sun)
-   - mapBuilding: { fill, stroke, width, height, label, iconName }
-   - road: { width, height, fill, lineColor, rotation }
-   - tree: { trunkWidth, trunkHeight, canopyRadius, trunkColor, canopyColor }
-   - river: { length, width, color, strokeWidth }
-   - lake: { radius, color, stroke, strokeWidth }
-   - sea: { width, height, color, stroke }
-   - mountain: { width, height, color, stroke }
-   - bridge: { length, width, color, stroke }
-   - footpath: { length, width, color }
-   - playground: { width, height, color, stroke }
-   - airport: { width, height, color, stroke }
-   - port: { width, height, color, stroke }
-   - sunDirection: { radius, color, label }
-   - flag: { radius, color, label, showLabel }
-   - compassRose: { radius, color, fill }
-   - scaleBar: { width, height, color, unitText }`
+
+Layout Paradigm Rules:
+Depending on the type of question, you MUST choose between two distinct layout modes:
+
+Mode A: COORDINATE GRID MAP
+Use this mode if the question refers to a coordinate grid system with column letters (A, B, C, D) and row numbers (1, 2, 3, 4).
+- The 'shapes' array must contain exactly ONE shape of type 'gridMap'. No other shapes (like roads, trees, markers, or buildings) are allowed in the shapes array.
+- The 'gridMap' properties MUST be:
+  {
+    "type": "gridMap",
+    "x": 400,
+    "y": 260,
+    "width": 420,
+    "height": 420,
+    "rows": 4,
+    "cols": 4,
+    "showCompass": true,
+    "scaleText": "1 square = 1 block",
+    "stroke": "#94a3b8",
+    "landmarks": [
+      {
+        "id": "school",
+        "col": 2, // 'B' maps to column 2
+        "row": 3, // Row index 3 maps to row label '3'
+        "label": "School (B3)",
+        "icon": "School",
+        "color": "#ef4444"
+      },
+      ...
+    ],
+    "routes": [
+      {
+        "id": "route1",
+        "path": "B3-B1-C1", // Path sequence showing the steps taken
+        "color": "#f59e0b"
+      }
+    ]
+  }
+- Important grid calculations:
+  - Column A = 1, B = 2, C = 3, D = 4.
+  - Row 1 is at the TOP (North), row 4 is at the BOTTOM (South). Moving North decreases the row index, moving South increases it.
+  - Route paths must match the question exactly. Example: "Start at B3. Walk 2 blocks North (row decreases by 2 to B1) then 1 block East (column increases by 1 to C1)". Path is "B3-B1-C1".
+  - Landmark labels should indicate the coordinate in parenthesis like "Library (C1)".
+
+Mode B: FREEFORM LANDSCAPE MAP
+Use this mode if the question is based on distances (in meters/kilometers), compass directions (N, S, E, W, NE, SW) or degrees, without grid references.
+- The 'shapes' array must contain individual elements (like mapBuilding, road, river, bridge, tree, mountain, compassRose, scaleBar).
+- You MUST follow strict layout and alignment guidelines to avoid overlaps and misalignments:
+  1. Always include a 'compassRose' (suggested x: 650, y: 100, radius: 45) and a 'scaleBar' (suggested x: 400, y: 480, width: 150, unitText: e.g. '100m').
+  2. Roads and Rivers must be linear or perpendicular, not randomly angled unless forming a logical intersection.
+     - A horizontal road: e.g., { "type": "road", "x": 400, "y": 300, "width": 400, "height": 32, "fill": "#475569", "lineColor": "#fbbf24", "rotation": 0 }
+     - A vertical road: e.g., { "type": "road", "x": 300, "y": 250, "width": 32, "height": 300, "fill": "#475569", "lineColor": "#fbbf24", "rotation": 90 }
+  3. Bridges must align perfectly with Rivers:
+     - If a vertical river is at x: 350, y: 300 (rotation: 90, length: 400), a horizontal bridge crossing it must be at x: 350, y: 300 (rotation: 0, length: 120, width: 24).
+  4. Buildings ('mapBuilding') and Markers ('mapMarker') should be placed at clean coordinates, separated by at least 100px so they don't overlap, and labelled clearly.
+  5. Trees and Mountain peaks should be placed as decorative clusters or key points in the question.
+
+Mathematical Graded Complexity Expectations:
+- Grade 2: Simple directions (N, S, E, W), simple paths.
+- Grade 3: Summing straight line path lengths (e.g. "Walk 200m East, then 150m North. Total distance?").
+- Grade 4: Compass directions, simple navigation logic, relative positions (e.g., "Which building is North-East of the School?").
+- Grade 5: Scale bar conversions, grid maps with fractional scales, complex routes.
+- Grade 6: Pythagoras diagonal calculations (e.g., right-angled triangle paths: 300m East, 400m North, distance back to start is 500m) or bearings in degrees (e.g. 090 degrees for East, 180 for South).
+
+Available Shape Types and Their Exact Properties:
+1. gridMap: { type: 'gridMap', x, y, width, height, rows, cols, showCompass, scaleText, landmarks: [{ id, row, col, label, icon, color }], routes: [{ id, path, color }], stroke }
+   - Icons for landmarks: School, Library, Home, Building, Hospital, Store, MapPin, Flag.
+2. mapBuilding: { type: 'mapBuilding', x, y, width, height, fill, stroke, label, iconName, showLabel }
+   - iconName: School, Library, Home, Building, Hospital, Store.
+3. mapMarker: { type: 'mapMarker', x, y, radius, color, label, iconName, showLabel }
+   - iconName: MapPin, Flag, Compass, Sun.
+4. road: { type: 'road', x, y, width, height, fill, lineColor, rotation }
+5. tree: { type: 'tree', x, y, trunkWidth, trunkHeight, canopyRadius, trunkColor, canopyColor }
+6. river: { type: 'river', x, y, length, width, color, rotation }
+7. lake: { type: 'lake', x, y, radius, color, stroke, strokeWidth }
+8. sea: { type: 'sea', x, y, width, height, color, stroke }
+9. mountain: { type: 'mountain', x, y, width, height, color, stroke }
+10. bridge: { type: 'bridge', x, y, length, width, color, stroke, rotation }
+11. footpath: { type: 'footpath', x, y, length, width, color, rotation }
+12. playground: { type: 'playground', x, y, width, height, color, stroke }
+13. airport: { type: 'airport', x, y, width, height, color, stroke }
+14. port: { type: 'port', x, y, width, height, color, stroke }
+15. sunDirection: { type: 'sunDirection', x, y, radius, color, label }
+16. flag: { type: 'flag', x, y, radius, color, label, showLabel }
+17. compassRose: { type: 'compassRose', x, y, radius, color, fill }
+18. scaleBar: { type: 'scaleBar', x, y, width, height, color, unitText }`
             },
             {
               role: 'user',
@@ -204,14 +302,7 @@ Important:
         throw new Error("Response JSON did not contain 'question' or 'shapes' array.");
       }
 
-      // Format custom shapes with IDs
-      const mappedResult = {
-        ...result,
-        shapes: result.shapes.map(s => ({
-          ...s,
-          id: `${s.type}-${Date.now()}-${Math.floor(Math.random() * 1000)}`
-        }))
-      };
+      const mappedResult = assignUniqueIds(result);
 
       onGenerate(mappedResult);
       onClose();
