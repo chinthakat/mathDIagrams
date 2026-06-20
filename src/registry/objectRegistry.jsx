@@ -1,5 +1,7 @@
 import React from 'react';
-import { Square, Circle, Triangle, Minus, Type, Scaling, Hexagon, Dot, CornerRightDown, ChevronsRight, Tally2, Pentagon, Octagon, Compass, MapPin, Building2, TreePine, Flag, Sun, Map as MapIcon, Heart, Car } from 'lucide-react';
+import { Square, Circle, Triangle, Minus, Type, Scaling, Hexagon, Dot, CornerRightDown, ChevronsRight, Tally2, Pentagon, Octagon, Compass, MapPin, Building2, TreePine, Flag, Sun, Map as MapIcon, Heart, Car, Sparkles, MountainSnow, Tent, Droplets, Tractor, Flower2 } from 'lucide-react';
+import AITerrain from '../components/MathObjects/AITerrain';
+import AIProp from '../components/MathObjects/AIProp';
 import { Rect as KonvaRect, Circle as KonvaCircle, RegularPolygon as KonvaPolygon, Arrow as KonvaArrow, Text as KonvaText, Arc as KonvaArc } from 'react-konva';
 import AngleMarker from '../components/MathObjects/AngleMarker';
 import Point from '../components/MathObjects/Point';
@@ -25,6 +27,7 @@ import MapMarker from '../components/MathObjects/MapMarker';
 import FlagComponent from '../components/MathObjects/Flag';
 import MapBuilding from '../components/MathObjects/MapBuilding';
 import Road from '../components/MathObjects/Road';
+import RoadJunction from '../components/MathObjects/RoadJunction';
 import Tree from '../components/MathObjects/Tree';
 import River from '../components/MathObjects/River';
 import Lake from '../components/MathObjects/Lake';
@@ -38,6 +41,7 @@ import Port from '../components/MathObjects/Port';
 import SunDirection from '../components/MathObjects/SunDirection';
 import CompassRose from '../components/MathObjects/CompassRose';
 import ScaleBar from '../components/MathObjects/ScaleBar';
+import MapSprite from '../components/MathObjects/MapSprite';
 import { PieChart, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon } from 'lucide-react';
 
 const ICON_PRESETS = [
@@ -60,6 +64,21 @@ const FONT_PRESETS = [
 
 // Registry of all 2D mathematical objects
 export const ObjectRegistry = {
+  roadJunction: {
+    id: 'roadJunction',
+    category: 'Roads & Paths',
+    name: 'Road Junction',
+    icon: <MapIcon size={18} />,
+    defaultProps: { junctionType: 'cross', size: 150, fill: '#334155', lineColor: '#fbbf24', rotation: 0 },
+    Component: ({ props }) => <RoadJunction junctionType={props.junctionType} size={props.size} fill={props.fill} lineColor={props.lineColor} />,
+    properties: [
+      { name: 'junctionType', label: 'Junction Type', type: 'select', options: [{value: 'cross', label: 'Cross'}, {value: 't-junction', label: 'T-Junction'}, {value: 'y-junction', label: 'Y-Junction'}, {value: 'roundabout', label: 'Roundabout'}] },
+      { name: 'fill', label: 'Asphalt Color', type: 'color' },
+      { name: 'lineColor', label: 'Line Color', type: 'color' },
+      { name: 'size', label: 'Size', type: 'number' }
+    ]
+  },
+
   // CATEGORY A: Basic Shapes
   rectangle: {
     id: 'rectangle',
@@ -67,7 +86,7 @@ export const ObjectRegistry = {
     name: 'Rectangle',
     icon: <Square size={18} />,
     defaultProps: { width: 100, height: 100, fill: '#3b82f6', stroke: '#2563eb', strokeWidth: 2, rotation: 0 },
-    Component: ({ props }) => <KonvaRect width={props.width} height={props.height} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
+    Component: ({ props }) => <KonvaRect x={-props.width / 2} y={-props.height / 2} width={props.width} height={props.height} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
     properties: [
       { name: 'fill', label: 'Fill Color', type: 'color' },
       { name: 'stroke', label: 'Border Color', type: 'color' },
@@ -347,7 +366,53 @@ export const ObjectRegistry = {
     ]
   },
 
-  // CATEGORY G: Measurement
+  // CATEGORY G: Custom Maps & Environments
+  aiTerrain: {
+    id: 'aiTerrain',
+    category: 'Map Elements',
+    name: 'AI Terrain',
+    icon: <Sparkles size={18} />,
+    defaultProps: { 
+      width: 600, 
+      height: 400, 
+      terrainType: 'island',
+      shape: 'organic',
+      count: '1',
+      features: 'Sandy beaches, a central mountain',
+      svgContent: '<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg"><path d="M 50,200 Q 100,50 300,50 T 550,200 Q 500,350 300,350 T 50,200" fill="#fde68a" /><path d="M 80,200 Q 120,80 300,80 T 520,200 Q 480,320 300,320 T 80,200" fill="#a3e635" /><path d="M 200,200 L 300,100 L 400,200 Z" fill="#9ca3af" /><path d="M 270,130 L 300,100 L 330,130 L 310,140 L 300,120 L 280,140 Z" fill="#f3f4f6" /></svg>'
+    },
+    Component: ({ props }) => <AITerrain width={props.width} height={props.height} svgContent={props.svgContent} />,
+    properties: [
+      { name: 'width', label: 'Width', type: 'number' },
+      { name: 'height', label: 'Height', type: 'number' },
+      { name: 'terrainType', label: 'Terrain Type', type: 'select', options: [
+          {value: 'island', label: 'Island'},
+          {value: 'desert', label: 'Desert'},
+          {value: 'jungle', label: 'Jungle'},
+          {value: 'rocks', label: 'Rocks/Canyon'},
+          {value: 'grasslands', label: 'Grasslands'},
+          {value: 'riverland', label: 'River Land'},
+          {value: 'lake', label: 'Lake'}
+      ]},
+      { name: 'shape', label: 'Shape Style', type: 'select', options: [
+          {value: 'organic', label: 'Organic/Natural'},
+          {value: 'skull', label: 'Skull Shaped'},
+          {value: 'crescent', label: 'Crescent Moon'},
+          {value: 'star', label: 'Star Shaped'},
+          {value: 'archipelago', label: 'Archipelago'}
+      ]},
+      { name: 'count', label: 'Number of Landmasses', type: 'select', options: [
+          {value: '1', label: '1 (Single)'},
+          {value: '2', label: '2 (Connected)'},
+          {value: '3', label: '3 (Scattered)'},
+          {value: 'many', label: 'Many Small (Cluster)'}
+      ]},
+      { name: 'features', label: 'Objects on Terrain', type: 'text' },
+      { name: 'svgContent', label: 'SVG Data', type: 'hidden' }
+    ]
+  },
+
+  // CATEGORY H: Measurement
   lengthMarker: {
     id: 'lengthMarker',
     category: 'Measurement',
@@ -501,7 +566,7 @@ export const ObjectRegistry = {
   },
   mapMarker: {
     id: 'mapMarker',
-    category: 'Map Elements',
+    category: 'Icons & Markers',
     name: 'Map Marker',
     icon: <MapPin size={18} />,
     defaultProps: { 
@@ -529,7 +594,7 @@ export const ObjectRegistry = {
   },
   mapBuilding: {
     id: 'mapBuilding',
-    category: 'Map Elements',
+    category: 'Buildings',
     name: 'Map Building',
     icon: <Building2 size={18} />,
     defaultProps: { 
@@ -565,7 +630,7 @@ export const ObjectRegistry = {
   },
   road: {
     id: 'road',
-    category: 'Map Elements',
+    category: 'Roads & Paths',
     name: 'Road',
     icon: <MapIcon size={18} />,
     defaultProps: { 
@@ -592,7 +657,7 @@ export const ObjectRegistry = {
   },
   tree: {
     id: 'tree',
-    category: 'Map Elements',
+    category: 'Nature & Water',
     name: 'Tree',
     icon: <TreePine size={18} />,
     defaultProps: { 
@@ -620,7 +685,7 @@ export const ObjectRegistry = {
   },
   river: {
     id: 'river',
-    category: 'Map Elements',
+    category: 'Nature & Water',
     name: 'River',
     icon: <MapIcon size={18} />,
     defaultProps: {
@@ -646,7 +711,7 @@ export const ObjectRegistry = {
   },
   lake: {
     id: 'lake',
-    category: 'Map Elements',
+    category: 'Nature & Water',
     name: 'Lake',
     icon: <Circle size={18} />,
     defaultProps: {
@@ -670,9 +735,52 @@ export const ObjectRegistry = {
       { name: 'radius', label: 'Size', type: 'range', min: 20, max: 150 }
     ]
   },
+  propTree: {
+    id: 'propTree', category: 'Map Elements', name: 'Tree', icon: <TreePine size={18} />,
+    defaultProps: { width: 100, height: 100, prompt: 'A cartoon green tree', svgContent: '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M 40,100 L 60,100 L 55,60 L 45,60 Z" fill="#8B4513"/><circle cx="50" cy="40" r="35" fill="#228B22"/></svg>' },
+    Component: ({ props }) => <AIProp width={props.width} height={props.height} svgContent={props.svgContent} />,
+    properties: [ { name: 'width', label: 'Width', type: 'number' }, { name: 'height', label: 'Height', type: 'number' }, { name: 'prompt', label: 'Prop Description', type: 'text' }, { name: 'svgContent', label: 'SVG Data', type: 'hidden' } ]
+  },
+  propRock: {
+    id: 'propRock', category: 'Map Elements', name: 'Rock', icon: <MountainSnow size={18} />,
+    defaultProps: { width: 100, height: 100, prompt: 'A cartoon grey rock or boulder', svgContent: '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M 20,80 Q 50,20 80,80 Z" fill="#808080"/></svg>' },
+    Component: ({ props }) => <AIProp width={props.width} height={props.height} svgContent={props.svgContent} />,
+    properties: [ { name: 'width', label: 'Width', type: 'number' }, { name: 'height', label: 'Height', type: 'number' }, { name: 'prompt', label: 'Prop Description', type: 'text' }, { name: 'svgContent', label: 'SVG Data', type: 'hidden' } ]
+  },
+  propTent: {
+    id: 'propTent', category: 'Map Elements', name: 'Tent', icon: <Tent size={18} />,
+    defaultProps: { width: 100, height: 100, prompt: 'A cartoon camping tent', svgContent: '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M 10,90 L 50,20 L 90,90 Z" fill="#D2B48C"/><path d="M 40,90 L 50,50 L 60,90 Z" fill="#000000"/></svg>' },
+    Component: ({ props }) => <AIProp width={props.width} height={props.height} svgContent={props.svgContent} />,
+    properties: [ { name: 'width', label: 'Width', type: 'number' }, { name: 'height', label: 'Height', type: 'number' }, { name: 'prompt', label: 'Prop Description', type: 'text' }, { name: 'svgContent', label: 'SVG Data', type: 'hidden' } ]
+  },
+  propWaterfall: {
+    id: 'propWaterfall', category: 'Map Elements', name: 'Waterfall', icon: <Droplets size={18} />,
+    defaultProps: { width: 100, height: 100, prompt: 'A cartoon waterfall flowing into a pool', svgContent: '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M 30,10 L 70,10 L 60,90 L 40,90 Z" fill="#1E90FF"/><path d="M 20,90 Q 50,110 80,90 Z" fill="#00BFFF"/></svg>' },
+    Component: ({ props }) => <AIProp width={props.width} height={props.height} svgContent={props.svgContent} />,
+    properties: [ { name: 'width', label: 'Width', type: 'number' }, { name: 'height', label: 'Height', type: 'number' }, { name: 'prompt', label: 'Prop Description', type: 'text' }, { name: 'svgContent', label: 'SVG Data', type: 'hidden' } ]
+  },
+  propFarm: {
+    id: 'propFarm', category: 'Map Elements', name: 'Farm', icon: <Tractor size={18} />,
+    defaultProps: { width: 100, height: 100, prompt: 'A small cartoon farm with crops', svgContent: '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="40" width="60" height="50" fill="#8B0000"/><polygon points="10,40 50,10 90,40" fill="#A52A2A"/></svg>' },
+    Component: ({ props }) => <AIProp width={props.width} height={props.height} svgContent={props.svgContent} />,
+    properties: [ { name: 'width', label: 'Width', type: 'number' }, { name: 'height', label: 'Height', type: 'number' }, { name: 'prompt', label: 'Prop Description', type: 'text' }, { name: 'svgContent', label: 'SVG Data', type: 'hidden' } ]
+  },
+  propFountain: {
+    id: 'propFountain', category: 'Map Elements', name: 'Fountain', icon: <Droplets size={18} />,
+    defaultProps: { width: 100, height: 100, prompt: 'A cartoon water fountain', svgContent: '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect x="40" y="60" width="20" height="30" fill="#A9A9A9"/><path d="M 20,60 Q 50,20 80,60 Z" fill="#1E90FF"/></svg>' },
+    Component: ({ props }) => <AIProp width={props.width} height={props.height} svgContent={props.svgContent} />,
+    properties: [ { name: 'width', label: 'Width', type: 'number' }, { name: 'height', label: 'Height', type: 'number' }, { name: 'prompt', label: 'Prop Description', type: 'text' }, { name: 'svgContent', label: 'SVG Data', type: 'hidden' } ]
+  },
+  propFlower: {
+    id: 'propFlower', category: 'Map Elements', name: 'Flower', icon: <Flower2 size={18} />,
+    defaultProps: { width: 100, height: 100, prompt: 'A cartoon colorful flower bush', svgContent: '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="20" fill="#FFD700"/><circle cx="50" cy="20" r="15" fill="#FF69B4"/><circle cx="80" cy="50" r="15" fill="#FF69B4"/><circle cx="50" cy="80" r="15" fill="#FF69B4"/><circle cx="20" cy="50" r="15" fill="#FF69B4"/></svg>' },
+    Component: ({ props }) => <AIProp width={props.width} height={props.height} svgContent={props.svgContent} />,
+    properties: [ { name: 'width', label: 'Width', type: 'number' }, { name: 'height', label: 'Height', type: 'number' }, { name: 'prompt', label: 'Prop Description', type: 'text' }, { name: 'svgContent', label: 'SVG Data', type: 'hidden' } ]
+  },
+
   sea: {
     id: 'sea',
-    category: 'Map Elements',
+    category: 'Nature & Water',
     name: 'Sea',
     icon: <MapIcon size={18} />,
     defaultProps: {
@@ -701,7 +809,7 @@ export const ObjectRegistry = {
   },
   mountain: {
     id: 'mountain',
-    category: 'Map Elements',
+    category: 'Nature & Water',
     name: 'Mountain',
     icon: <Triangle size={18} />,
     defaultProps: {
@@ -730,36 +838,24 @@ export const ObjectRegistry = {
   },
   bridge: {
     id: 'bridge',
-    category: 'Map Elements',
+    category: 'Roads & Paths',
     name: 'Bridge',
     icon: <Minus size={18} />,
-    defaultProps: {
-      length: 120,
-      width: 30,
-      color: '#f59e0b',
-      stroke: '#d97706',
-      strokeWidth: 2,
-      rotation: 0
-    },
-    Component: ({ props }) => (
-      <Bridge
-        length={props.length}
-        width={props.width}
-        color={props.color}
-        stroke={props.stroke}
-        strokeWidth={props.strokeWidth}
-      />
-    ),
+    defaultProps: { length: 150, width: 60, fill: '#334155', lineColor: '#fbbf24', bridgeType: 'suspension', label: 'Golden Gate', labelColor: '#1e293b', rotation: 0 },
+    Component: ({ props }) => <Bridge length={props.length} width={props.width} fill={props.fill} lineColor={props.lineColor} bridgeType={props.bridgeType} label={props.label} labelColor={props.labelColor} />,
     properties: [
-      { name: 'color', label: 'Bridge Color', type: 'color' },
-      { name: 'stroke', label: 'Border Color', type: 'color' },
+      { name: 'bridgeType', label: 'Bridge Type', type: 'select', options: [{value: 'suspension', label: 'Suspension'}, {value: 'beam', label: 'Beam'}, {value: 'stone-arch', label: 'Stone Arch'}] },
+      { name: 'label', label: 'Bridge Name', type: 'text' },
       { name: 'length', label: 'Length', type: 'number' },
-      { name: 'width', label: 'Width', type: 'number' }
+      { name: 'width', label: 'Width', type: 'number' },
+      { name: 'fill', label: 'Asphalt Color', type: 'color' },
+      { name: 'lineColor', label: 'Dashed Line Color', type: 'color' },
+      { name: 'labelColor', label: 'Label Color', type: 'color' }
     ]
   },
   footpath: {
     id: 'footpath',
-    category: 'Map Elements',
+    category: 'Roads & Paths',
     name: 'Footpath',
     icon: <Minus size={18} />,
     defaultProps: {
@@ -787,7 +883,7 @@ export const ObjectRegistry = {
   },
   playground: {
     id: 'playground',
-    category: 'Map Elements',
+    category: 'Buildings',
     name: 'Playground',
     icon: <Heart size={18} />,
     defaultProps: {
@@ -818,7 +914,7 @@ export const ObjectRegistry = {
   },
   airport: {
     id: 'airport',
-    category: 'Map Elements',
+    category: 'Buildings',
     name: 'Airport',
     icon: <Car size={18} />,
     defaultProps: {
@@ -849,7 +945,7 @@ export const ObjectRegistry = {
   },
   port: {
     id: 'port',
-    category: 'Map Elements',
+    category: 'Buildings',
     name: 'Port',
     icon: <MapIcon size={18} />,
     defaultProps: {
@@ -880,7 +976,7 @@ export const ObjectRegistry = {
   },
   sunDirection: {
     id: 'sunDirection',
-    category: 'Map Elements',
+    category: 'Icons & Markers',
     name: 'Sun Direction',
     icon: <Sun size={18} />,
     defaultProps: {
@@ -904,7 +1000,7 @@ export const ObjectRegistry = {
   },
   flag: {
     id: 'flag',
-    category: 'Map Elements',
+    category: 'Icons & Markers',
     name: 'Flag',
     icon: <Flag size={18} />,
     defaultProps: {
@@ -931,7 +1027,7 @@ export const ObjectRegistry = {
   },
   compassRose: {
     id: 'compassRose',
-    category: 'Map Elements',
+    category: 'Icons & Markers',
     name: 'Compass Rose',
     icon: <Compass size={18} />,
     defaultProps: {
@@ -957,7 +1053,7 @@ export const ObjectRegistry = {
   },
   scaleBar: {
     id: 'scaleBar',
-    category: 'Map Elements',
+    category: 'Icons & Markers',
     name: 'Scale Bar',
     icon: <RulerIcon size={18} />,
     defaultProps: {
@@ -1039,6 +1135,20 @@ export const ObjectRegistry = {
   },
 
   // CATEGORY L: Logic
+
+  mapSprite: {
+    id: 'mapSprite',
+    category: 'Icons & Markers',
+    name: 'Map Sprite',
+    icon: <ImageIcon size={18} />,
+    defaultProps: { spriteName: 'pirate_ship', width: 64, height: 64, rotation: 0 },
+    Component: ({ props, isSelected, onSelect }) => <MapSprite shape={props} isSelected={isSelected} onSelect={onSelect} />,
+    properties: [
+      { name: 'spriteName', label: 'Sprite Name', type: 'text' },
+      { name: 'width', label: 'Width', type: 'number' },
+      { name: 'height', label: 'Height', type: 'number' }
+    ]
+  },
 
   vennDiagram: {
     id: 'vennDiagram',

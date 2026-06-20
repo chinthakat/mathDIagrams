@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Sparkles, Undo, Redo, Download, Compass, Plus, X, Grid, Sliders, Layout, Monitor } from 'lucide-react';
+import { Sparkles, Undo, Redo, Download, Compass, Plus, X, Grid, Sliders, Layout, Monitor, Map as MapIcon } from 'lucide-react';
 import { ObjectRegistry, getCategories } from '../registry/objectRegistry';
+import { MapTemplates } from '../registry/MapTemplates';
 import CanvasEditor2D from './CanvasEditor2D';
 import PropertiesPanel from './PropertiesPanel';
 import TabBar from './TabBar';
 import AIMapGeneratorModal from './AIMapGeneratorModal';
+import TopNavigation from './TopNavigation';
 
-export default function MapEditor() {
+export default function MapEditor({ globalMode, setGlobalMode }) {
   const [mapTheme, setMapTheme] = useState('paper');
-  const [snapToGrid, setSnapToGrid] = useState(true);
+  const [snapToGrid, setSnapToGrid] = useState(false);
 
   // AI Generator States
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
@@ -118,6 +120,19 @@ export default function MapEditor() {
     const newShape = { ...baseProps, ...(regObj?.defaultProps || {}) };
     setShapes([...shapes, newShape]);
     setSelectedId(newId);
+  };
+
+  const handleAppendTemplate = (templateId) => {
+    const template = MapTemplates.find(t => t.id === templateId);
+    if (!template) return;
+    
+    // Create new IDs for appended shapes to avoid collisions
+    const newShapes = template.shapes.map(shape => ({
+      ...shape,
+      id: `${shape.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    }));
+
+    setShapes([...shapes, ...newShapes]);
   };
 
   const updateShape = (id, newProps) => {
@@ -254,8 +269,10 @@ export default function MapEditor() {
     setSelectedId(newId);
   };
 
+  const mapCategories = ['Roads & Paths', 'Nature & Water', 'Buildings', 'Icons & Markers', 'Map Elements'];
+  const [activeCategory, setActiveCategory] = useState(mapCategories[0]);
   const categories = getCategories();
-  const mapElements = categories['Map Elements'] || [];
+  const currentCategoryElements = categories[activeCategory] || [];
 
   // Background selection list swatches definitions
   const backgroundLibrary = [
@@ -274,60 +291,50 @@ export default function MapEditor() {
   return (
     <div className="app-container">
       {/* Top bar header */}
-      <div className="topbar">
-        <div className="topbar-logo" style={{ color: '#10b981' }}>
-          <Compass className="animate-spin-slow" /> SimplyMaths Map Maker
+      <div className="sub-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', background: '#1e293b', borderBottom: '1px solid #334155' }}>
+        <div style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>
+          Map Editor Tools
         </div>
         
-        {/* Workspace controls */}
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <button 
-              className="btn"
-              onClick={() => setIsAIModalOpen(true)}
-              style={{ 
-                padding: '6px 12px', 
-                fontSize: '12px', 
-                background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', 
-                border: 'none', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '6px', 
-                color: 'white',
-                fontWeight: '600'
-              }}
-            >
-              <Sparkles size={14} /> AI Generate Map ✨
-            </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button 
+            className="btn"
+            onClick={() => setIsAIModalOpen(true)}
+            style={{ 
+              padding: '6px 12px', 
+              fontSize: '12px', 
+              background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', 
+              border: 'none', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px', 
+              color: 'white',
+              fontWeight: '600'
+            }}
+          >
+            <Sparkles size={14} /> AI Generate Map ✨
+          </button>
 
-            <button className="btn-icon" onClick={handleUndo} title="Undo (Ctrl+Z)" disabled={!activeDoc?.history?.length}>
-              <Undo size={18} />
-            </button>
-            <button className="btn-icon" onClick={handleRedo} title="Redo (Ctrl+Y)" disabled={!activeDoc?.future?.length}>
-              <Redo size={18} />
-            </button>
-            <button 
-              className="btn btn-secondary" 
-              onClick={() => {
-                if (window.confirm("Are you sure you want to clear this map?")) {
-                  setShapes([]);
-                  setSelectedId(null);
-                  setAiQuestion('');
-                  setAiAnswer('');
-                }
-              }}
-              style={{ padding: '6px 12px', fontSize: '12px' }}
-            >
-              Clear Canvas
-            </button>
-          </div>
+          <button className="btn-icon" onClick={handleUndo} title="Undo (Ctrl+Z)" disabled={!activeDoc?.history?.length}>
+            <Undo size={18} />
+          </button>
+          <button className="btn-icon" onClick={handleRedo} title="Redo (Ctrl+Y)" disabled={!activeDoc?.future?.length}>
+            <Redo size={18} />
+          </button>
           
           <button 
-            className="btn btn-secondary"
-            onClick={() => window.open('/', '_blank')}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', borderColor: '#3b82f6', color: '#60a5fa' }}
+            className="btn btn-secondary" 
+            onClick={() => {
+              if (window.confirm("Are you sure you want to clear this map?")) {
+                setShapes([]);
+                setSelectedId(null);
+                setAiQuestion('');
+                setAiAnswer('');
+              }
+            }}
+            style={{ padding: '6px 12px', fontSize: '12px', marginLeft: '12px' }}
           >
-            <Monitor size={14} /> Open Math Diagrams ↗
+            Clear Canvas
           </button>
         </div>
       </div>
@@ -352,6 +359,39 @@ export default function MapEditor() {
                 />
                 Snap to Grid (20px)
               </label>
+            </div>
+          </div>
+
+          {/* Section: Templates */}
+          <div className="shape-grid-section" style={{ marginBottom: '24px' }}>
+            <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              <Plus size={12} /> Templates
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
+              {MapTemplates.map(template => (
+                <button
+                  key={template.id}
+                  onClick={() => handleAppendTemplate(template.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-dark)',
+                    border: '1px solid var(--border-color)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    textAlign: 'left'
+                  }}
+                  className="bg-theme-card"
+                >
+                  <span style={{ color: '#10b981' }}><MapIcon size={14} /></span>
+                  <span style={{ fontSize: '12px' }}>{template.name}</span>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -433,49 +473,73 @@ export default function MapEditor() {
           renameDoc={renameDoc}
         />
         
-        {/* Map Elements Horizontal Toolbar */}
-        <div 
-          className="map-elements-toolbar no-scrollbar" 
-          style={{ 
-            display: 'flex', 
-            gap: '8px', 
-            alignItems: 'center', 
-            padding: '8px 16px', 
-            background: 'var(--bg-panel)', 
-            borderBottom: '1px solid var(--border-color)',
-            overflowX: 'auto',
-            width: '100%',
-            scrollbarWidth: 'none'
-          }}
-        >
-          <span style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 'bold', marginRight: '6px', whiteSpace: 'nowrap' }}>
-            Toolbar:
-          </span>
-          {mapElements.map(shape => (
-            <button
-              key={shape.id}
-              onClick={() => addShape(shape.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                background: 'var(--bg-dark)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '6px',
-                padding: '6px 12px',
-                color: 'white',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                whiteSpace: 'nowrap'
-              }}
-              title={`Add ${shape.name}`}
-            >
-              <span style={{ color: '#10b981', display: 'flex', alignItems: 'center' }}>
-                {shape.icon}
-              </span>
-              <span style={{ fontSize: '11px', fontWeight: 500 }}>{shape.name}</span>
-            </button>
-          ))}
+        {/* Map Elements Toolbar (Categorized) */}
+        <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)', borderBottom: '1px solid var(--border-color)' }}>
+          
+          {/* Category Tabs */}
+          <div style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid var(--border-color)' }} className="no-scrollbar">
+            {mapCategories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                style={{
+                  padding: '10px 16px',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: activeCategory === cat ? '2px solid #10b981' : '2px solid transparent',
+                  color: activeCategory === cat ? '#10b981' : 'var(--text-muted)',
+                  fontSize: '12px',
+                  fontWeight: activeCategory === cat ? 600 : 500,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Tools for Active Category */}
+          <div 
+            className="no-scrollbar" 
+            style={{ 
+              display: 'flex', 
+              gap: '8px', 
+              alignItems: 'center', 
+              padding: '8px 16px', 
+              overflowX: 'auto',
+              width: '100%',
+              minHeight: '48px'
+            }}
+          >
+            {currentCategoryElements.map(shape => (
+              <button
+                key={shape.id}
+                onClick={() => addShape(shape.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'var(--bg-dark)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '6px',
+                  padding: '6px 12px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  whiteSpace: 'nowrap'
+                }}
+                className="hover-brighten"
+                title={`Add ${shape.name}`}
+              >
+                <span style={{ color: '#10b981', display: 'flex', alignItems: 'center' }}>
+                  {shape.icon}
+                </span>
+                <span style={{ fontSize: '11px', fontWeight: 500 }}>{shape.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         <div style={{ flex: 1, position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>

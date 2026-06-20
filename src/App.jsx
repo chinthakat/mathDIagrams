@@ -8,9 +8,12 @@ import TabBar from './components/TabBar';
 import IconPickerModal from './components/IconPickerModal';
 import AIGeneratorModal from './components/AIGeneratorModal';
 import { ObjectRegistry } from './registry/objectRegistry';
+import TopNavigation from './components/TopNavigation';
 
-function App() {
-  const [mode, setMode] = useState('2D');
+function App({ globalMode, setGlobalMode }) {
+  const mode = globalMode || '2D';
+  const setMode = setGlobalMode || (() => {});
+  const is2D = mode === '2D' || mode === 'Equations';
 
   // Icon Picker Modal State
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
@@ -112,7 +115,7 @@ function App() {
   const addShape = (type) => {
     const newId = Date.now().toString();
     
-    if (mode === '2D') {
+    if (is2D) {
       if (type === 'imageIcon') {
         setIconPickerCallback(() => (selectedIcon) => {
           const regObj = ObjectRegistry.imageIcon;
@@ -156,7 +159,7 @@ function App() {
   };
 
   const updateShape = (id, newProps) => {
-    if (mode === '2D') {
+    if (is2D) {
       setActiveShapes(shapes2D.map(s => s.id === id ? { ...s, ...newProps } : s));
     } else {
       setActiveShapes(shapes3D.map(s => s.id === id ? { ...s, ...newProps } : s), true);
@@ -164,7 +167,7 @@ function App() {
   };
 
   const deleteShape = (id) => {
-    if (mode === '2D') {
+    if (is2D) {
       setActiveShapes(shapes2D.filter(s => s.id !== id));
       if (selectedId2D === id) setSelectedId2D(null);
     } else {
@@ -174,7 +177,7 @@ function App() {
   };
 
   const reorderShape = (id, direction) => {
-    if (mode === '2D') {
+    if (is2D) {
       const index = shapes2D.findIndex(s => s.id === id);
       if (index === -1) return;
       
@@ -248,7 +251,7 @@ function App() {
           if (selected) clipboardRef.current = JSON.parse(JSON.stringify(selected));
         }
         if (e.key === 'v') {
-          if (clipboardRef.current && mode === '2D') {
+          if (clipboardRef.current && is2D) {
             const pastedShape = {
               ...clipboardRef.current,
               id: Date.now().toString(),
@@ -277,7 +280,7 @@ function App() {
   }, [shapes2D, shapes3D, selectedId2D, selectedId3D, activeDocId, mode, setActiveShapes, handleUndo, handleRedo]);
 
   const handleExport = (format = 'png') => {
-    if (mode === '2D' && stageRef2D.current) {
+    if (is2D && stageRef2D.current) {
       if (format === 'png') {
         const uri = stageRef2D.current.toDataURL({ pixelRatio: 3 });
         const link = document.createElement('a');
@@ -414,72 +417,21 @@ function App() {
 
   const selectedShape2D = shapes2D.find(s => s.id === selectedId2D);
   const selectedShape3D = shapes3D.find(s => s.id === selectedId3D);
-  const selectedShape = mode === '2D' ? selectedShape2D : selectedShape3D;
+  const selectedShape = is2D ? selectedShape2D : selectedShape3D;
 
   return (
     <div className="app-container">
-      <div className="topbar">
-        <div className="topbar-logo">
-          <Sparkles /> MathDiagram AI
+      <div className="sub-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', background: '#1e293b', borderBottom: '1px solid #334155' }}>
+        <div style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>
+          {mode === '2D' ? 'Geometry Tools' : mode === 'Equations' ? 'Equations Tools' : '3D Builder Tools'}
         </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', background: '#1e293b', borderRadius: '8px', padding: '4px' }}>
-            <button
-              onClick={() => setMode('2D')}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '6px',
-                border: 'none',
-                background: mode === '2D' ? '#3b82f6' : 'transparent',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
-            >
-              2D Canvas
-            </button>
-            <button
-              onClick={() => window.open('?editor=map', '_blank')}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '6px',
-                border: 'none',
-                background: 'transparent',
-                color: '#60a5fa',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '600'
-              }}
-            >
-              Map Maker ↗
-            </button>
-            <button
-              onClick={() => setMode('3D')}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '6px',
-                border: 'none',
-                background: mode === '3D' ? '#f59e0b' : 'transparent',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
-            >
-              3D Builder
-            </button>
-          </div>
-          {(mode === '2D' || mode === 'Map') && (
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn-icon" onClick={handleUndo} title="Undo (Ctrl+Z)" disabled={!activeDoc.history2D?.length}>
-                <Undo size={18} />
-              </button>
-              <button className="btn-icon" onClick={handleRedo} title="Redo (Ctrl+Y)" disabled={!activeDoc.future2D?.length}>
-                <Redo size={18} />
-              </button>
-            </div>
-          )}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="btn-icon" onClick={handleUndo} title="Undo (Ctrl+Z)" disabled={!activeDoc.history2D?.length}>
+            <Undo size={18} />
+          </button>
+          <button className="btn-icon" onClick={handleRedo} title="Redo (Ctrl+Y)" disabled={!activeDoc.future2D?.length}>
+            <Redo size={18} />
+          </button>
         </div>
       </div>
 
@@ -501,27 +453,26 @@ function App() {
           deleteDoc={deleteDoc}
           renameDoc={renameDoc}
         />
-        <div style={{ flex: 1, position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-          {mode === '2D' || mode === 'Map' ? (
-            <CanvasEditor2D 
-              shapes={shapes2D} 
-              setShapes={(newShapes) => setActiveShapes(newShapes)} 
-              selectedId={selectedId2D} 
-              setSelectedId={setSelectedId2D}
-              stageRef={stageRef2D}
-              showGrid={mode === 'Map'}
-            />
-          ) : (
-            <CanvasEditor3D
-              shapes={shapes3D}
-              setShapes={(newShapes) => setActiveShapes(newShapes, true)}
-              selectedId={selectedId3D}
-              setSelectedId={setSelectedId3D}
-              canvasRef={canvasRef3D}
-            />
-          )}
-        </div>
-      </div>
+          <div style={{ flex: 1, position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+            {is2D ? (
+              <CanvasEditor2D 
+                shapes={shapes2D} 
+                setShapes={(newShapes) => setActiveShapes(newShapes)} 
+                selectedId={selectedId2D} 
+                setSelectedId={setSelectedId2D}
+                stageRef={stageRef2D}
+                showGrid={mode === 'Equations'}
+              />
+            ) : (
+              <CanvasEditor3D
+                shapes={shapes3D}
+                setShapes={(newShapes) => setActiveShapes(newShapes, true)}
+                selectedId={selectedId3D}
+                setSelectedId={setSelectedId3D}
+                canvasRef={canvasRef3D}
+              />
+            )}
+          </div></div>
 
       <PropertiesPanel 
         selectedShape={selectedShape}

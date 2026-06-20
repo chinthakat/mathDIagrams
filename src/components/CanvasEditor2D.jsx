@@ -4,7 +4,7 @@ import { ObjectRegistry } from '../registry/objectRegistry';
 
 const GRID_SIZE = 20;
 
-const ShapeElement = ({ shapeProps, isSelected, onSelect, onChange, snapToGrid }) => {
+const ShapeElement = ({ shapeProps, isSelected, onSelect, onChange, snapToGrid, allShapes }) => {
   const shapeRef = useRef();
   const trRef = useRef();
 
@@ -17,16 +17,72 @@ const ShapeElement = ({ shapeProps, isSelected, onSelect, onChange, snapToGrid }
 
   const snapValue = (val) => Math.round(val / GRID_SIZE) * GRID_SIZE;
 
-  const onDragEnd = (e) => {
-    let newX = e.target.x();
-    let newY = e.target.y();
+  const dragBoundFunc = (pos) => {
+    const parent = shapeRef.current?.getParent();
+    if (!parent) return pos;
+
+    // Convert absolute pos to local
+    const transform = parent.getAbsoluteTransform().copy();
+    transform.invert();
+    const localPos = transform.point(pos);
+
+    let newX = localPos.x;
+    let newY = localPos.y;
+
+    // 1. Grid Snapping
     if (snapToGrid) {
       newX = snapValue(newX);
       newY = snapValue(newY);
-      e.target.x(newX);
-      e.target.y(newY);
+      return parent.getAbsoluteTransform().point({ x: newX, y: newY });
     }
-    onChange({ ...shapeProps, x: newX, y: newY });
+
+    // 2. Magnetic Road Snapping
+    if (shapeProps.type === 'road' || shapeProps.type === 'roadJunction' || shapeProps.type === 'bridge') {
+      const localThresh = 20;
+      let snappedX = false;
+      let snappedY = false;
+
+      const getBounds = (shape) => {
+        let w = shape.type === 'roadJunction' ? (shape.size || 150) : (shape.width || (shape.length || 200));
+        let h = shape.type === 'roadJunction' ? (shape.size || 150) : (shape.height || (shape.width || 40));
+        return { x: shape.x, y: shape.y, w, h };
+      };
+      
+      const myBounds = getBounds(shapeProps);
+
+      if (allShapes) {
+        for (const other of allShapes) {
+          if (other.id === shapeProps.id) continue;
+          if (other.type !== 'road' && other.type !== 'roadJunction' && other.type !== 'bridge') continue;
+
+          const otherBounds = getBounds(other);
+
+          // Center-to-Center snap
+          if (!snappedX && Math.abs(newX - otherBounds.x) < localThresh) { newX = otherBounds.x; snappedX = true; }
+          if (!snappedY && Math.abs(newY - otherBounds.y) < localThresh) { newY = otherBounds.y; snappedY = true; }
+
+          // Edge-to-Edge snap
+          if (!snappedX) {
+            const myRightTarget = otherBounds.x - otherBounds.w/2 - myBounds.w/2;
+            if (Math.abs(newX - myRightTarget) < localThresh) { newX = myRightTarget; snappedX = true; }
+            const myLeftTarget = otherBounds.x + otherBounds.w/2 + myBounds.w/2;
+            if (Math.abs(newX - myLeftTarget) < localThresh) { newX = myLeftTarget; snappedX = true; }
+          }
+          if (!snappedY) {
+            const myBottomTarget = otherBounds.y - otherBounds.h/2 - myBounds.h/2;
+            if (Math.abs(newY - myBottomTarget) < localThresh) { newY = myBottomTarget; snappedY = true; }
+            const myTopTarget = otherBounds.y + otherBounds.h/2 + myBounds.h/2;
+            if (Math.abs(newY - myTopTarget) < localThresh) { newY = myTopTarget; snappedY = true; }
+          }
+        }
+      }
+    }
+
+    return parent.getAbsoluteTransform().point({ x: newX, y: newY });
+  };
+
+  const onDragEnd = (e) => {
+    onChange({ ...shapeProps, x: e.target.x(), y: e.target.y() });
   };
 
   const onTransformEnd = (e) => {
@@ -55,6 +111,7 @@ const ShapeElement = ({ shapeProps, isSelected, onSelect, onChange, snapToGrid }
     ref: shapeRef,
     ...shapeProps,
     draggable: true,
+    dragBoundFunc,
     onDragEnd,
     onTransformEnd,
   };
@@ -351,6 +408,7 @@ export default function CanvasEditor2D({
               onSelect={() => setSelectedId(shape.id)}
               onChange={(newProps) => updateShape(shape.id, newProps)}
               snapToGrid={snapToGrid}
+              allShapes={shapes}
             />
           ))}
         </Layer>

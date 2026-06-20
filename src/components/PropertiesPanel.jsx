@@ -1,5 +1,5 @@
-import React from 'react';
-import { Trash2, ArrowUp, ArrowDown, AlignCenter, AlignLeft, AlignRight, AlignHorizontalSpaceBetween, AlignVerticalSpaceBetween, Image as ImageIcon } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trash2, ArrowUp, ArrowDown, AlignCenter, AlignLeft, AlignRight, AlignHorizontalSpaceBetween, AlignVerticalSpaceBetween, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { ObjectRegistry } from '../registry/objectRegistry';
 import { GET_ICON } from '../registry/iconRegistry';
 
@@ -10,6 +10,11 @@ const PRESET_COLORS = [
 ];
 
 export default function PropertiesPanel({ selectedShape, updateShape, deleteShape, reorderShape, mode, openIconPicker }) {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [genError, setGenError] = useState('');
+  const [isGeneratingProp, setIsGeneratingProp] = useState(false);
+  const [propGenError, setPropGenError] = useState('');
+
   if (!selectedShape) {
     return (
       <div className="properties-panel">
@@ -117,11 +122,121 @@ export default function PropertiesPanel({ selectedShape, updateShape, deleteShap
     updateShape(selectedShape.id, { routes: newRoutes });
   };
 
+  const generateAITerrain = async () => {
+    setIsGenerating(true);
+    setGenError('');
+    try {
+      const apiKey = localStorage.getItem('deepseekApiKey');
+      if (!apiKey) {
+        setGenError('DeepSeek API Key is required. Please set it in the AI Map Modal first.');
+        setIsGenerating(false);
+        return;
+      }
+
+      const { terrainType, shape, count, features, width, height } = selectedShape;
+      const typeDesc = terrainType || 'island';
+      const shapeDesc = shape === 'organic' ? 'natural, organic shape' : `${shape} shape`;
+      const countDesc = count === '1' ? '1 single contiguous' : count === 'many' ? 'a scattered cluster of many small' : `exactly ${count}`;
+      
+      const p = `You are a specialized SVG cartography generator. Generate a beautiful cartoon 2D map element for a ${typeDesc} environment. 
+
+CRITICAL INSTRUCTIONS:
+1. Return ONLY valid, raw SVG code without markdown formatting. Return nothing else.
+2. DO NOT draw a sky, ocean, sea, or solid background! The SVG MUST have a completely TRANSPARENT background so it can be placed on top of other maps.
+3. ONLY draw the landmass itself (sand, dirt, grass, mountains, trees, etc.) and its immediate geographic features.
+4. Terrain Specifications:
+   - Type: ${typeDesc}
+   - Shape constraint: The overall landmass must form a ${shapeDesc}.
+   - Quantity: Draw ${countDesc} landmasses.
+   - Required Features to include: ${features || 'none specific'}
+5. STRICT BOUNDARY RULE: ALL rivers, trees, and geographic features MUST be contained entirely within the boundaries of the main landmass! Do not let rivers or objects bleed out into the transparent space.
+6. The map is viewed from a top-down or slight isometric angle, suitable for a children's math worksheet diagram.
+7. Make the shapes clear, vibrant, and well-defined.
+8. The SVG should be designed to fit perfectly into a viewBox of 0 0 ${width || 600} ${height || 400}.`;
+
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [{ role: 'user', content: p }],
+          temperature: 0.7,
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      let content = data.choices[0].message.content;
+      
+      content = content.replace(/```xml\n?/gi, '').replace(/```svg\n?/gi, '').replace(/```\n?/g, '').trim();
+
+      updateShape(selectedShape.id, { svgContent: content });
+    } catch (err) {
+      setGenError(err.message);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const generateAIProp = async () => {
+    setIsGeneratingProp(true);
+    setPropGenError('');
+    try {
+      const apiKey = localStorage.getItem('deepseekApiKey');
+      if (!apiKey) {
+        setPropGenError('DeepSeek API Key is required.');
+        setIsGeneratingProp(false);
+        return;
+      }
+
+      const p = `You are a specialized SVG prop generator. Generate a top-down 2D cartoon map prop of: "${selectedShape.prompt}". 
+
+CRITICAL INSTRUCTIONS:
+1. Return ONLY valid, raw SVG code without markdown formatting. Return nothing else.
+2. The SVG MUST have a completely TRANSPARENT background.
+3. Keep the design clean, cartoonish, and suitable for a children's math map.
+4. The SVG should be designed to tightly fit into a viewBox of 0 0 ${selectedShape.width || 100} ${selectedShape.height || 100}.`;
+
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [{ role: 'user', content: p }],
+          temperature: 0.7,
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      let content = data.choices[0].message.content;
+      content = content.replace(/```xml\n?/gi, '').replace(/```svg\n?/gi, '').replace(/```\n?/g, '').trim();
+
+      updateShape(selectedShape.id, { svgContent: content });
+    } catch (err) {
+      setPropGenError(err.message);
+    } finally {
+      setIsGeneratingProp(false);
+    }
+  };
+
   return (
     <div className="properties-panel">
       <div className="section-title">Properties</div>
       
-      {(mode === '2D' || mode === 'Map') && regObj && regObj.properties.map(prop => (
+      {(mode === '2D' || mode === 'Map') && regObj && regObj.properties.filter(p => p.type !== 'hidden').map(prop => (
         <div className="input-group" key={prop.name}>
           <label>
             <span>{prop.label}</span>
@@ -203,6 +318,42 @@ export default function PropertiesPanel({ selectedShape, updateShape, deleteShap
           )}
         </div>
       ))}
+
+      {selectedShape?.type === 'aiTerrain' && (
+        <div style={{ marginTop: '24px', background: 'var(--bg-dark)', padding: '12px', borderRadius: '8px', border: '1px solid var(--accent)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--accent)' }}>
+            <Sparkles size={16} />
+            <span style={{ fontSize: '13px', fontWeight: '600' }}>AI Terrain Generator</span>
+          </div>
+          <button 
+            className="action-button primary" 
+            style={{ width: '100%', justifyContent: 'center' }}
+            onClick={generateAITerrain}
+            disabled={isGenerating}
+          >
+            {isGenerating ? 'Generating Terrain...' : 'Generate New Terrain'}
+          </button>
+          {genError && <div style={{ color: '#ef4444', fontSize: '11px', marginTop: '8px', lineHeight: '1.4' }}>{genError}</div>}
+        </div>
+      )}
+
+      {selectedShape?.type?.startsWith('prop') && (
+        <div style={{ marginTop: '24px', background: 'var(--bg-dark)', padding: '12px', borderRadius: '8px', border: '1px solid var(--accent)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--accent)' }}>
+            <Sparkles size={16} />
+            <span style={{ fontSize: '13px', fontWeight: '600' }}>AI Prop Generator</span>
+          </div>
+          <button 
+            className="action-button primary" 
+            style={{ width: '100%', justifyContent: 'center' }}
+            onClick={generateAIProp}
+            disabled={isGeneratingProp}
+          >
+            {isGeneratingProp ? 'Generating...' : 'Regenerate Prop'}
+          </button>
+          {propGenError && <div style={{ color: '#ef4444', fontSize: '11px', marginTop: '8px', lineHeight: '1.4' }}>{propGenError}</div>}
+        </div>
+      )}
 
       {selectedShape?.type === 'barGraph' && (
         <div style={{ marginTop: '24px' }}>

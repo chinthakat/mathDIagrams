@@ -3,12 +3,14 @@ import { X, Sparkles, AlertCircle, Play, Key, Terminal, Clipboard, Check } from 
 
 export default function AIMapGeneratorModal({ isOpen, onClose, onGenerate }) {
   const [gradeLevel, setGradeLevel] = useState('Grade 3');
+  const [mapCategory, setMapCategory] = useState('Grid Reference Map');
   const [themePrompt, setThemePrompt] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [useDemo, setUseDemo] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showDebug, setShowDebug] = useState(true);
+  const [saveKey, setSaveKey] = useState(true);
   const [debugRequest, setDebugRequest] = useState(null);
   const [debugResponse, setDebugResponse] = useState(null);
 
@@ -185,16 +187,46 @@ export default function AIMapGeneratorModal({ isOpen, onClose, onGenerate }) {
       return;
     }
 
-    // Save key to localStorage
-    localStorage.setItem('deepseekApiKey', apiKey);
+    // Save key to localStorage if requested
+    if (saveKey) {
+      localStorage.setItem('deepseekApiKey', apiKey);
+    } else {
+      localStorage.removeItem('deepseekApiKey');
+    }
     
     setLoading(true);
     setError('');
 
+    let categoryRules = '';
+    if (mapCategory === 'Grid Reference Map') {
+      categoryRules = `Mode A: COORDINATE GRID MAP
+Use this mode. The 'shapes' array must contain exactly ONE shape of type 'gridMap'. No other shapes (like roads, trees, markers, or buildings) are allowed in the shapes array.
+- The 'gridMap' properties MUST be:
+  {
+    "type": "gridMap",
+    "x": 400, "y": 260, "width": 420, "height": 420, "rows": 4, "cols": 4, "showCompass": true, "scaleText": "1 square = 1 block", "stroke": "#94a3b8",
+    "landmarks": [ { "id": "school", "col": 2, "row": 3, "label": "School (B3)", "icon": "School", "color": "#ef4444" } ],
+    "routes": [ { "id": "route1", "path": "B3-B1-C1", "color": "#f59e0b" } ]
+  }
+- Important grid calculations: Column A = 1, B = 2, C = 3, D = 4. Row 1 is at the TOP (North), row 4 is at the BOTTOM (South).
+- Generate questions like: "What object is found at [Coordinate]?" or "What is the grid reference for the [Object]?".`;
+    } else if (mapCategory === 'Community Layout Map') {
+      categoryRules = `Mode B: FREEFORM LANDSCAPE MAP - Community Layout
+- The 'shapes' array must contain individual elements (like mapBuilding, road, tree).
+- Describe a town layout with at least 4 named intersecting streets and 8 distinct landmarks (e.g., Fire Station, Library, Bakery, Park).
+- Explicitly state the spatial relationships in the question (e.g., "The Bakery is on the corner of Elm St and Oak St, next to the Library").
+- Ask spatial relationship questions (e.g., "What building is directly north of the Fire Station?", or "Which street do you cross to get from the Park to the Bakery?").`;
+    } else if (mapCategory === 'Directional Navigation Map') {
+      categoryRules = `Mode B: FREEFORM LANDSCAPE MAP - Directional Navigation
+- The 'shapes' array must contain individual elements (like mapBuilding, road, tree).
+- Include a specific starting point. Describe a path with at least 3 intersections. Place 5-6 different shops or buildings along these streets.
+- Generate questions like: "You are at START. Go straight ahead. Take the first left, then the second right. What building is on your left?" or "Write the step-by-step directions to get from the START to the [Building]."`;
+    }
+
     const systemPromptContent = `You are an AI mathematical map diagram generator. Return ONLY a valid JSON object. Do not wrap the JSON output in markdown \`\`\`json code blocks.
 The JSON must match the following schema:
 {
-  "question": "A clear, mathematically rich navigation, direction, or bearing math question suitable for ${gradeLevel} with the requested theme/topic.",
+  "question": "A clear navigation or spatial question suitable for ${gradeLevel} matching the ${mapCategory}.",
   "answer": "The numerical or short text answer with a brief description of the steps.",
   "theme": "one of: paper, parchment, blueprint, topography, grassland, desert, ocean, dark",
   "shapes": [
@@ -203,70 +235,12 @@ The JSON must match the following schema:
 }
 
 Layout Paradigm Rules:
-Depending on the type of question, you MUST choose between two distinct layout modes:
-
-Mode A: COORDINATE GRID MAP
-Use this mode if the question refers to a coordinate grid system with column letters (A, B, C, D) and row numbers (1, 2, 3, 4).
-- The 'shapes' array must contain exactly ONE shape of type 'gridMap'. No other shapes (like roads, trees, markers, or buildings) are allowed in the shapes array.
-- The 'gridMap' properties MUST be:
-  {
-    "type": "gridMap",
-    "x": 400,
-    "y": 260,
-    "width": 420,
-    "height": 420,
-    "rows": 4,
-    "cols": 4,
-    "showCompass": true,
-    "scaleText": "1 square = 1 block",
-    "stroke": "#94a3b8",
-    "landmarks": [
-      {
-        "id": "school",
-        "col": 2, // 'B' maps to column 2
-        "row": 3, // Row index 3 maps to row label '3'
-        "label": "School (B3)",
-        "icon": "School",
-        "color": "#ef4444"
-      },
-      ...
-    ],
-    "routes": [
-      {
-        "id": "route1",
-        "path": "B3-B1-C1", // Path sequence showing the steps taken
-        "color": "#f59e0b"
-      }
-    ]
-  }
-- Important grid calculations:
-  - Column A = 1, B = 2, C = 3, D = 4.
-  - Row 1 is at the TOP (North), row 4 is at the BOTTOM (South). Moving North decreases the row index, moving South increases it.
-  - Route paths must match the question exactly. Example: "Start at B3. Walk 2 blocks North (row decreases by 2 to B1) then 1 block East (column increases by 1 to C1)". Path is "B3-B1-C1".
-  - Landmark labels should indicate the coordinate in parenthesis like "Library (C1)".
-
-Mode B: FREEFORM LANDSCAPE MAP
-Use this mode if the question is based on distances (in meters/kilometers), compass directions (N, S, E, W, NE, SW) or degrees, without grid references.
-- The 'shapes' array must contain individual elements (like mapBuilding, road, river, bridge, tree, mountain, compassRose, scaleBar).
-- You MUST follow strict layout and alignment guidelines to avoid overlaps and misalignments:
-  1. Always include a 'compassRose' (suggested x: 650, y: 100, radius: 45) and a 'scaleBar' (suggested x: 400, y: 480, width: 150, unitText: e.g. '100m').
-  2. Roads and Rivers must be linear or perpendicular, not randomly angled unless forming a logical intersection.
-     - A horizontal road: e.g., { "type": "road", "x": 400, "y": 300, "width": 400, "height": 32, "fill": "#475569", "lineColor": "#fbbf24", "rotation": 0 }
-     - A vertical road: e.g., { "type": "road", "x": 300, "y": 250, "width": 32, "height": 300, "fill": "#475569", "lineColor": "#fbbf24", "rotation": 90 }
-  3. Bridges must align perfectly with Rivers:
-     - If a vertical river is at x: 350, y: 300 (rotation: 90, length: 400), a horizontal bridge crossing it must be at x: 350, y: 300 (rotation: 0, length: 120, width: 24).
-  4. Buildings ('mapBuilding') and Markers ('mapMarker') should be placed at clean coordinates, separated by at least 100px so they don't overlap, and labelled clearly.
-  5. Trees and Mountain peaks should be placed as decorative clusters or key points in the question.
+${categoryRules}
 
 CRITICAL SHAPES REQUIREMENT:
-- The 'shapes' array must NEVER be empty. For every single location, landmark (e.g. School, Library), route, and distance path mentioned in the question text, you MUST generate matching canvas shapes with correct positions so the map matches the question.
-- For example, if the question is "In a town, the library is 300 meters east and 400 meters north of the school. What is the straight-line distance from the school to the library?":
-  1. Set the School at x: 200, y: 450 (using type 'mapBuilding', label 'School', iconName: 'School').
-  2. The Library is 300m East and 400m North. Under a scale of 1px = 1m, the library should be at x: 200+300 = 500, y: 450-400 = 50 (using type 'mapBuilding', label 'Library', iconName: 'Library').
-  3. Draw a 'footpath' or 'road' shape connecting the school and library (e.g., horizontal footpath from (200, 450) to (500, 450), and vertical footpath from (500, 450) to (500, 50)).
-  4. Include a 'scaleBar' showing '100m' scale.
-  5. Include a 'compassRose'.
-- You must always visualize the full scenario described in the question. Do NOT leave the canvas blank or the 'shapes' array empty under any circumstances.
+- The 'shapes' array must NEVER be empty. For every single location, landmark, route, and distance path mentioned in the question text, you MUST generate matching canvas shapes with correct positions so the map matches the question.
+- Always include a 'compassRose' and a 'scaleBar' for Mode B.
+- Buildings and markers must not overlap and be cleanly labeled.
 
 Mathematical Graded Complexity Expectations:
 - Grade 2: Simple directions (N, S, E, W), simple paths.
@@ -302,7 +276,7 @@ Available Shape Types and Their Exact Properties:
 
     try {
       const requestPayload = {
-        model: 'deepseek-chat',
+        model: 'deepseek-v4-pro',
         messages: [
           { role: 'system', content: systemPromptContent },
           { role: 'user', content: userPromptContent }
@@ -451,6 +425,21 @@ Available Shape Types and Their Exact Properties:
               </select>
             </div>
 
+            {/* Input: Map Category */}
+            <div className="input-group">
+              <label style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600 }}>Map Category</label>
+              <select
+                value={mapCategory}
+                onChange={e => setMapCategory(e.target.value)}
+                disabled={loading}
+                style={{ width: '100%', padding: '10px', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '6px', marginTop: '4px', outline: 'none' }}
+              >
+                <option value="Grid Reference Map">Grid Reference Map</option>
+                <option value="Community Layout Map">Community Layout Map</option>
+                <option value="Directional Navigation Map">Directional Navigation Map</option>
+              </select>
+            </div>
+
             {/* Input: Topic prompt hint */}
             <div className="input-group">
               <label style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600 }}>Theme / Topic Hint (Optional)</label>
@@ -495,6 +484,19 @@ Available Shape Types and Their Exact Properties:
                   disabled={loading}
                   style={{ width: '100%', padding: '10px', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '6px', marginTop: '4px', outline: 'none' }}
                 />
+                <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <input 
+                    type="checkbox" 
+                    id="saveKeyCheckbox" 
+                    checked={saveKey} 
+                    onChange={e => setSaveKey(e.target.checked)} 
+                    disabled={loading} 
+                    style={{ accentColor: '#10b981' }} 
+                  />
+                  <label htmlFor="saveKeyCheckbox" style={{ fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer', userSelect: 'none' }}>
+                    Save API key for future use
+                  </label>
+                </div>
               </div>
             )}
 

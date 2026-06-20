@@ -6,10 +6,26 @@ export default function Sidebar({ mode, setMode, addShape, handleExport, recentl
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedCategories, setExpandedCategories] = useState({});
 
-  const categories = getCategories();
-  delete categories['Map Elements'];
+  const rawCategories = getCategories();
+  const categories = {};
+  
+  // Filter categories based on mode
+  const allowedCategories2D = ['Basic Shapes', 'Geometry', 'Triangles', 'Arrows', 'Logic & Problem Solving', 'Text & Annotation', 'Images & Icons', 'Measurement', 'Coordinate Geometry'];
+  const allowedCategoriesEq = ['Fractions', 'Graphs & Data', 'Number Lines', 'Text & Annotation'];
 
-  const allShapes = Object.values(ObjectRegistry).filter(shape => shape.category !== 'Map Elements');
+  Object.keys(rawCategories).forEach(cat => {
+    if (mode === '2D' && allowedCategories2D.includes(cat)) {
+      categories[cat] = rawCategories[cat];
+    } else if (mode === 'Equations' && allowedCategoriesEq.includes(cat)) {
+      categories[cat] = rawCategories[cat];
+    }
+  });
+
+  const allShapes = Object.values(ObjectRegistry).filter(shape => {
+    if (mode === '2D') return allowedCategories2D.includes(shape.category);
+    if (mode === 'Equations') return allowedCategoriesEq.includes(shape.category);
+    return false;
+  });
 
   const filteredShapes = allShapes.filter(shape => 
     shape.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -28,27 +44,8 @@ export default function Sidebar({ mode, setMode, addShape, handleExport, recentl
   return (
     <div className="sidebar" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
       <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px' }}>
-        {mode === '2D' ? (
+        {(mode === '2D' || mode === 'Equations') ? (
           <>
-            <button 
-              className="shape-btn" 
-              onClick={() => window.open('?editor=map', '_blank')} 
-              style={{ 
-                background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', 
-                border: 'none', 
-                color: 'white', 
-                fontWeight: '600', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                gap: '8px',
-                marginBottom: '16px',
-                padding: '12px'
-              }}
-            >
-              <Compass size={16} /> Open Map Editor ↗
-            </button>
-
             <div className="modal-search" style={{ marginBottom: '16px', background: 'var(--bg-dark)', borderRadius: '6px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
               <Search size={16} className="search-icon" style={{ color: 'var(--text-muted)' }} />
               <input 

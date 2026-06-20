@@ -101,10 +101,10 @@ export default function CompassRose({
       {drawBevelledPointer(315, radius * 0.7, radius * 0.16, lightSlate, darkSlate)}
 
       {/* Cardinal pointers (N, E, S, W) - larger, gold */}
-      {drawBevelledPointer(270, radius * 0.92, radius * 0.22, lightGold, darkGold)} {/* North */}
-      {drawBevelledPointer(0, radius * 0.92, radius * 0.22, lightGold, darkGold)}   {/* East */}
-      {drawBevelledPointer(90, radius * 0.92, radius * 0.22, lightGold, darkGold)}  {/* South */}
-      {drawBevelledPointer(180, radius * 0.92, radius * 0.22, lightGold, darkGold)} {/* West */}
+      {drawBevelledPointer(270, radius * 0.92, radius * 0.22, lightGold, darkGold)}{/* North */}
+      {drawBevelledPointer(0, radius * 0.92, radius * 0.22, lightGold, darkGold)}{/* East */}
+      {drawBevelledPointer(90, radius * 0.92, radius * 0.22, lightGold, darkGold)}{/* South */}
+      {drawBevelledPointer(180, radius * 0.92, radius * 0.22, lightGold, darkGold)}{/* West */}
 
       {/* Center cap disk */}
       <Circle

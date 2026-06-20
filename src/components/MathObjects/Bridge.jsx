@@ -1,43 +1,93 @@
 import React from 'react';
-import { Group, Rect, Line } from 'react-konva';
+import { Group, Rect, Line, Text } from 'react-konva';
 
 export default function Bridge({
-  length = 120,
-  width = 30,
-  color = '#f59e0b',
-  stroke = '#d97706',
-  strokeWidth = 2
+  length = 160,
+  width = 60,
+  fill = '#334155', // asphalt color
+  lineColor = '#fbbf24', // dashed line color
+  bridgeType = 'suspension', // 'suspension', 'beam', 'stone-arch'
+  label = 'Golden Gate',
+  labelColor = '#1e293b'
 }) {
   const halfW = length / 2;
   const halfH = width / 2;
-  const pylonH = width * 1.2;
+  const pylonH = width * 0.8;
 
-  // Let's create a beautiful suspension-bridge silhouette structure
+  const renderBridgeStructure = () => {
+    switch (bridgeType) {
+      case 'stone-arch':
+        return (
+          <Group>
+            {/* Stone side walls */}
+            <Rect x={-halfW} y={-halfH - 8} width={length} height={16} fill="#78716c" cornerRadius={2} />
+            <Rect x={-halfW} y={halfH - 8} width={length} height={16} fill="#78716c" cornerRadius={2} />
+            {/* Texture lines */}
+            <Line points={[-halfW + 15, -halfH - 8, -halfW + 15, -halfH + 8]} stroke="#57534e" strokeWidth={2} />
+            <Line points={[-halfW + 45, -halfH - 8, -halfW + 45, -halfH + 8]} stroke="#57534e" strokeWidth={2} />
+            <Line points={[0, -halfH - 8, 0, -halfH + 8]} stroke="#57534e" strokeWidth={2} />
+            <Line points={[halfW - 45, -halfH - 8, halfW - 45, -halfH + 8]} stroke="#57534e" strokeWidth={2} />
+            <Line points={[halfW - 15, -halfH - 8, halfW - 15, -halfH + 8]} stroke="#57534e" strokeWidth={2} />
+            
+            <Line points={[-halfW + 15, halfH - 8, -halfW + 15, halfH + 8]} stroke="#57534e" strokeWidth={2} />
+            <Line points={[-halfW + 45, halfH - 8, -halfW + 45, halfH + 8]} stroke="#57534e" strokeWidth={2} />
+            <Line points={[0, halfH - 8, 0, halfH + 8]} stroke="#57534e" strokeWidth={2} />
+            <Line points={[halfW - 45, halfH - 8, halfW - 45, halfH + 8]} stroke="#57534e" strokeWidth={2} />
+            <Line points={[halfW - 15, halfH - 8, halfW - 15, halfH + 8]} stroke="#57534e" strokeWidth={2} />
+          </Group>
+        );
+      case 'beam':
+        return (
+          <Group>
+            {/* Concrete barriers */}
+            <Rect x={-halfW} y={-halfH - 4} width={length} height={8} fill="#94a3b8" />
+            <Rect x={-halfW} y={halfH - 4} width={length} height={8} fill="#94a3b8" />
+            {/* Support beams visible extending a bit */}
+            <Rect x={-length * 0.3} y={-halfH - 8} width={12} height={width + 16} fill="#64748b" />
+            <Rect x={length * 0.3 - 12} y={-halfH - 8} width={12} height={width + 16} fill="#64748b" />
+          </Group>
+        );
+      case 'suspension':
+      default:
+        return (
+          <Group>
+            {/* Pylons */}
+            <Rect x={-length * 0.3} y={-halfH - pylonH} width={12} height={width + pylonH * 2} fill="#64748b" cornerRadius={2} />
+            <Rect x={length * 0.3 - 12} y={-halfH - pylonH} width={12} height={width + pylonH * 2} fill="#64748b" cornerRadius={2} />
+            
+            {/* Main Suspension Cables (Top edge) */}
+            <Line
+              points={[-halfW, -halfH, -length * 0.3 + 6, -halfH - pylonH + 4, 0, -halfH, length * 0.3 - 6, -halfH - pylonH + 4, halfW, -halfH]}
+              stroke="#ef4444" strokeWidth={3} tension={0.4}
+            />
+            {/* Main Suspension Cables (Bottom edge) */}
+            <Line
+              points={[-halfW, halfH, -length * 0.3 + 6, halfH + pylonH - 4, 0, halfH, length * 0.3 - 6, halfH + pylonH - 4, halfW, halfH]}
+              stroke="#ef4444" strokeWidth={3} tension={0.4}
+            />
+
+            {/* Vertical Hangers (Top) */}
+            <Line points={[-length * 0.4, -halfH, -length * 0.4, -halfH - pylonH * 0.4]} stroke="#cbd5e1" strokeWidth={1} />
+            <Line points={[-length * 0.15, -halfH, -length * 0.15, -halfH - pylonH * 0.4]} stroke="#cbd5e1" strokeWidth={1} />
+            <Line points={[length * 0.15, -halfH, length * 0.15, -halfH - pylonH * 0.4]} stroke="#cbd5e1" strokeWidth={1} />
+            <Line points={[length * 0.4, -halfH, length * 0.4, -halfH - pylonH * 0.4]} stroke="#cbd5e1" strokeWidth={1} />
+            
+            {/* Vertical Hangers (Bottom) */}
+            <Line points={[-length * 0.4, halfH, -length * 0.4, halfH + pylonH * 0.4]} stroke="#cbd5e1" strokeWidth={1} />
+            <Line points={[-length * 0.15, halfH, -length * 0.15, halfH + pylonH * 0.4]} stroke="#cbd5e1" strokeWidth={1} />
+            <Line points={[length * 0.15, halfH, length * 0.15, halfH + pylonH * 0.4]} stroke="#cbd5e1" strokeWidth={1} />
+            <Line points={[length * 0.4, halfH, length * 0.4, halfH + pylonH * 0.4]} stroke="#cbd5e1" strokeWidth={1} />
+          </Group>
+        );
+    }
+  };
+
   return (
     <Group>
-      {/* Support Pillars (Pylons) extending below the deck */}
-      <Rect
-        x={-length * 0.28}
-        y={-pylonH}
-        width={width * 0.3}
-        height={pylonH * 2.2}
-        fill="#94a3b8"
-        stroke="#475569"
-        strokeWidth={1}
-        cornerRadius={1}
-      />
-      <Rect
-        x={length * 0.28 - width * 0.3}
-        y={-pylonH}
-        width={width * 0.3}
-        height={pylonH * 2.2}
-        fill="#94a3b8"
-        stroke="#475569"
-        strokeWidth={1}
-        cornerRadius={1}
-      />
+      {/* 1. Underlying bridge structure */}
+      {renderBridgeStructure()}
 
-      {/* Main Bridge Roadway Deck */}
+      {/* 2. Main Asphalt Roadway (matches Road.jsx) */}
       <Rect
         x={-halfW}
         y={-halfH}
@@ -45,59 +95,34 @@ export default function Bridge({
         height={width}
         fillLinearGradientStartPoint={{ x: 0, y: -halfH }}
         fillLinearGradientEndPoint={{ x: 0, y: halfH }}
-        fillLinearGradientColorStops={[0, color, 1, adjustColorBrightness(color, -20)]}
-        stroke={stroke}
-        strokeWidth={strokeWidth}
-        cornerRadius={1}
+        fillLinearGradientColorStops={[0, fill, 1, '#1e293b']}
+        shadowColor="#000"
+        shadowBlur={4}
+        shadowOffset={{ x: 0, y: 4 }}
+        shadowOpacity={0.3}
       />
+      
+      {/* Outer White Shoulders */}
+      <Line points={[-halfW, -halfH + 1.5, halfW, -halfH + 1.5]} stroke="#e2e8f0" strokeWidth={2} />
+      <Line points={[-halfW, halfH - 1.5, halfW, halfH - 1.5]} stroke="#e2e8f0" strokeWidth={2} />
 
-      {/* Roadway markings / texture lines */}
-      <Line
-        points={[-halfW + 4, 0, halfW - 4, 0]}
-        stroke="#ffffff"
-        strokeWidth={1.5}
-        dash={[8, 6]}
-        opacity={0.7}
-      />
+      {/* Center Dashed Lane Divider */}
+      <Line points={[-halfW, 0, halfW, 0]} stroke={lineColor} strokeWidth={2.5} dash={[12, 10]} />
 
-      {/* Suspension Cables (Arch curves) */}
-      <Line
-        points={[-halfW, -halfH, -length * 0.28 + (width * 0.15), -pylonH, 0, -halfH + 2, length * 0.28 - (width * 0.15), -pylonH, halfW, -halfH]}
-        stroke={stroke}
-        strokeWidth={2}
-        tension={0.4}
-      />
-
-      {/* Vertical Hanger lines connecting main cable to deck */}
-      <Line points={[-length * 0.4, -halfH, -length * 0.4, -halfH * 1.5]} stroke={stroke} strokeWidth={1} />
-      <Line points={[-length * 0.15, -halfH, -length * 0.15, -halfH * 1.1]} stroke={stroke} strokeWidth={1} />
-      <Line points={[length * 0.15, -halfH, length * 0.15, -halfH * 1.1]} stroke={stroke} strokeWidth={1} />
-      <Line points={[length * 0.4, -halfH, length * 0.4, -halfH * 1.5]} stroke={stroke} strokeWidth={1} />
+      {/* 3. Label */}
+      {label && (
+        <Text
+          x={-halfW}
+          y={-halfH - 24}
+          width={length}
+          text={label}
+          fontSize={12}
+          fontFamily="Inter"
+          fontStyle="bold"
+          fill={labelColor}
+          align="center"
+        />
+      )}
     </Group>
   );
-}
-
-// Color adjust utility
-function adjustColorBrightness(hex, percent) {
-  let R = parseInt(hex.substring(1, 3), 16);
-  let G = parseInt(hex.substring(3, 5), 16);
-  let B = parseInt(hex.substring(5, 7), 16);
-
-  R = parseInt((R * (100 + percent)) / 100);
-  G = parseInt((G * (100 + percent)) / 100);
-  B = parseInt((B * (100 + percent)) / 100);
-
-  R = R < 255 ? R : 255;
-  G = G < 255 ? G : 255;
-  B = B < 255 ? B : 255;
-
-  R = R > 0 ? R : 0;
-  G = G > 0 ? G : 0;
-  B = B > 0 ? B : 0;
-
-  const rHex = R.toString(16).padStart(2, '0');
-  const gHex = G.toString(16).padStart(2, '0');
-  const bHex = B.toString(16).padStart(2, '0');
-
-  return `#${rHex}${gHex}${bHex}`;
 }

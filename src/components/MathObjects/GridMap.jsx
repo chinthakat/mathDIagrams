@@ -211,6 +211,7 @@ export default function GridMap({
         width={width} 
         height={height} 
         fill="transparent" 
+        listening={false}
       />
 
       {gridElements}
