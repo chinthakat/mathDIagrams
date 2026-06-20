@@ -9,7 +9,7 @@ const PRESET_COLORS = [
   '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'
 ];
 
-export default function PropertiesPanel({ selectedShape, updateShape, deleteShape, reorderShape, mode, openIconPicker }) {
+export default function PropertiesPanel({ selectedShape, updateShape, updateAllShapes, deleteShape, reorderShape, mode, openIconPicker }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [genError, setGenError] = useState('');
   const [isGeneratingProp, setIsGeneratingProp] = useState(false);
@@ -674,6 +674,68 @@ CRITICAL INSTRUCTIONS:
         <>
           <div className="input-group">
             <label>
+              <span>Color</span>
+            </label>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input 
+                type="color" 
+                name="color" 
+                value={selectedShape.color || '#3b82f6'} 
+                onChange={handleChange}
+                style={{ flex: 1, height: '32px', padding: '0', cursor: 'pointer', border: '1px solid var(--border-color)', borderRadius: '4px' }}
+              />
+            </div>
+          </div>
+
+          <div className="input-group" style={{ marginTop: '16px' }}>
+            <label>
+              <span>Display Style</span>
+            </label>
+            <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-dark)', padding: '4px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+              <button 
+                onClick={() => updateShape(selectedShape.id, { wireframe: false })}
+                style={{ flex: 1, padding: '6px', fontSize: '11px', borderRadius: '4px', border: 'none', background: !selectedShape.wireframe ? 'var(--accent)' : 'transparent', color: !selectedShape.wireframe ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 600 }}
+              >
+                Solid
+              </button>
+              <button 
+                onClick={() => updateShape(selectedShape.id, { wireframe: true })}
+                style={{ flex: 1, padding: '6px', fontSize: '11px', borderRadius: '4px', border: 'none', background: selectedShape.wireframe ? 'var(--accent)' : 'transparent', color: selectedShape.wireframe ? 'white' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 600 }}
+              >
+                Wireframe
+              </button>
+            </div>
+          </div>
+          
+          {selectedShape.wireframe && (
+            <>
+              <div className="input-group" style={{ marginTop: '16px' }}>
+                <label>
+                  <span>Wireframe Color</span>
+                </label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input 
+                    type="color" 
+                    name="edgeColor" 
+                    value={selectedShape.edgeColor || '#3b82f6'} 
+                    onChange={handleChange}
+                    style={{ flex: 1, height: '32px', padding: '0', cursor: 'pointer', border: '1px solid var(--border-color)', borderRadius: '4px' }}
+                  />
+                </div>
+              </div>
+              
+              <div className="input-group">
+                <label>
+                  <span>Wireframe Thickness</span>
+                  <span>{selectedShape.edgeWidth || 1}</span>
+                </label>
+                <input type="range" name="edgeWidth" min="1" max="10" step="1" value={selectedShape.edgeWidth || 1} onChange={handleChange} />
+              </div>
+            </>
+          )}
+          
+          <div className="input-group" style={{ marginTop: '16px' }}>
+            <label>
               <span>Rotation X</span>
               <span>{((selectedShape.rotationX || 0) * (180/Math.PI)).toFixed(0)}°</span>
             </label>
@@ -687,6 +749,19 @@ CRITICAL INSTRUCTIONS:
             </label>
             <input type="range" name="rotationY" min="0" max={Math.PI * 2} step={0.01} value={selectedShape.rotationY || 0} onChange={handleChange} />
           </div>
+          
+          <button 
+            className="btn btn-secondary" 
+            style={{ width: '100%', marginTop: '16px', padding: '8px', cursor: 'pointer', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px dashed #3b82f6' }}
+            onClick={() => updateAllShapes({ 
+              color: selectedShape.color, 
+              wireframe: selectedShape.wireframe, 
+              edgeColor: selectedShape.edgeColor, 
+              edgeWidth: selectedShape.edgeWidth 
+            })}
+          >
+            Apply Style to All Shapes
+          </button>
         </>
       )}
 

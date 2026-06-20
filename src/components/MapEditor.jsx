@@ -1,14 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Sparkles, Undo, Redo, Download, Compass, Plus, X, Grid, Sliders, Layout, Monitor, Map as MapIcon } from 'lucide-react';
+import { Sparkles, Undo, Redo, Download, Compass, Plus, X, Grid, Sliders, Layout, Monitor, Map as MapIcon, Play, Trash2 } from 'lucide-react';
 import { ObjectRegistry, getCategories } from '../registry/objectRegistry';
 import { MapTemplates } from '../registry/MapTemplates';
 import CanvasEditor2D from './CanvasEditor2D';
 import PropertiesPanel from './PropertiesPanel';
 import TabBar from './TabBar';
 import AIMapGeneratorModal from './AIMapGeneratorModal';
-import TopNavigation from './TopNavigation';
 
-export default function MapEditor({ globalMode, setGlobalMode }) {
+export default function MapEditor({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData }) {
   const [mapTheme, setMapTheme] = useState('paper');
   const [snapToGrid, setSnapToGrid] = useState(false);
 
@@ -250,6 +249,37 @@ export default function MapEditor({ globalMode, setGlobalMode }) {
     }
   };
 
+  const handleSaveToLibrary = async () => {
+    try {
+      const response = await fetch('/api/generations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: crypto.randomUUID(),
+          createdAt: new Date().toISOString(),
+          title: `Map Generation - ${new Date().toLocaleTimeString()}`,
+          category: '2D_MAP',
+          request: { type: 'manual_save' },
+          payload: { shapes: activeDoc.shapes }
+        })
+      });
+
+      if (!response.ok) throw new Error('Network response was not ok');
+      alert('Saved Map to Library successfully!');
+    } catch(e) {
+      console.error(e);
+      alert('Failed to save to Library');
+    }
+  };
+
+  useEffect(() => {
+    if (globalLoadedData && globalLoadedData.category === '2D_MAP') {
+      setShapes(globalLoadedData.payload.shapes);
+      setGlobalLoadedData(null);
+    }
+  }, [globalLoadedData, setShapes, setGlobalLoadedData]);
+
+  // Process AI Insertion
   const handleAddQuestionToCanvas = () => {
     if (!aiQuestion) return;
     const newId = 'ai-text-' + Date.now();
@@ -297,44 +327,11 @@ export default function MapEditor({ globalMode, setGlobalMode }) {
         </div>
         
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <button 
-            className="btn"
-            onClick={() => setIsAIModalOpen(true)}
-            style={{ 
-              padding: '6px 12px', 
-              fontSize: '12px', 
-              background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', 
-              border: 'none', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px', 
-              color: 'white',
-              fontWeight: '600'
-            }}
-          >
-            <Sparkles size={14} /> AI Generate Map ✨
-          </button>
-
           <button className="btn-icon" onClick={handleUndo} title="Undo (Ctrl+Z)" disabled={!activeDoc?.history?.length}>
             <Undo size={18} />
           </button>
           <button className="btn-icon" onClick={handleRedo} title="Redo (Ctrl+Y)" disabled={!activeDoc?.future?.length}>
             <Redo size={18} />
-          </button>
-          
-          <button 
-            className="btn btn-secondary" 
-            onClick={() => {
-              if (window.confirm("Are you sure you want to clear this map?")) {
-                setShapes([]);
-                setSelectedId(null);
-                setAiQuestion('');
-                setAiAnswer('');
-              }
-            }}
-            style={{ padding: '6px 12px', fontSize: '12px', marginLeft: '12px' }}
-          >
-            Clear Canvas
           </button>
         </div>
       </div>
@@ -629,6 +626,42 @@ export default function MapEditor({ globalMode, setGlobalMode }) {
               </div>
             </div>
           )}
+        </div>
+
+        <div style={{ flexShrink: 0, marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+          <div className="section-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '12px' }}>Export & Save</div>
+          
+          <button className="btn" style={{ width: '100%', marginBottom: '6px', display: 'flex', justifyContent: 'center', gap: '8px', padding: '10px', background: '#6366f1' }} onClick={handleSaveToLibrary}>
+            <Download size={16} /> Save Map to Library
+          </button>
+          
+          <button className="btn" style={{ width: '100%', marginBottom: '6px', display: 'flex', justifyContent: 'center', gap: '8px', padding: '10px' }} onClick={() => handleExport('png')}>
+            <Download size={16} /> Export PNG
+          </button>
+          
+          <button className="btn" style={{ width: '100%', marginBottom: '6px', display: 'flex', justifyContent: 'center', gap: '8px', padding: '10px' }} onClick={() => handleExport('json')}>
+            <Download size={16} /> Export JSON
+          </button>
+
+          <button 
+            className="btn" 
+            style={{ width: '100%', marginBottom: '6px', display: 'flex', justifyContent: 'center', gap: '8px', padding: '10px', background: 'transparent', border: '1px solid #ef4444', color: '#f87171' }} 
+            onClick={() => {
+              if (window.confirm("Are you sure you want to clear this map?")) {
+                setShapes([]);
+                setSelectedId(null);
+                setAiQuestion('');
+                setAiAnswer('');
+              }
+            }}
+          >
+            <Trash2 size={16} /> Clear Canvas
+          </button>
+
+          <div className="section-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '12px', marginTop: '16px' }}>AI Generator</div>
+          <button className="btn" style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '8px', padding: '10px' }} onClick={() => setIsAIModalOpen(true)}>
+            <Play size={16} /> Auto-Generate Map
+          </button>
         </div>
       </div>
 

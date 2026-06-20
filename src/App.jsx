@@ -7,10 +7,11 @@ import CanvasEditor3D from './components/CanvasEditor3D';
 import TabBar from './components/TabBar';
 import IconPickerModal from './components/IconPickerModal';
 import AIGeneratorModal from './components/AIGeneratorModal';
+import ThreeDQuestionGenerator from './components/3DQuestionGenerator';
 import { ObjectRegistry } from './registry/objectRegistry';
 import TopNavigation from './components/TopNavigation';
 
-function App({ globalMode, setGlobalMode }) {
+function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData }) {
   const mode = globalMode || '2D';
   const setMode = setGlobalMode || (() => {});
   const is2D = mode === '2D' || mode === 'Equations';
@@ -21,6 +22,7 @@ function App({ globalMode, setGlobalMode }) {
 
   // AI Generator Modal State
   const [isAIGeneratorOpen, setIsAIGeneratorOpen] = useState(false);
+  const [is3DQuestionGeneratorOpen, setIs3DQuestionGeneratorOpen] = useState(false);
   
   // Tab Management State
   const [documents, setDocuments] = useState(() => {
@@ -317,6 +319,38 @@ function App({ globalMode, setGlobalMode }) {
     }
   };
 
+  const handleSaveToLibrary = async () => {
+    try {
+      const payload = is2D 
+        ? { shapes: activeDoc.shapes2D }
+        : { shapes: activeDoc.shapes3D };
+        
+      let category = '2D_GEOMETRY';
+      if (mode === 'Map') category = '2D_MAP';
+      else if (mode === 'Equations') category = 'EQUATIONS';
+      else if (mode === '3D') category = '3D_ELEVATIONS';
+      
+      const response = await fetch('/api/generations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: crypto.randomUUID(),
+          createdAt: new Date().toISOString(),
+          title: `${mode} Generation - ${new Date().toLocaleTimeString()}`,
+          category: category,
+          request: { type: 'manual_save' },
+          payload: payload
+        })
+      });
+
+      if (!response.ok) throw new Error('Network response was not ok');
+      alert('Saved to Library successfully!');
+    } catch(e) {
+      console.error(e);
+      alert('Failed to save to Library');
+    }
+  };
+
   const handleAIGenerate = (prompt) => {
     // Demo generation logic based on prompt keywords
     const newShapes = [];
@@ -419,13 +453,34 @@ function App({ globalMode, setGlobalMode }) {
   const selectedShape3D = shapes3D.find(s => s.id === selectedId3D);
   const selectedShape = is2D ? selectedShape2D : selectedShape3D;
 
+  useEffect(() => {
+    if (globalLoadedData) {
+      if (globalLoadedData.category === '2D_GEOMETRY' || globalLoadedData.category === 'EQUATIONS') {
+        setActiveShapes(globalLoadedData.payload.shapes, false);
+      } else if (globalLoadedData.category === '3D_ELEVATIONS' || globalLoadedData.category === '3D_NET_QUIZ') {
+        setIs3DQuestionGeneratorOpen(true);
+      }
+      setGlobalLoadedData(null);
+    }
+  }, [globalLoadedData, setActiveShapes, setGlobalLoadedData]);
+
   return (
-    <div className="app-container">
+    <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', background: '#0f172a', color: '#f8fafc', overflow: 'hidden' }}>
       <div className="sub-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', background: '#1e293b', borderBottom: '1px solid #334155' }}>
         <div style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>
           {mode === '2D' ? 'Geometry Tools' : mode === 'Equations' ? 'Equations Tools' : '3D Builder Tools'}
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          {mode === '3D' && (
+            <button 
+              className="btn" 
+              onClick={() => setIs3DQuestionGeneratorOpen(true)}
+              style={{ padding: '6px 12px', fontSize: '12px', background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)', border: 'none', display: 'flex', alignItems: 'center', gap: '6px', color: 'white', fontWeight: '600' }}
+            >
+              <Sparkles size={14} /> 3D Questions
+            </button>
+          )}
+          <div style={{ width: '1px', background: '#334155', margin: '0 4px' }} />
           <button className="btn-icon" onClick={handleUndo} title="Undo (Ctrl+Z)" disabled={!activeDoc.history2D?.length}>
             <Undo size={18} />
           </button>
@@ -435,14 +490,16 @@ function App({ globalMode, setGlobalMode }) {
         </div>
       </div>
 
-      <Sidebar 
-        mode={mode} 
-        setMode={setMode} 
-        addShape={addShape} 
-        handleExport={handleExport}
-        recentlyUsed={recentlyUsed}
-        openAIGenerator={() => setIsAIGeneratorOpen(true)}
-      />
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <Sidebar 
+          mode={mode} 
+          setMode={setMode} 
+          addShape={addShape} 
+          handleExport={handleExport}
+          handleSaveToLibrary={handleSaveToLibrary}
+          recentlyUsed={recentlyUsed}
+          openAIGenerator={() => setIsAIGeneratorOpen(true)}
+        />
 
       <div className="canvas-area" style={{ flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start' }}>
         <TabBar 
@@ -472,7 +529,8 @@ function App({ globalMode, setGlobalMode }) {
                 canvasRef={canvasRef3D}
               />
             )}
-          </div></div>
+          </div>
+      </div>
 
       <PropertiesPanel 
         selectedShape={selectedShape}
@@ -500,6 +558,18 @@ function App({ globalMode, setGlobalMode }) {
         onClose={() => setIsAIGeneratorOpen(false)} 
         onGenerate={handleAIGenerate}
       />
+      {is3DQuestionGeneratorOpen && (
+        <ThreeDQuestionGenerator 
+          initialData={globalLoadedData}
+          onClose={() => {
+            setIs3DQuestionGeneratorOpen(false);
+          }} 
+          onSave={(generatedShapes) => {
+            setActiveShapes(generatedShapes, true);
+          }}
+        />
+      )}
+    </div>
     </div>
   );
 }

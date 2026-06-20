@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Download, Play, Box, Cylinder, Globe, Search, ChevronDown, ChevronUp, Compass } from 'lucide-react';
+import { Download, Play, Box, Cylinder, Globe, Search, ChevronDown, ChevronUp, Compass, Triangle, Hexagon } from 'lucide-react';
 import { ObjectRegistry, getCategories } from '../registry/objectRegistry';
 
-export default function Sidebar({ mode, setMode, addShape, handleExport, recentlyUsed = [], openAIGenerator }) {
+export default function Sidebar({ mode, setMode, addShape, handleExport, handleSaveToLibrary, recentlyUsed = [], openAIGenerator }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedCategories, setExpandedCategories] = useState({});
 
@@ -128,16 +128,34 @@ export default function Sidebar({ mode, setMode, addShape, handleExport, recentl
 
         ) : (
           <>
-            <div className="section-title" style={{ marginTop: '24px', fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px' }}>Basic Shapes</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button className="shape-btn" onClick={() => addShape('cube')} style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '12px', color: 'white', cursor: 'pointer' }}>
-                <Box size={16} style={{ color: 'var(--accent)' }} /> Cube
+            <div className="section-title" style={{ marginTop: '24px', fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px' }}>Basic 3D Shapes</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+              <button className="shape-card" onClick={() => addShape('cube')} style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '12px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'white' }}>
+                <Box size={16} style={{ color: 'var(--accent)' }} /> <span style={{ fontSize: '11px', textAlign: 'center' }}>Cube</span>
               </button>
-              <button className="shape-btn" onClick={() => addShape('cylinder')} style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '12px', color: 'white', cursor: 'pointer' }}>
-                <Cylinder size={16} style={{ color: 'var(--accent)' }} /> Cylinder
+              <button className="shape-card" onClick={() => addShape('cuboid')} style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '12px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'white' }}>
+                <Box size={16} style={{ color: 'var(--accent)' }} /> <span style={{ fontSize: '11px', textAlign: 'center' }}>Cuboid</span>
               </button>
-              <button className="shape-btn" onClick={() => addShape('sphere')} style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '12px', color: 'white', cursor: 'pointer' }}>
-                <Globe size={16} style={{ color: 'var(--accent)' }} /> Sphere
+              <button className="shape-card" onClick={() => addShape('cylinder')} style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '12px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'white' }}>
+                <Cylinder size={16} style={{ color: 'var(--accent)' }} /> <span style={{ fontSize: '11px', textAlign: 'center' }}>Cylinder</span>
+              </button>
+              <button className="shape-card" onClick={() => addShape('cone')} style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '12px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'white' }}>
+                <Cylinder size={16} style={{ color: 'var(--accent)' }} /> <span style={{ fontSize: '11px', textAlign: 'center' }}>Cone</span>
+              </button>
+              <button className="shape-card" onClick={() => addShape('sphere')} style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '12px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'white' }}>
+                <Globe size={16} style={{ color: 'var(--accent)' }} /> <span style={{ fontSize: '11px', textAlign: 'center' }}>Sphere</span>
+              </button>
+              <button className="shape-card" onClick={() => addShape('squarePyramid')} style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '12px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'white' }}>
+                <Triangle size={16} style={{ color: 'var(--accent)' }} /> <span style={{ fontSize: '11px', textAlign: 'center' }}>Square Pyramid</span>
+              </button>
+              <button className="shape-card" onClick={() => addShape('tetrahedron')} style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '12px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'white' }}>
+                <Triangle size={16} style={{ color: 'var(--accent)' }} /> <span style={{ fontSize: '11px', textAlign: 'center' }}>Tetrahedron</span>
+              </button>
+              <button className="shape-card" onClick={() => addShape('octahedron')} style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '12px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'white' }}>
+                <Hexagon size={16} style={{ color: 'var(--accent)' }} /> <span style={{ fontSize: '11px', textAlign: 'center' }}>Octahedron</span>
+              </button>
+              <button className="shape-card" onClick={() => addShape('triangularPrism')} style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '12px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'white' }}>
+                <Box size={16} style={{ color: 'var(--accent)' }} /> <span style={{ fontSize: '11px', textAlign: 'center' }}>Triangular Prism</span>
               </button>
             </div>
           </>
@@ -145,7 +163,10 @@ export default function Sidebar({ mode, setMode, addShape, handleExport, recentl
       </div>
 
       <div style={{ flexShrink: 0, marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-        <div className="section-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '12px' }}>Export</div>
+        <div className="section-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '12px' }}>Export & Save</div>
+        <button className="btn" style={{ width: '100%', marginBottom: '6px', display: 'flex', justifyContent: 'center', gap: '8px', padding: '10px', background: '#6366f1' }} onClick={handleSaveToLibrary}>
+          <Download size={16} /> Save to Library
+        </button>
         <button className="btn" style={{ width: '100%', marginBottom: '6px', display: 'flex', justifyContent: 'center', gap: '8px', padding: '10px' }} onClick={() => handleExport('png')}>
           <Download size={16} /> Export PNG
         </button>
@@ -154,9 +175,6 @@ export default function Sidebar({ mode, setMode, addShape, handleExport, recentl
         </button>
         <button className="btn" style={{ width: '100%', marginBottom: '6px', display: 'flex', justifyContent: 'center', gap: '8px', padding: '10px' }} onClick={() => handleExport('json')}>
           <Download size={16} /> Export JSON
-        </button>
-        <button className="btn btn-secondary" style={{ width: '100%', marginBottom: '12px', display: 'flex', justifyContent: 'center', gap: '8px', padding: '10px' }} onClick={() => handleExport('pdf')}>
-          <Download size={16} /> Export PDF (WIP)
         </button>
 
         <div className="section-title" style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '12px' }}>AI Generator</div>
