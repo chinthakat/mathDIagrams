@@ -23,6 +23,7 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
   // AI Generator Modal State
   const [isAIGeneratorOpen, setIsAIGeneratorOpen] = useState(false);
   const [is3DQuestionGeneratorOpen, setIs3DQuestionGeneratorOpen] = useState(false);
+  const [loadedQuizData, setLoadedQuizData] = useState(null);
   
   // Tab Management State
   const [documents, setDocuments] = useState(() => {
@@ -458,6 +459,7 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
       if (globalLoadedData.category === '2D_GEOMETRY' || globalLoadedData.category === 'EQUATIONS') {
         setActiveShapes(globalLoadedData.payload.shapes, false);
       } else if (globalLoadedData.category === '3D_ELEVATIONS' || globalLoadedData.category === '3D_NET_QUIZ') {
+        setLoadedQuizData(globalLoadedData);
         setIs3DQuestionGeneratorOpen(true);
       }
       setGlobalLoadedData(null);
@@ -560,9 +562,10 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
       />
       {is3DQuestionGeneratorOpen && (
         <ThreeDQuestionGenerator 
-          initialData={globalLoadedData}
+          initialData={loadedQuizData}
           onClose={() => {
             setIs3DQuestionGeneratorOpen(false);
+            setLoadedQuizData(null);
           }} 
           onSave={(generatedShapes) => {
             setActiveShapes(generatedShapes, true);
