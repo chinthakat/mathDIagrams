@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Projects\\\\MathsDIagrams\" -Recurse)",
+      "Bash(Select-Object FullName)",
+      "PowerShell(head -150)",
+      "Bash(ls /mnt/)",
+      "Read(//c//**)",
+      "Read(//proc/**)",
+      "Bash(powershell.exe -Command \"Get-ChildItem C:\\\\Projects\")",
+      "Bash(xargs grep -l \"claude\\\\|openai\\\\|generate.*question\\\\|agentic\")",
+      "PowerShell(cd \"C:\\\\Projects\\\\MathsDIagrams\\\\app\"; Start-Process -NoNewWindow -FilePath \"node\" -ArgumentList \"C:\\\\Program Files\\\\nodejs\\\\node_modules\\\\npm\\\\bin\\\\npm-cli.js\", \"run\", \"dev\" -RedirectStandardOutput \"$env:TEMP\\\\vite-dev.log\" -RedirectStandardError \"$env:TEMP\\\\vite-dev-err.log\"; Start-Sleep -Seconds 4; Get-Content \"$env:TEMP\\\\vite-dev.log\", \"$env:TEMP\\\\vite-dev-err.log\" -ErrorAction SilentlyContinue | Select-Object -First 20)",
+      "Bash(npm run *)",
+      "mcp__Claude_Preview__preview_start",
+      "mcp__Claude_in_Chrome__navigate",
+      "PowerShell(Stop-Process -Id 6656 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(\"Port freed\")",
+      "Bash(node index.js)",
+      "Bash(Get-Content \"C:\\\\Projects\\\\MathsDIagrams\\\\server\\\\logs\\\\repair_pipeline.log\")",
+      "Bash(Select-Object -Last 200)",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git fetch *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)"
+    ]
+  }
+}
