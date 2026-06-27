@@ -1459,6 +1459,30 @@ export const ObjectRegistry = {
     ],
   },
 
+  // ── Connector Arrows (rendered natively in CanvasEditor2D, not via Component) ──
+
+  connectorArrow: {
+    id: 'connectorArrow',
+    category: 'Arrows',
+    name: 'Connector Arrow',
+    icon: <ArrowRight size={18} />,
+    defaultProps: {
+      x1: 0, y1: 0, x2: 160, y2: 0,
+      startBinding: null, endBinding: null,
+      stroke: '#64748b', strokeWidth: 2,
+      pointerAtEnd: true, pointerAtStart: false,
+      dash: false,
+    },
+    Component: null,
+    properties: [
+      { name: 'stroke',      label: 'Color',     type: 'color' },
+      { name: 'strokeWidth', label: 'Thickness', type: 'range', min: 1, max: 10 },
+      { name: 'pointerAtEnd',   label: 'Arrow at End',   type: 'checkbox' },
+      { name: 'pointerAtStart', label: 'Arrow at Start', type: 'checkbox' },
+      { name: 'dash',        label: 'Dashed',    type: 'checkbox' },
+    ],
+  },
+
   // ── Diagram Annotations ────────────────────────────────────────────────────
 
   spiderIcon: {

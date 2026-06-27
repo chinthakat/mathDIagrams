@@ -1,11 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Stage, Layer, Transformer, Group, Rect, Circle, Line, Path } from 'react-konva';
+import { Stage, Layer, Transformer, Group, Rect, Circle, Line, Path, Arrow } from 'react-konva';
+import { getConnectionPoints, resolveEndpoint, findNearestConnectionPoint } from '../utils/connectionUtils';
 import { ObjectRegistry } from '../registry/objectRegistry';
 import { MousePointer2, Pen, Highlighter, Square as SquareIcon, Circle as CircleIcon, Minus, Shapes, Triangle, Star, Hexagon, ArrowRight, Eraser } from 'lucide-react';
 
 const GRID_SIZE = 20;
 
-const ShapeElement = ({ shapeProps, isSelected, onSelect, onDelete, onChange, snapToGrid, allShapes, drawMode }) => {
+const ShapeElement = ({ shapeProps, isSelected, onSelect, onDelete, onChange, snapToGrid, allShapes, drawMode, onHoverChange }) => {
   const shapeRef = useRef();
   const trRef = useRef();
 
@@ -109,9 +110,10 @@ const ShapeElement = ({ shapeProps, isSelected, onSelect, onDelete, onChange, sn
   const commonProps = {
     onClick: drawMode === 'select' ? onSelect : drawMode === 'eraser' ? onDelete : undefined,
     onTap: drawMode === 'select' ? onSelect : drawMode === 'eraser' ? onDelete : undefined,
-    onMouseEnter: drawMode === 'eraser' ? (e) => {
-      if (e.evt.buttons === 1) onDelete();
-    } : undefined,
+    onMouseEnter: drawMode === 'eraser'
+      ? (e) => { if (e.evt.buttons === 1) onDelete(); onHoverChange?.(shapeProps.id); }
+      : () => onHoverChange?.(shapeProps.id),
+    onMouseLeave: () => onHoverChange?.(null),
     ref: shapeRef,
     ...shapeProps,
     draggable: drawMode === 'select',
@@ -268,7 +270,12 @@ export default function CanvasEditor2D({
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [stageConfig, setStageConfig] = useState({ scale: 1, x: 0, y: 0 });
   const [snapToGrid, setSnapToGrid] = useState(showGrid);
-  
+
+  // Connector / connection-point state
+  const [hoveredShapeId, setHoveredShapeId] = useState(null);
+  const [isDraggingEndpoint, setIsDraggingEndpoint] = useState(false);
+  const snapIndicatorRef = useRef(null);
+
   // Drawing Tools State
   const [drawMode, setDrawMode] = useState('select');
   const [drawColor, setDrawColor] = useState('#ef4444');
@@ -426,17 +433,21 @@ export default function CanvasEditor2D({
     // Get center of current view
     const centerX = -stageConfig.x / stageConfig.scale + dimensions.width / 2 / stageConfig.scale;
     const centerY = -stageConfig.y / stageConfig.scale + dimensions.height / 2 / stageConfig.scale;
-    
+
     const baseShape = ObjectRegistry[type]?.defaultProps || {};
     const newShapeId = `${type}-${Date.now()}`;
-    
+
+    // Connector arrows use x1/y1/x2/y2 instead of a single x/y anchor
+    const posProps = type === 'connectorArrow'
+      ? { x1: centerX - 80, y1: centerY, x2: centerX + 80, y2: centerY }
+      : { x: centerX, y: centerY };
+
     const newShape = {
       ...baseShape,
       ...overrideProps,
       id: newShapeId,
       type: type,
-      x: centerX,
-      y: centerY
+      ...posProps,
     };
 
     setShapes([...shapes, newShape]);
@@ -560,6 +571,7 @@ export default function CanvasEditor2D({
                   { type: 'triangle', icon: <Triangle size={16} />, label: 'Triangle' },
                   { type: 'polygon', overrides: { sides: 5 }, icon: <Star size={16} />, label: 'Pentagon' },
                   { type: 'polygon', overrides: { sides: 6 }, icon: <Hexagon size={16} />, label: 'Hexagon' },
+                  { type: 'connectorArrow', icon: <ArrowRight size={16} />, label: 'Connector' },
                   { type: 'line', overrides: { pointerWidth: 10, pointerLength: 10 }, icon: <ArrowRight size={16} />, label: 'Arrow' },
                   { type: 'point', icon: <CircleIcon size={16} fill="currentColor" />, label: 'Point' }
                 ].map(s => (
@@ -639,7 +651,8 @@ export default function CanvasEditor2D({
           {/* Beautiful vector background decorations moving with stage */}
           <BackgroundDecorations theme={mapTheme} />
 
-          {shapes.map((shape) => (
+          {/* Regular (non-connector) shapes */}
+          {shapes.filter(s => s.type !== 'connectorArrow').map((shape) => (
             <ShapeElement
               key={shape.id}
               shapeProps={shape}
@@ -650,8 +663,130 @@ export default function CanvasEditor2D({
               snapToGrid={snapToGrid}
               allShapes={shapes}
               drawMode={drawMode}
+              onHoverChange={drawMode === 'select' ? setHoveredShapeId : undefined}
             />
           ))}
+
+          {/* Connector arrow lines */}
+          {shapes.filter(s => s.type === 'connectorArrow').map(conn => {
+            const start = resolveEndpoint(conn.startBinding, conn.x1 ?? conn.x ?? 0, conn.y1 ?? conn.y ?? 0, shapes);
+            const end   = resolveEndpoint(conn.endBinding,   conn.x2 ?? (conn.x ?? 0) + 150, conn.y2 ?? conn.y ?? 0, shapes);
+            const isSelected = conn.id === selectedId;
+            return (
+              <Arrow
+                key={conn.id}
+                points={[start.x, start.y, end.x, end.y]}
+                stroke={isSelected ? '#3b82f6' : (conn.stroke || '#94a3b8')}
+                strokeWidth={conn.strokeWidth || 2}
+                pointerLength={conn.pointerAtEnd !== false ? 10 : 0}
+                pointerWidth={conn.pointerAtEnd  !== false ? 10 : 0}
+                fill={isSelected ? '#3b82f6' : (conn.stroke || '#94a3b8')}
+                dash={conn.dash ? [8, 4] : undefined}
+                hitStrokeWidth={16}
+                listening={drawMode === 'select' || drawMode === 'eraser'}
+                onClick={() => {
+                  if (drawMode === 'select') { setSelectedId(conn.id); setHoveredShapeId(null); }
+                  if (drawMode === 'eraser') deleteShape(conn.id);
+                }}
+                onTap={() => drawMode === 'select' && setSelectedId(conn.id)}
+              />
+            );
+          })}
+
+          {/* ── Connection-point overlay ── */}
+
+          {/* Dots on hovered shape (or all shapes while dragging an endpoint) */}
+          {(isDraggingEndpoint
+            ? shapes.filter(s => s.type !== 'connectorArrow' && s.type !== 'freehand')
+            : hoveredShapeId ? [shapes.find(s => s.id === hoveredShapeId)].filter(Boolean) : []
+          ).flatMap(shape =>
+            getConnectionPoints(shape).map((pt, i) => (
+              <Circle
+                key={`cp-${shape.id}-${i}`}
+                x={pt.x}
+                y={pt.y}
+                radius={5}
+                fill="#3b82f6"
+                stroke="#ffffff"
+                strokeWidth={1.5}
+                opacity={0.9}
+                listening={false}
+              />
+            ))
+          )}
+
+          {/* Snap-target ring (imperatively controlled — no React state change during drag) */}
+          <Circle
+            ref={snapIndicatorRef}
+            x={0}
+            y={0}
+            radius={11}
+            fill="rgba(59,130,246,0.18)"
+            stroke="#3b82f6"
+            strokeWidth={2.5}
+            visible={false}
+            listening={false}
+          />
+
+          {/* Endpoint handles for the selected connector */}
+          {(() => {
+            if (!selectedId || drawMode !== 'select') return null;
+            const conn = shapes.find(s => s.id === selectedId && s.type === 'connectorArrow');
+            if (!conn) return null;
+
+            const start = resolveEndpoint(conn.startBinding, conn.x1 ?? conn.x ?? 0, conn.y1 ?? conn.y ?? 0, shapes);
+            const end   = resolveEndpoint(conn.endBinding,   conn.x2 ?? (conn.x ?? 0) + 150, conn.y2 ?? conn.y ?? 0, shapes);
+
+            const makeHandle = (pos, endKey) => (
+              <Circle
+                key={`ep-${conn.id}-${endKey}`}
+                x={pos.x}
+                y={pos.y}
+                radius={7}
+                fill={endKey === 'start' ? '#10b981' : '#f59e0b'}
+                stroke="#ffffff"
+                strokeWidth={2.5}
+                draggable
+                onDragStart={() => {
+                  setIsDraggingEndpoint(true);
+                  setHoveredShapeId(null);
+                }}
+                onDragMove={(e) => {
+                  const p = { x: e.target.x(), y: e.target.y() };
+                  const snap = findNearestConnectionPoint(p, shapes, conn.id);
+                  if (snap) {
+                    e.target.x(snap.x);
+                    e.target.y(snap.y);
+                    if (snapIndicatorRef.current) {
+                      snapIndicatorRef.current.x(snap.x);
+                      snapIndicatorRef.current.y(snap.y);
+                      snapIndicatorRef.current.visible(true);
+                      snapIndicatorRef.current.getLayer()?.batchDraw();
+                    }
+                  } else if (snapIndicatorRef.current) {
+                    snapIndicatorRef.current.visible(false);
+                    snapIndicatorRef.current.getLayer()?.batchDraw();
+                  }
+                }}
+                onDragEnd={(e) => {
+                  setIsDraggingEndpoint(false);
+                  if (snapIndicatorRef.current) snapIndicatorRef.current.visible(false);
+                  const p = { x: e.target.x(), y: e.target.y() };
+                  const snap = findNearestConnectionPoint(p, shapes, conn.id);
+                  const binding = snap ? { shapeId: snap.shapeId, pointIndex: snap.pointIndex } : null;
+                  const fx = snap?.x ?? p.x;
+                  const fy = snap?.y ?? p.y;
+                  if (endKey === 'start') {
+                    updateShape(conn.id, { x1: fx, y1: fy, startBinding: binding });
+                  } else {
+                    updateShape(conn.id, { x2: fx, y2: fy, endBinding: binding });
+                  }
+                }}
+              />
+            );
+
+            return [makeHandle(start, 'start'), makeHandle(end, 'end')];
+          })()}
         </Layer>
       </Stage>
     </div>
