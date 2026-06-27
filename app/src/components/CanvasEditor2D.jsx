@@ -625,7 +625,7 @@ export default function CanvasEditor2D({
           <Group key={`cp-${shape.id}-${i}`} x={pt.x} y={pt.y} listening={false}>
             {isSnapped
               ? <Circle radius={8} fill="rgba(16,185,129,0.25)" stroke="#10b981" strokeWidth={2} />
-              : <> <Line points={[-5,0,5,0]} stroke="#3b82f6" strokeWidth={1.5} opacity={0.8} /> <Line points={[0,-5,0,5]} stroke="#3b82f6" strokeWidth={1.5} opacity={0.8} /> </>
+              : <React.Fragment><Line points={[-5,0,5,0]} stroke="#3b82f6" strokeWidth={1.5} opacity={0.8} /><Line points={[0,-5,0,5]} stroke="#3b82f6" strokeWidth={1.5} opacity={0.8} /></React.Fragment>
             }
           </Group>
         );
