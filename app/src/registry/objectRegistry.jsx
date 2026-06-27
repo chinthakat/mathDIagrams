@@ -49,6 +49,7 @@ import BearingsMarker from '../components/MathObjects/BearingsMarker';
 import SpiderIcon from '../components/MathObjects/SpiderIcon';
 import JSXGraphBoard from '../components/MathObjects/JSXGraphBoard';
 import TikZRenderer from '../components/MathObjects/TikZRenderer';
+import RasterImage from '../components/MathObjects/RasterImage';
 import DottedLineArrow from '../components/MathObjects/DottedLineArrow';
 import ElbowArrow from '../components/MathObjects/ElbowArrow';
 import BezierArrow from '../components/MathObjects/BezierArrow';
@@ -1379,6 +1380,25 @@ export const ObjectRegistry = {
       { name: 'label', label: 'Custom Label', type: 'text' },
       { name: 'stroke', label: 'Line Color', type: 'color' }
     ]
+  },
+
+  // ── Raster image (for TikZ output, imported PNGs, screenshots) ──────────────
+
+  rasterImage: {
+    id: 'rasterImage',
+    category: 'Images & Icons',
+    name: 'Raster Image',
+    icon: <ImageIcon size={18} />,
+    defaultProps: { src: '', width: 320, height: 240, opacity: 1, rotation: 0 },
+    Component: ({ props }) => (
+      <RasterImage src={props.src} width={props.width} height={props.height} opacity={props.opacity} />
+    ),
+    properties: [
+      { name: 'src',     label: 'Image src (URL or data-URL)', type: 'text' },
+      { name: 'width',   label: 'Width',   type: 'number' },
+      { name: 'height',  label: 'Height',  type: 'number' },
+      { name: 'opacity', label: 'Opacity', type: 'range', min: 0.1, max: 1, step: 0.05 },
+    ],
   },
 
   // ── Math Engines (JSXGraph + TikZ embedded objects) ─────────────────────────

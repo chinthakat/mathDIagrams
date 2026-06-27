@@ -7,7 +7,7 @@ import {
   resolveImageUrl,
 } from '../services/lmsApiService.js';
 import QuestionEditModal from './QuestionEditModal.jsx';
-import DiagramEngineModal from './DiagramEngineModal.jsx';
+import DiagramEditorModal from './DiagramEditorModal.jsx';
 
 const S = {
   root: { display: 'flex', flexDirection: 'column', height: '100%', background: '#0f172a', color: '#e2e8f0', fontFamily: 'system-ui, sans-serif', overflow: 'hidden' },
@@ -344,9 +344,9 @@ export default function MockExamBrowser() {
         />
       )}
 
-      {/* Multi-engine diagram editor (Konva / JSXGraph / TikZ) */}
+      {/* Single-engine Konva diagram editor (beta) */}
       {canvasEditingQuestion && (
-        <DiagramEngineModal
+        <DiagramEditorModal
           question={canvasEditingQuestion}
           onClose={() => setCanvasEditingQuestion(null)}
           onSaved={(updated) => {
