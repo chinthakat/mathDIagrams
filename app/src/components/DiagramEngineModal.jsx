@@ -287,6 +287,12 @@ export default function DiagramEngineModal({ question, onClose, onSaved }) {
     setRecentlyUsed(prev => [type, ...prev.filter(t => t !== type)].slice(0, 10));
   };
 
+  const addClipart = item => {
+    const id = `clipart_${Date.now()}`;
+    setShapes(prev => [...prev, { id, type: 'rasterImage', x: 360, y: 210, src: item.url, width: 80, height: 80, opacity: 1, rotation: 0 }]);
+    setSelectedId(id);
+  };
+
   const updateShape = (id, p) => setShapes(prev => prev.map(s => s.id === id ? { ...s, ...p } : s));
   const deleteShape = (id) => { setShapes(prev => prev.filter(s => s.id !== id)); if (selectedId === id) setSelectedId(null); };
   const reorderShape = (id, dir) => setShapes(prev => {
@@ -407,6 +413,7 @@ export default function DiagramEngineModal({ question, onClose, onSaved }) {
                 mode="Geometry"
                 setMode={() => {}}
                 addShape={addShape}
+                addClipart={addClipart}
                 handleExport={() => {}}
                 handleSaveToLibrary={() => {}}
                 recentlyUsed={recentlyUsed}

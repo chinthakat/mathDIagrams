@@ -1,10 +1,33 @@
-import React, { useState } from 'react';
-import { Download, Play, Box, Cylinder, Globe, Search, ChevronDown, ChevronUp, Compass, Triangle, Hexagon } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { Download, Play, Box, Cylinder, Globe, Search, ChevronDown, ChevronUp, Compass, Triangle, Hexagon, Smile } from 'lucide-react';
 import { ObjectRegistry, getCategories } from '../registry/objectRegistry';
+import ClipArtPanel from './ClipArtPanel';
 
-export default function Sidebar({ mode, setMode, addShape, handleExport, handleSaveToLibrary, recentlyUsed = [], openAIGenerator }) {
+export default function Sidebar({ mode, setMode, addShape, addClipart, handleExport, handleSaveToLibrary, recentlyUsed = [], openAIGenerator }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedCategories, setExpandedCategories] = useState({});
+  const [sidebarTab, setSidebarTab] = useState('shapes');
+  const [sidebarWidth, setSidebarWidth] = useState(260);
+
+  const onResizeMouseDown = useCallback((e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+    const onMove = (mv) => {
+      const next = Math.min(520, Math.max(180, startWidth + mv.clientX - startX));
+      setSidebarWidth(next);
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [sidebarWidth]);
 
   const rawCategories = getCategories();
   const categories = {};
@@ -42,10 +65,40 @@ export default function Sidebar({ mode, setMode, addShape, handleExport, handleS
   };
 
   return (
-    <div className="sidebar" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+    <div className="sidebar" style={{ width: sidebarWidth, minWidth: sidebarWidth, maxWidth: sidebarWidth, overflowY: 'auto', display: 'flex', flexDirection: 'column', position: 'relative', flexShrink: 0 }}>
+      {/* Drag-to-resize handle */}
+      <div
+        onMouseDown={onResizeMouseDown}
+        style={{ position: 'absolute', top: 0, right: 0, width: '5px', height: '100%', cursor: 'col-resize', zIndex: 10, background: 'transparent' }}
+        title="Drag to resize"
+      />
       <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px' }}>
         {(mode === '2D' || mode === 'Geometry' || mode === 'Equations') ? (
           <>
+            {/* Tab switcher */}
+            <div style={{ display: 'flex', gap: '4px', marginBottom: '12px' }}>
+              <button
+                onClick={() => setSidebarTab('shapes')}
+                style={{ flex: 1, padding: '6px', borderRadius: '6px', border: '1px solid', cursor: 'pointer', fontSize: '11px', fontWeight: 700,
+                  borderColor: sidebarTab === 'shapes' ? 'var(--accent)' : 'var(--border-color)',
+                  background:  sidebarTab === 'shapes' ? 'rgba(99,102,241,0.15)' : 'var(--bg-dark)',
+                  color:       sidebarTab === 'shapes' ? 'var(--accent)' : 'var(--text-muted)',
+                }}
+              >Shapes</button>
+              <button
+                onClick={() => setSidebarTab('clipart')}
+                style={{ flex: 1, padding: '6px', borderRadius: '6px', border: '1px solid', cursor: 'pointer', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                  borderColor: sidebarTab === 'clipart' ? 'var(--accent)' : 'var(--border-color)',
+                  background:  sidebarTab === 'clipart' ? 'rgba(99,102,241,0.15)' : 'var(--bg-dark)',
+                  color:       sidebarTab === 'clipart' ? 'var(--accent)' : 'var(--text-muted)',
+                }}
+              ><Smile size={12} /> Clip Art</button>
+            </div>
+
+            {sidebarTab === 'clipart' ? (
+              <ClipArtPanel onInsert={item => addClipart?.(item)} />
+            ) : (
+            <>
             <div className="modal-search" style={{ marginBottom: '16px', background: 'var(--bg-dark)', borderRadius: '6px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', padding: '0 8px' }}>
               <Search size={16} className="search-icon" style={{ color: 'var(--text-muted)' }} />
               <input 
@@ -123,6 +176,8 @@ export default function Sidebar({ mode, setMode, addShape, handleExport, handleS
                   );
                 })}
               </>
+            )}
+            </>
             )}
           </>
 

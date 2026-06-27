@@ -55,6 +55,12 @@ import ElbowArrow from '../components/MathObjects/ElbowArrow';
 import BezierArrow from '../components/MathObjects/BezierArrow';
 import { PieChart, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon, Bug, Waypoints, CornerDownRight, Spline, Code } from 'lucide-react';
 
+const getNumeric = (val, fallback) => {
+  if (val === null || val === undefined) return fallback;
+  const num = Number(val);
+  return Number.isNaN(num) ? fallback : num;
+};
+
 const ICON_PRESETS = [
   { value: 'https://upload.wikimedia.org/wikipedia/en/thumb/b/b9/Flag_of_Australia.svg/1200px-Flag_of_Australia.svg.png', label: 'Australian Flag' },
   { value: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/ae/Flag_of_the_United_Kingdom.svg/1200px-Flag_of_the_United_Kingdom.svg.png', label: 'UK Flag' },
@@ -134,7 +140,11 @@ export const ObjectRegistry = {
     name: 'Rectangle',
     icon: <Square size={18} />,
     defaultProps: { width: 100, height: 100, fill: '#3b82f6', stroke: '#2563eb', strokeWidth: 2, rotation: 0 },
-    Component: ({ props }) => <KonvaRect x={-props.width / 2} y={-props.height / 2} width={props.width} height={props.height} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
+    Component: ({ props }) => {
+      const w = getNumeric(props.width, 100);
+      const h = getNumeric(props.height, 100);
+      return <KonvaRect x={-w / 2} y={-h / 2} width={w} height={h} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />;
+    },
     properties: [
       { name: 'fill', label: 'Fill Color', type: 'color' },
       { name: 'stroke', label: 'Border Color', type: 'color' },
@@ -149,7 +159,10 @@ export const ObjectRegistry = {
     name: 'Circle',
     icon: <Circle size={18} />,
     defaultProps: { radius: 50, fill: '#3b82f6', stroke: '#2563eb', strokeWidth: 2, rotation: 0 },
-    Component: ({ props }) => <KonvaCircle radius={props.radius} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
+    Component: ({ props }) => {
+      const r = getNumeric(props.radius, 50);
+      return <KonvaCircle radius={r} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />;
+    },
     properties: [
       { name: 'fill', label: 'Fill Color', type: 'color' },
       { name: 'stroke', label: 'Border Color', type: 'color' },
@@ -163,7 +176,10 @@ export const ObjectRegistry = {
     name: 'Triangle',
     icon: <Triangle size={18} />,
     defaultProps: { radius: 50, fill: '#3b82f6', stroke: '#2563eb', strokeWidth: 2, rotation: 0 },
-    Component: ({ props }) => <KonvaPolygon sides={3} radius={props.radius} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
+    Component: ({ props }) => {
+      const r = getNumeric(props.radius, 50);
+      return <KonvaPolygon sides={3} radius={r} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />;
+    },
     properties: [
       { name: 'fill', label: 'Fill Color', type: 'color' },
       { name: 'stroke', label: 'Border Color', type: 'color' },
@@ -177,7 +193,11 @@ export const ObjectRegistry = {
     name: 'Polygon',
     icon: <Hexagon size={18} />,
     defaultProps: { sides: 5, radius: 50, fill: '#3b82f6', stroke: '#2563eb', strokeWidth: 2, rotation: 0 },
-    Component: ({ props }) => <KonvaPolygon sides={props.sides} radius={props.radius} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
+    Component: ({ props }) => {
+      const s = getNumeric(props.sides, 5);
+      const r = getNumeric(props.radius, 50);
+      return <KonvaPolygon sides={s} radius={r} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />;
+    },
     properties: [
       { name: 'fill', label: 'Fill Color', type: 'color' },
       { name: 'stroke', label: 'Border Color', type: 'color' },
@@ -186,13 +206,46 @@ export const ObjectRegistry = {
       { name: 'sides', label: 'Number of Sides', type: 'range', min: 3, max: 12 }
     ]
   },
+  customPolygon: {
+    id: 'customPolygon',
+    category: 'Basic Shapes',
+    name: 'Custom Polygon',
+    icon: <Hexagon size={18} />,
+    defaultProps: { points: [-20, -20, 20, -20, 20, 20, -20, 20], fill: '#3b82f6', stroke: '#2563eb', strokeWidth: 2, closed: true, rotation: 0 },
+    Component: ({ props }) => {
+      const pts = Array.isArray(props.points)
+        ? props.points.map(p => {
+            const num = Number(p);
+            return Number.isNaN(num) ? 0 : num;
+          })
+        : [-20, -20, 20, -20, 20, 20, -20, 20];
+      return (
+        <KonvaLine
+          points={pts}
+          fill={props.fill}
+          stroke={props.stroke}
+          strokeWidth={props.strokeWidth ?? 2}
+          closed={props.closed !== false}
+        />
+      );
+    },
+    properties: [
+      { name: 'fill', label: 'Fill Color', type: 'color' },
+      { name: 'stroke', label: 'Border Color', type: 'color' },
+      { name: 'strokeWidth', label: 'Border Width', type: 'range', min: 0, max: 10 },
+      { name: 'closed', label: 'Closed', type: 'checkbox' }
+    ]
+  },
   line: {
     id: 'line',
     category: 'Basic Shapes',
     name: 'Line / Ray',
     icon: <Minus size={18} />,
     defaultProps: { length: 150, stroke: '#334155', strokeWidth: 4, pointerWidth: 0, pointerLength: 0, rotation: 0 },
-    Component: ({ props }) => <KonvaArrow points={[0, 0, props.length, 0]} stroke={props.stroke} strokeWidth={props.strokeWidth} pointerWidth={props.pointerWidth} pointerLength={props.pointerLength} fill={props.stroke} />,
+    Component: ({ props }) => {
+      const len = getNumeric(props.length, 150);
+      return <KonvaArrow points={[0, 0, len, 0]} stroke={props.stroke} strokeWidth={props.strokeWidth} pointerWidth={props.pointerWidth} pointerLength={props.pointerLength} fill={props.stroke} />;
+    },
     properties: [
       { name: 'stroke', label: 'Line Color', type: 'color' },
       { name: 'strokeWidth', label: 'Thickness', type: 'range', min: 1, max: 10 },
@@ -1389,15 +1442,17 @@ export const ObjectRegistry = {
     category: 'Images & Icons',
     name: 'Raster Image',
     icon: <ImageIcon size={18} />,
-    defaultProps: { src: '', width: 320, height: 240, opacity: 1, rotation: 0 },
+    defaultProps: { src: '', width: 320, height: 240, opacity: 1, rotation: 0, flipX: false, flipY: false },
     Component: ({ props }) => (
-      <RasterImage src={props.src} width={props.width} height={props.height} opacity={props.opacity} />
+      <RasterImage src={props.src} width={props.width} height={props.height} opacity={props.opacity} flipX={!!props.flipX} flipY={!!props.flipY} />
     ),
     properties: [
       { name: 'src',     label: 'Image src (URL or data-URL)', type: 'text' },
       { name: 'width',   label: 'Width',   type: 'number' },
       { name: 'height',  label: 'Height',  type: 'number' },
       { name: 'opacity', label: 'Opacity', type: 'range', min: 0.1, max: 1, step: 0.05 },
+      { name: 'flipX',   label: 'Flip Horizontal', type: 'boolean' },
+      { name: 'flipY',   label: 'Flip Vertical',   type: 'boolean' },
     ],
   },
 

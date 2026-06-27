@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Sparkles, Undo, Redo, Download, Compass, Plus, X, Grid, Sliders, Layout, Monitor, Map as MapIcon, Play, Trash2 } from 'lucide-react';
+import { Sparkles, Undo, Redo, Download, Compass, Plus, X, Grid, Sliders, Layout, Monitor, Map as MapIcon, Play, Trash2, Smile } from 'lucide-react';
 import { ObjectRegistry, getCategories } from '../registry/objectRegistry';
 import { MapTemplates } from '../registry/MapTemplates';
 import CanvasEditor2D from './CanvasEditor2D';
 import PropertiesPanel from './PropertiesPanel';
 import TabBar from './TabBar';
 import AIMapGeneratorModal from './AIMapGeneratorModal';
+import ClipArtPanel from './ClipArtPanel';
 
 export default function MapEditor({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData }) {
   const [mapTheme, setMapTheme] = useState('paper');
@@ -111,6 +112,35 @@ export default function MapEditor({ globalMode, setGlobalMode, globalLoadedData,
       return doc;
     }));
   }, [activeDocId]);
+
+  const [sidebarTab, setSidebarTab] = useState('shapes');
+  const [sidebarWidth, setSidebarWidth] = useState(220);
+
+  const onResizeMouseDown = useCallback((e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+    const onMove = (mv) => {
+      const next = Math.min(520, Math.max(180, startWidth + mv.clientX - startX));
+      setSidebarWidth(next);
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [sidebarWidth]);
+
+  const addClipart = (item) => {
+    const newId = Date.now().toString();
+    setShapes([...shapes, { id: newId, type: 'rasterImage', x: 250, y: 250, src: item.url, width: 80, height: 80 }]);
+    setSelectedId(newId);
+  };
 
   const addShape = (type) => {
     const newId = Date.now().toString();
@@ -319,7 +349,7 @@ export default function MapEditor({ globalMode, setGlobalMode, globalLoadedData,
   const selectedShape = shapes.find(s => s.id === selectedId);
 
   return (
-    <div className="app-container">
+    <div className="app-container" style={{ gridTemplateColumns: `${sidebarWidth}px 1fr 300px` }}>
       {/* Top bar header */}
       <div className="sub-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', background: '#1e293b', borderBottom: '1px solid #334155' }}>
         <div style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>
@@ -337,9 +367,39 @@ export default function MapEditor({ globalMode, setGlobalMode, globalLoadedData,
       </div>
 
       {/* Left Sidebar */}
-      <div className="sidebar" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', padding: '16px' }}>
+      <div className="sidebar" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', padding: '16px', position: 'relative' }}>
+        {/* Drag-to-resize handle */}
+        <div
+          onMouseDown={onResizeMouseDown}
+          style={{ position: 'absolute', top: 0, right: 0, width: '5px', height: '100%', cursor: 'col-resize', zIndex: 10 }}
+          title="Drag to resize"
+        />
         <div style={{ flex: 1 }}>
-          
+
+          {/* Tab switcher */}
+          <div style={{ display: 'flex', gap: '4px', marginBottom: '12px' }}>
+            <button
+              onClick={() => setSidebarTab('shapes')}
+              style={{ flex: 1, padding: '6px', borderRadius: '6px', border: '1px solid', cursor: 'pointer', fontSize: '11px', fontWeight: 700,
+                borderColor: sidebarTab === 'shapes' ? 'var(--accent)' : 'var(--border-color)',
+                background:  sidebarTab === 'shapes' ? 'rgba(99,102,241,0.15)' : 'var(--bg-dark)',
+                color:       sidebarTab === 'shapes' ? 'var(--accent)' : 'var(--text-muted)',
+              }}
+            >Shapes</button>
+            <button
+              onClick={() => setSidebarTab('clipart')}
+              style={{ flex: 1, padding: '6px', borderRadius: '6px', border: '1px solid', cursor: 'pointer', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                borderColor: sidebarTab === 'clipart' ? 'var(--accent)' : 'var(--border-color)',
+                background:  sidebarTab === 'clipart' ? 'rgba(99,102,241,0.15)' : 'var(--bg-dark)',
+                color:       sidebarTab === 'clipart' ? 'var(--accent)' : 'var(--text-muted)',
+              }}
+            ><Smile size={12} /> Clip Art</button>
+          </div>
+
+          {sidebarTab === 'clipart' ? (
+            <ClipArtPanel onInsert={addClipart} />
+          ) : (<>
+
           {/* Section: Map Grid Configuration */}
           <div className="shape-grid-section" style={{ marginBottom: '20px' }}>
             <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -444,6 +504,7 @@ export default function MapEditor({ globalMode, setGlobalMode, globalLoadedData,
             </div>
           </div>
 
+          </>)}
 
         </div>
 
@@ -542,7 +603,7 @@ export default function MapEditor({ globalMode, setGlobalMode, globalLoadedData,
         <div style={{ flex: 1, position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
           <CanvasEditor2D 
             shapes={shapes} 
-            setShapes={(newShapes) => setShapes(newShapes)} 
+            setShapes={(newShapesOrFn, skip) => setShapes(typeof newShapesOrFn === 'function' ? newShapesOrFn(shapes) : newShapesOrFn, skip)}
             selectedId={selectedId} 
             setSelectedId={setSelectedId}
             stageRef={stageRef}

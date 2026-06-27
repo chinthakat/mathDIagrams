@@ -1,3 +1,5 @@
+import { CLIPART_ITEMS } from '../assets/clipartLibrary';
+
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
 
@@ -28,6 +30,7 @@ Available shape types (use these exact strings for the "type" field):
 - circle: { radius, fill, stroke, strokeWidth, rotation }
 - triangle: { radius, fill, stroke, strokeWidth, rotation }
 - polygon: { sides, radius, fill, stroke, strokeWidth, rotation }
+- customPolygon: { points: [x1, y1, x2, y2, ...], fill, stroke, strokeWidth, closed, rotation } — closed custom polygon defined by relative coordinates; use this to draw custom irregular/composite shapes like L-shapes, T-shapes, or cut-corner rectangles (e.g. points relative to shape's x,y center)
 - line: { length, stroke, strokeWidth, rotation }
 - rightTriangle: { base, height, fill, stroke, strokeWidth, rotation }
 - isoscelesTriangle: { base, height, fill, stroke, strokeWidth, rotation }
@@ -369,7 +372,8 @@ export async function generateFromSampleImage(imageBase64, mimeType, apiKey, yea
 // ─── Image-to-editable-shapes analysis ───────────────────────────────────────
 
 const REGISTERED_COMPONENT_TYPES = [
-  'rectangle','circle','triangle','polygon','line','rightTriangle','isoscelesTriangle',
+  'rasterImage',
+  'rectangle','circle','triangle','polygon','customPolygon','line','rightTriangle','isoscelesTriangle',
   'equilateralTriangle','fractionCircle','fractionRectangle','fractionBar','numberline',
   'cartesianPlane','barGraph','vennDiagram','annulus','bearings','spinner','factorTree',
   'angleMarker','point','rightAngleMarker','lengthMarker','ruler','text',
@@ -379,33 +383,78 @@ const REGISTERED_COMPONENT_TYPES = [
   'spiderIcon','dottedLineArrow','elbowArrow','bezierArrow',
 ];
 
-const ANALYSE_FOR_EDITING_PROMPT = `You are analysing a primary/middle school maths diagram image.
-Your task: reconstruct it as a list of Konva shape objects using ONLY the registered component types listed below.
+const makeAnalyseForEditingPrompt = (imageUrl) => `You are analysing a primary/middle school maths diagram image.
+Your task: reconstruct it as editable Konva shape objects using ONLY the registered component types below.
 
 REGISTERED COMPONENT TYPES (use EXACT strings):
 ${REGISTERED_COMPONENT_TYPES.join(', ')}
 
+━━━ CLIPART LIBRARY — USE THESE INSTEAD OF DRAWING ILLUSTRATIONS ━━━
+We have a built-in clipart library. When the diagram contains animals, vehicles, or objects
+that match an entry below, use rasterImage with the exact URL from this list.
+
+Available clipart (id → URL):
+${CLIPART_ITEMS.map(i => `  ${i.id}: ${i.url}  [${i.label}]`).join('\n')}
+
+- rasterImage: { src, x, y, width, height, opacity?, flipX?, flipY? }
+  • src = one of the clipart URLs above (preferred), OR src="ORIGINAL" for the source image
+  • flipX: true  = mirror horizontally (use for reflections across a vertical axis)
+  • flipY: true  = mirror vertically   (use for reflections across a horizontal axis)
+  • rotation = degrees clockwise (use for rotations/turns)
+
+  STRATEGY for illustration MCQ questions (e.g. "which fish is the reflection?"):
+  1. Identify the BEST matching clipart item (e.g. 'fish' for a fish question).
+  2. Place ONE clipart rasterImage at the MAIN question illustration position (the "before" shape).
+  3. For EACH MCQ option box (A/B/C/D), ALSO place a clipart rasterImage inside the box
+     with the correct transformation (flipX, flipY, rotation) to show what that option looks like.
+     Example for a horizontal reflection question:
+       - Main fish (original):  { src: fishUrl, flipX: false, flipY: false }
+       - Option A (reflected):  { src: fishUrl, flipX: true,  flipY: false }
+       - Option B (original):   { src: fishUrl, flipX: false, flipY: false }
+       - Option C (rotated 90): { src: fishUrl, rotation: 90 }
+       - Option D (reflected+rotated): { src: fishUrl, flipX: true, rotation: 180 }
+  4. Draw rectangle frames for each option box and add letter labels (A, B, C, D) as text.
+  5. Add the question text and any geometric elements (dotted lines, arrows).
+  ❌ DO NOT use src="ORIGINAL" for individual option boxes — use clipart URLs instead.
+  ❌ DO NOT trace illustrations with customPolygon.
+
 ${SHAPE_CATALOGUE}
 
-Also identify any visual elements in the diagram that CANNOT be represented by the registered components.
+━━━ POSITIONING RULES (critical — follow exactly) ━━━
+The canvas is 800×500 logical pixels. x increases right, y increases down. (0,0) = top-left.
 
-Respond ONLY with valid JSON in this exact structure:
+STEP 1 — MAP THE IMAGE: For every element estimate its centre as a fraction of image width/height,
+  then convert: canvasX = fracX × 800, canvasY = fracY × 500.
+STEP 2 — SIZE ELEMENTS: Element spanning 20% of image width → 160 px wide on canvas.
+STEP 3 — VERIFY: No two shapes overlap unless they do in the original.
+
+• Same horizontal row → same (or very close) y values.
+• NEVER cluster everything at the centre — spread to match the original layout.
+
+COLOR RULES:
+• Border/frame boxes → fill='#ffffff', stroke='#333333', strokeWidth=2. NEVER black fill.
+• Geometric content shapes → fill='#a8d8ea' (light blue) unless the image shows otherwise.
+• Text labels → fill='#000000'.
+
+SHAPE RULES:
+• IRREGULAR SHAPES (L-shape, notched rect, trapezoid): use customPolygon with points relative to shape x,y.
+• TEXT LABELS: add a text shape for every visible number, letter, or word.
+
+Also identify visual elements that CANNOT be represented by the registered components.
+
+Respond ONLY with valid JSON:
 {
-  "description": "brief description of what the diagram shows",
-  "diagramType": "e.g. map, geometry, graph, fraction, number line, etc.",
-  "shapes": [ ...array of shape objects with type, x, y, and props... ],
+  "description": "brief description",
+  "diagramType": "e.g. reflection, geometry, graph, fraction, map, etc.",
+  "shapes": [ ...shape objects with type, x, y, and type-specific props... ],
   "missingComponents": [
-    {
-      "name": "ComponentName",
-      "description": "what it should render",
-      "reason": "why it's needed / what visual element it represents"
-    }
+    { "name": "ComponentName", "description": "what it renders", "reason": "why needed" }
   ],
-  "coveragePercent": number 0-100 (how much of the diagram can be reproduced with registered components)
+  "coveragePercent": number 0-100
 }
 
-Canvas is 800x500 logical pixels. Place shapes to recreate the diagram layout as accurately as possible.
-If the diagram is fully reproducible, missingComponents should be an empty array.`;
+If fully reproducible, missingComponents = [].
+Image URL (for reference): ${imageUrl}`;
 
 async function callClaudeWithImageUrl(imageUrl, systemPrompt, userText, apiKey, model, maxTokens = 1024) {
   const response = await fetch(CLAUDE_API_URL, {
@@ -436,19 +485,48 @@ async function callClaudeWithImageUrl(imageUrl, systemPrompt, userText, apiKey, 
   return JSON.parse(cleaned);
 }
 
+async function fetchImageBase64(url) {
+  try {
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const mimeType = blob.type || 'image/jpeg';
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve({ base64: reader.result.split(',')[1], mimeType });
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function analyseImageForEditing(imageUrl, apiKey) {
-  const result = await callClaudeWithImageUrl(
-    imageUrl,
-    ANALYSE_FOR_EDITING_PROMPT,
-    'Analyse this diagram and output the JSON reconstruction.',
-    apiKey,
-    'claude-haiku-4-5-20251001',
-    4096,
+  const prompt = makeAnalyseForEditingPrompt(imageUrl);
+
+  // Try to fetch image as base64 first (works when S3 has CORS headers).
+  // Fall back to URL-type if the fetch is blocked.
+  const b64 = await fetchImageBase64(imageUrl);
+  const result = b64
+    ? await callClaudeWithImage(b64.base64, b64.mimeType, prompt,
+        'Analyse this diagram and output the JSON reconstruction.',
+        apiKey, 'claude-haiku-4-5-20251001', 4096)
+    : await callClaudeWithImageUrl(imageUrl, prompt,
+        'Analyse this diagram and output the JSON reconstruction.',
+        apiKey, 'claude-haiku-4-5-20251001', 4096);
+
+  // Replace 'ORIGINAL' placeholder with a data URL (preferred — no CORS in Konva canvas)
+  // or fall back to the raw URL if base64 fetch failed.
+  const dataUrlSrc = b64 ? `data:${b64.mimeType};base64,${b64.base64}` : imageUrl;
+  const shapes = (Array.isArray(result.shapes) ? result.shapes : []).map(s =>
+    s.type === 'rasterImage' && s.src === 'ORIGINAL' ? { ...s, src: dataUrlSrc } : s
   );
+
   return {
     description: result.description || '',
     diagramType: result.diagramType || 'diagram',
-    shapes: Array.isArray(result.shapes) ? result.shapes : [],
+    shapes,
     missingComponents: Array.isArray(result.missingComponents) ? result.missingComponents : [],
     coveragePercent: typeof result.coveragePercent === 'number' ? result.coveragePercent : 100,
   };

@@ -223,6 +223,12 @@ export default function DiagramCanvasEditModal({ question, onClose, onSaved }) {
     setRecentlyUsed(prev => [type, ...prev.filter(t => t !== type)].slice(0, 10));
   };
 
+  const addClipart = item => {
+    const newId = 'clipart_' + Date.now();
+    setShapes(prev => [...prev, { id: newId, type: 'rasterImage', x: 360, y: 210, src: item.url, width: 80, height: 80, opacity: 1, rotation: 0 }]);
+    setSelectedId(newId);
+  };
+
   const updateShape = (id, newProps) => {
     setShapes(prev => prev.map(s => s.id === id ? { ...s, ...newProps } : s));
   };
@@ -315,6 +321,7 @@ export default function DiagramCanvasEditModal({ question, onClose, onSaved }) {
               mode="Geometry"
               setMode={() => {}}
               addShape={addShape}
+              addClipart={addClipart}
               handleExport={() => {}}
               handleSaveToLibrary={() => {}}
               recentlyUsed={recentlyUsed}

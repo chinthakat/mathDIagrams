@@ -177,6 +177,13 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
     }
   };
 
+  const addClipart = item => {
+    const newId = Date.now().toString();
+    const newShape = { id: newId, type: 'rasterImage', x: 360, y: 210, src: item.url, width: 80, height: 80, opacity: 1, rotation: 0 };
+    setActiveShapes([...shapes2D, newShape]);
+    setSelectedId2D(newId);
+  };
+
   const updateShape = (id, newProps) => {
     if (is2D) {
       setActiveShapes(shapes2D.map(s => s.id === id ? { ...s, ...newProps } : s));
@@ -459,7 +466,8 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
         <Sidebar 
           mode={mode === '2D' ? subMode : mode} 
           setMode={setMode} 
-          addShape={addShape} 
+          addShape={addShape}
+          addClipart={addClipart}
           handleExport={handleExport}
           handleSaveToLibrary={handleSaveToLibrary}
           recentlyUsed={recentlyUsed}
@@ -479,7 +487,7 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
             {is2D ? (
               <CanvasEditor2D
                 shapes={shapes2D}
-                setShapes={(newShapes, skipHistory = false) => setActiveShapes(newShapes, false, skipHistory)}
+                setShapes={(newShapesOrFn, skipHistory = false) => setActiveShapes(typeof newShapesOrFn === 'function' ? newShapesOrFn(shapes2D) : newShapesOrFn, false, skipHistory)}
                 selectedId={selectedId2D}
                 setSelectedId={setSelectedId2D}
                 stageRef={stageRef2D}

@@ -7,7 +7,7 @@ import { Group, Image as KonvaImage, Rect, Text } from 'react-konva';
  *
  * props: src, width, height, opacity
  */
-export default function RasterImage({ src, width = 300, height = 200, opacity = 1 }) {
+export default function RasterImage({ src, width = 300, height = 200, opacity = 1, flipX = false, flipY = false }) {
   const [image, setImage] = useState(null);
   const [error, setError] = useState(false);
 
@@ -15,9 +15,20 @@ export default function RasterImage({ src, width = 300, height = 200, opacity = 
     if (!src) { setImage(null); return; }
     setError(false);
     const img = new window.Image();
-    img.crossOrigin = 'anonymous';
+    // Only set crossOrigin for non-data URLs (data: URIs don't need it)
+    if (!src.startsWith('data:')) img.crossOrigin = 'anonymous';
     img.onload = () => setImage(img);
-    img.onerror = () => setError(true);
+    img.onerror = () => {
+      // Retry without crossOrigin (some servers don't send CORS headers)
+      if (!src.startsWith('data:') && img.crossOrigin) {
+        const img2 = new window.Image();
+        img2.onload = () => setImage(img2);
+        img2.onerror = () => setError(true);
+        img2.src = src;
+      } else {
+        setError(true);
+      }
+    };
     img.src = src;
   }, [src]);
 
@@ -25,7 +36,7 @@ export default function RasterImage({ src, width = 300, height = 200, opacity = 
   const h = height;
 
   return (
-    <Group>
+    <Group scaleX={flipX ? -1 : 1} scaleY={flipY ? -1 : 1}>
       {image ? (
         <KonvaImage
           image={image}

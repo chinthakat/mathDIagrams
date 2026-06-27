@@ -148,6 +148,7 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
   const [prompt, setPrompt]        = useState('');
   const [generating, setGenerating]= useState(false);
   const [genError, setGenError]    = useState(null);
+  const [analysisStatus, setAnalysisStatus] = useState(null); // null | 'analysing' | 'done' | 'error'
   const [tikzDrawerOpen, setTikzDrawerOpen] = useState(false);
   const [tikzCode, setTikzCode]    = useState('');
   const [inserting, setInserting]  = useState(false);
@@ -179,14 +180,20 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
   // ── AI generation ────────────────────────────────────────────────────────────
 
   const analyseImage = useCallback(async () => {
-    if (!apiKey || !imageUrl) return;
+    if (!apiKey || !imageUrl) {
+      setAnalysisStatus(!apiKey ? 'no-key' : 'no-image');
+      return;
+    }
     setGenerating(true);
     setGenError(null);
+    setAnalysisStatus('analysing');
     try {
       const result = await analyseImageForEditing(imageUrl, apiKey);
       loadShapes(result);
+      setAnalysisStatus('done');
     } catch (e) {
       setGenError(e.message);
+      setAnalysisStatus('error');
     } finally {
       setGenerating(false);
     }
@@ -195,6 +202,7 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
   // Auto-analyse on open
   useEffect(() => {
     if (apiKey && imageUrl) analyseImage();
+    else if (!apiKey) setAnalysisStatus('no-key');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -203,15 +211,17 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
     const p = prompt.trim();
     setGenerating(true);
     setGenError(null);
+    setAnalysisStatus('analysing');
 
     try {
       if (aiMode === 'shapes') {
-        // If no prompt, re-analyse the image; otherwise generate from prompt
         if (!p && imageUrl) {
           await analyseImage();
+          return; // analyseImage sets its own status
         } else if (p) {
           const result = await generateDiagramFromPrompt(p, apiKey);
           loadShapes(result);
+          setAnalysisStatus('done');
         }
       } else {
         // TikZ mode
@@ -224,10 +234,12 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
         if (code) {
           setTikzCode(code);
           setTikzDrawerOpen(true);
+          setAnalysisStatus(null);
         }
       }
     } catch (e) {
       setGenError(e.message);
+      setAnalysisStatus('error');
     } finally {
       setGenerating(false);
     }
@@ -270,6 +282,12 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
     setShapes(prev => [...prev, { id, type, x: 400, y: 250, ...reg?.defaultProps }]);
     setSelectedId(id);
     setRecentlyUsed(prev => [type, ...prev.filter(t => t !== type)].slice(0, 10));
+  };
+
+  const addClipart = item => {
+    const id = `clipart_${Date.now()}`;
+    setShapes(prev => [...prev, { id, type: 'rasterImage', x: 360, y: 210, src: item.url, width: 80, height: 80, opacity: 1, rotation: 0 }]);
+    setSelectedId(id);
   };
 
   const updateShape = (id, p) =>
@@ -344,23 +362,92 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
           mode="Geometry"
           setMode={() => {}}
           addShape={addShape}
+          addClipart={addClipart}
           handleExport={() => {}}
           handleSaveToLibrary={() => {}}
           recentlyUsed={recentlyUsed}
           openAIGenerator={() => {}}
         />
 
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          <CanvasEditor2D
-            shapes={shapes}
-            setShapes={setShapes}
-            selectedId={selectedId}
-            setSelectedId={setSelectedId}
-            stageRef={stageRef}
-            showGrid={false}
-          />
-          {imageUrl && <ImageRef imageUrl={imageUrl} />}
-        </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+          {/* ── Analysis status banner ── */}
+          {analysisStatus && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '6px 14px', flexShrink: 0,
+              background:
+                analysisStatus === 'error'    ? 'rgba(239,68,68,0.12)' :
+                analysisStatus === 'done'     ? 'rgba(5,150,105,0.12)' :
+                analysisStatus === 'no-key'   ? 'rgba(245,158,11,0.12)' :
+                                                'rgba(124,58,237,0.12)',
+              borderBottom: `1px solid ${
+                analysisStatus === 'error'    ? '#7f1d1d' :
+                analysisStatus === 'done'     ? '#064e3b' :
+                analysisStatus === 'no-key'   ? '#78350f' :
+                                                '#4c1d95'
+              }`,
+            }}>
+              {analysisStatus === 'analysing' && <Loader size={13} color="#a78bfa" className="spin" />}
+              {analysisStatus === 'done'      && <CheckCircle size={13} color="#34d399" />}
+              {analysisStatus === 'error'     && <AlertTriangle size={13} color="#f87171" />}
+              {analysisStatus === 'no-key'    && <Key size={13} color="#fbbf24" />}
+
+              <span style={{ fontSize: '12px', color:
+                analysisStatus === 'error'    ? '#fca5a5' :
+                analysisStatus === 'done'     ? '#6ee7b7' :
+                analysisStatus === 'no-key'   ? '#fde68a' :
+                                                '#c4b5fd',
+                flex: 1,
+              }}>
+                {analysisStatus === 'analysing' && 'Analysing diagram with Claude…'}
+                {analysisStatus === 'done'      && `Analysis complete — ${shapes.length} shape${shapes.length !== 1 ? 's' : ''} placed on canvas`}
+                {analysisStatus === 'error'     && `Analysis failed: ${genError}`}
+                {analysisStatus === 'no-key'    && 'No Claude API key — paste your sk-ant-… key in the header, then click Re-analyse'}
+              </span>
+
+              {(analysisStatus === 'error' || analysisStatus === 'no-key') && apiKey && (
+                <button
+                  style={{ ...S.btn, background: 'rgba(124,58,237,0.3)', color: '#c4b5fd', border: '1px solid #4c1d95', padding: '3px 10px', fontSize: '11px' }}
+                  onClick={analyseImage}
+                  disabled={generating}
+                >
+                  <RotateCcw size={11} /> Retry
+                </button>
+              )}
+
+              <button
+                onClick={() => setAnalysisStatus(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '0 2px', lineHeight: 1 }}
+                title="Dismiss"
+              >×</button>
+            </div>
+          )}
+
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+              <CanvasEditor2D
+                shapes={shapes}
+                setShapes={setShapes}
+                selectedId={selectedId}
+                setSelectedId={setSelectedId}
+                stageRef={stageRef}
+                showGrid={false}
+              />
+              {imageUrl && <ImageRef imageUrl={imageUrl} />}
+
+              {/* Large centre overlay when canvas is empty and analysing */}
+              {shapes.length === 0 && generating && (
+                <div style={{
+                  position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', gap: '10px',
+                  pointerEvents: 'none',
+                }}>
+                  <Loader size={32} color="#7c3aed" className="spin" />
+                  <div style={{ fontSize: '13px', color: '#94a3b8' }}>Analysing diagram with Claude…</div>
+                </div>
+              )}
+            </div>
+          </div>
 
         <PropertiesPanel
           selectedShape={selectedShape}
