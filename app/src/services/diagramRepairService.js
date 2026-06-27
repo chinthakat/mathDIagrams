@@ -198,6 +198,52 @@ export async function generateRepairShapes(analysis, feedbackHistory, userInstru
   return parsed;
 }
 
+// ── Step 2b: Refine image-generation prompt (Gemini path only) ───────────────
+
+const REFINE_SYSTEM = `You are an expert at writing precise image-generation prompts for mathematics diagrams.
+
+You will receive:
+- The original diagram analysis (type, description, pixel-level instructions)
+- Any user instructions requesting changes
+- Previous attempt failures (if any)
+
+Your job: produce a single, refined image-generation prompt that an image AI will use to draw the diagram.
+
+STRICT RULES for the prompt you write:
+1. Describe ONLY the diagram elements — grid lines, shapes, letters placed on cells, arrows, directional key labels (N↑ S↓ E→ W←). Nothing else.
+2. NEVER mention difficulty levels, question text, hints, challenge tasks, answer keys, or any prose that should appear in the image.
+3. Be exhaustive about spatial layout: exact grid size, exact cell positions of each label, shading, colours.
+4. Incorporate any user instructions as diagram-level changes only (e.g. "make harder" → reposition labels, don't add text to the image).
+5. Incorporate all previous failure feedback so those mistakes are not repeated.
+
+Return ONLY the refined prompt text — no JSON, no preamble, no explanation.`;
+
+export async function refineImagePrompt(analysis, userInstructions, feedbackHistory, apiKey) {
+  let userMsg = `DIAGRAM TYPE: ${analysis.diagramType}\n\nDESCRIPTION:\n${analysis.diagramDescription}\n\nPIXEL-LEVEL INSTRUCTIONS:\n${analysis.imagePrompt || analysis.generationInstructions || ''}`;
+
+  if (userInstructions?.trim()) {
+    userMsg += `\n\nUSER INSTRUCTIONS (apply as diagram-level changes only):\n${userInstructions.trim()}`;
+  }
+
+  if (feedbackHistory?.length > 0) {
+    userMsg += `\n\nPREVIOUS ATTEMPT FAILURES — these must be fixed:\n`;
+    feedbackHistory.forEach((fb, i) => { userMsg += `Attempt ${i + 1}: ${fb}\n`; });
+  }
+
+  const text = await callClaude({
+    stage: 'refine_prompt', attempt: feedbackHistory?.length ?? 0,
+    model: 'claude-haiku-4-5-20251001',
+    system: REFINE_SYSTEM,
+    messages: [{ role: 'user', content: userMsg }],
+    apiKey, maxTokens: 1024,
+  });
+
+  // callClaude runs extractJson on the response — but we want raw text here
+  // Re-fetch the raw text: callClaude returns extractJson output, which is fine
+  // for prose (no JSON brackets), so just use it directly.
+  return text.trim();
+}
+
 // ── Step 3: Validate rendered diagram ────────────────────────────────────────
 
 const VALIDATE_SYSTEM = `You are a mathematics diagram QA validator. Your ONLY job is to check what is physically drawn in the image.
@@ -300,11 +346,14 @@ export async function repairDiagramWithRetry({
 
       if (isGeminiGen) {
         // ── Gemini image generation path ────────────────────────────────────
-        onProgress({ stage: 'generating', attempt, maxAttempts: maxRetries, analysis, mode: 'gemini' });
 
-        // Prefer the dedicated imagePrompt (pixel-level instructions) over Konva-style generationInstructions
-        let prompt = analysis.imagePrompt || analysis.generationInstructions || analysis.diagramDescription;
-        if (userInstructions?.trim()) prompt += `\n\nAdditional instructions: ${userInstructions.trim()}`;
+        // Refine the image prompt using Claude before sending to Gemini
+        onProgress({ stage: 'refining_prompt', attempt, maxAttempts: maxRetries, analysis, mode: 'gemini' });
+        await logEvent({ stage: 'refining_prompt', attempt, message: 'Refining image prompt with Claude...' });
+        const prompt = await refineImagePrompt(analysis, userInstructions, feedbackHistory, apiKey);
+        await logEvent({ stage: 'prompt_refined', attempt, message: 'Image prompt refined', data: { prompt } });
+
+        onProgress({ stage: 'generating', attempt, maxAttempts: maxRetries, analysis, mode: 'gemini' });
 
         const imageDataUri = await generateGeminiImage({
           prompt,

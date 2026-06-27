@@ -46,7 +46,13 @@ import Spinner from '../components/MathObjects/Spinner';
 import FactorTree from '../components/MathObjects/FactorTree';
 import Annulus from '../components/MathObjects/Annulus';
 import BearingsMarker from '../components/MathObjects/BearingsMarker';
-import { PieChart, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon } from 'lucide-react';
+import SpiderIcon from '../components/MathObjects/SpiderIcon';
+import JSXGraphBoard from '../components/MathObjects/JSXGraphBoard';
+import TikZRenderer from '../components/MathObjects/TikZRenderer';
+import DottedLineArrow from '../components/MathObjects/DottedLineArrow';
+import ElbowArrow from '../components/MathObjects/ElbowArrow';
+import BezierArrow from '../components/MathObjects/BezierArrow';
+import { PieChart, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon, Bug, Waypoints, CornerDownRight, Spline, Code } from 'lucide-react';
 
 const ICON_PRESETS = [
   { value: 'https://upload.wikimedia.org/wikipedia/en/thumb/b/b9/Flag_of_Australia.svg/1200px-Flag_of_Australia.svg.png', label: 'Australian Flag' },
@@ -1373,7 +1379,201 @@ export const ObjectRegistry = {
       { name: 'label', label: 'Custom Label', type: 'text' },
       { name: 'stroke', label: 'Line Color', type: 'color' }
     ]
-  }
+  },
+
+  // ── Math Engines (JSXGraph + TikZ embedded objects) ─────────────────────────
+
+  jsxgraphObject: {
+    id: 'jsxgraphObject',
+    category: 'Math Engines',
+    name: 'JSXGraph Board',
+    icon: <Triangle size={18} />,
+    defaultProps: {
+      width: 400, height: 300, interactive: false,
+      config: {
+        boundingBox: [-5, 5, 5, -5],
+        axis: true, grid: true,
+        elements: [
+          { type: 'point', id: 'A', coords: [0, 0], name: 'O', color: '#3b82f6' },
+          { type: 'functiongraph', id: 'f1', fn: 'Math.sin(x)', color: '#ef4444', strokeWidth: 2 },
+        ],
+      },
+      rotation: 0,
+    },
+    Component: ({ props }) => (
+      <JSXGraphBoard
+        config={props.config}
+        width={props.width || 400}
+        height={props.height || 300}
+        interactive={props.interactive || false}
+      />
+    ),
+    properties: [
+      { name: 'width',  label: 'Width',  type: 'number' },
+      { name: 'height', label: 'Height', type: 'number' },
+      { name: 'interactive', label: 'Interactive (drag points)', type: 'checkbox' },
+    ],
+  },
+
+  tikzObject: {
+    id: 'tikzObject',
+    category: 'Math Engines',
+    name: 'TikZ Diagram',
+    icon: <Code size={18} />,
+    defaultProps: {
+      width: 400, height: 300,
+      code: '\\begin{tikzpicture}\n  \\draw[->] (-3,0) -- (3,0) node[right] {$x$};\n  \\draw[->] (0,-2) -- (0,2) node[above] {$y$};\n  \\draw[blue,thick,domain=-2.5:2.5] plot (\\x,{\\x*\\x*0.5-1});\n\\end{tikzpicture}',
+      rotation: 0,
+    },
+    Component: ({ props }) => (
+      <TikZRenderer
+        code={props.code}
+        width={props.width || 400}
+        height={props.height || 300}
+      />
+    ),
+    properties: [
+      { name: 'width',  label: 'Width',  type: 'number' },
+      { name: 'height', label: 'Height', type: 'number' },
+      { name: 'code',   label: 'TikZ Code', type: 'textarea' },
+    ],
+  },
+
+  // ── Diagram Annotations ────────────────────────────────────────────────────
+
+  spiderIcon: {
+    id: 'spiderIcon',
+    category: 'Diagram Annotations',
+    name: 'Ant / Spider Icon',
+    icon: <Bug size={18} />,
+    defaultProps: { size: 36, fill: '#1e293b', stroke: '#0f172a', strokeWidth: 1.5, label: '(A)', labelPos: 'top', rotation: 0 },
+    Component: ({ props }) => (
+      <SpiderIcon
+        size={props.size}
+        fill={props.fill}
+        stroke={props.stroke}
+        strokeWidth={props.strokeWidth}
+        label={props.label}
+        labelPos={props.labelPos}
+      />
+    ),
+    properties: [
+      { name: 'size', label: 'Size', type: 'range', min: 16, max: 80 },
+      { name: 'fill', label: 'Body Color', type: 'color' },
+      { name: 'stroke', label: 'Outline Color', type: 'color' },
+      { name: 'strokeWidth', label: 'Outline Width', type: 'range', min: 0.5, max: 4, step: 0.5 },
+      { name: 'label', label: 'Label (e.g. (A))', type: 'text' },
+      { name: 'labelPos', label: 'Label Position', type: 'select', options: [{ value: 'top', label: 'Above' }, { value: 'bottom', label: 'Below' }] },
+    ]
+  },
+
+  dottedLineArrow: {
+    id: 'dottedLineArrow',
+    category: 'Diagram Annotations',
+    name: 'Dotted Arrow',
+    icon: <Waypoints size={18} />,
+    defaultProps: { endX: 120, endY: 0, stroke: '#1e293b', strokeWidth: 2, dashSize: 6, gapSize: 5, pointerLength: 10, pointerWidth: 8, rotation: 0 },
+    Component: ({ props }) => (
+      <DottedLineArrow
+        endX={props.endX}
+        endY={props.endY}
+        stroke={props.stroke}
+        strokeWidth={props.strokeWidth}
+        dashSize={props.dashSize}
+        gapSize={props.gapSize}
+        pointerLength={props.pointerLength}
+        pointerWidth={props.pointerWidth}
+      />
+    ),
+    properties: [
+      { name: 'endX', label: 'End X (horizontal reach)', type: 'number' },
+      { name: 'endY', label: 'End Y (vertical reach)', type: 'number' },
+      { name: 'stroke', label: 'Color', type: 'color' },
+      { name: 'strokeWidth', label: 'Thickness', type: 'range', min: 1, max: 8 },
+      { name: 'dashSize', label: 'Dash Length', type: 'range', min: 2, max: 20 },
+      { name: 'gapSize', label: 'Gap Length', type: 'range', min: 2, max: 20 },
+      { name: 'pointerLength', label: 'Arrowhead Length', type: 'range', min: 0, max: 24 },
+      { name: 'pointerWidth', label: 'Arrowhead Width', type: 'range', min: 0, max: 24 },
+    ]
+  },
+
+  elbowArrow: {
+    id: 'elbowArrow',
+    category: 'Diagram Annotations',
+    name: 'Elbow Arrow',
+    icon: <CornerDownRight size={18} />,
+    defaultProps: { endX: 120, endY: 80, elbowStyle: 'h-v', stroke: '#1e293b', strokeWidth: 2, pointerLength: 10, pointerWidth: 8, dash: false, dashSize: 6, gapSize: 4, rotation: 0 },
+    Component: ({ props }) => (
+      <ElbowArrow
+        endX={props.endX}
+        endY={props.endY}
+        elbowStyle={props.elbowStyle}
+        stroke={props.stroke}
+        strokeWidth={props.strokeWidth}
+        pointerLength={props.pointerLength}
+        pointerWidth={props.pointerWidth}
+        dash={props.dash}
+        dashSize={props.dashSize}
+        gapSize={props.gapSize}
+      />
+    ),
+    properties: [
+      { name: 'endX', label: 'End X', type: 'number' },
+      { name: 'endY', label: 'End Y', type: 'number' },
+      { name: 'elbowStyle', label: 'Bend Style', type: 'select', options: [
+        { value: 'h-v', label: 'Horizontal → Vertical' },
+        { value: 'v-h', label: 'Vertical → Horizontal' },
+        { value: 'mid', label: 'Mid-point (H-V-H)' },
+      ]},
+      { name: 'stroke', label: 'Color', type: 'color' },
+      { name: 'strokeWidth', label: 'Thickness', type: 'range', min: 1, max: 8 },
+      { name: 'pointerLength', label: 'Arrowhead Length', type: 'range', min: 0, max: 24 },
+      { name: 'pointerWidth', label: 'Arrowhead Width', type: 'range', min: 0, max: 24 },
+      { name: 'dash', label: 'Dashed', type: 'checkbox' },
+      { name: 'dashSize', label: 'Dash Size', type: 'range', min: 2, max: 20 },
+      { name: 'gapSize', label: 'Gap Size', type: 'range', min: 2, max: 20 },
+    ]
+  },
+
+  bezierArrow: {
+    id: 'bezierArrow',
+    category: 'Diagram Annotations',
+    name: 'Bezier Curve Arrow',
+    icon: <Spline size={18} />,
+    defaultProps: { endX: 150, endY: 60, curveStyle: 'auto', curvature: 0.4, stroke: '#1e293b', strokeWidth: 2, pointerLength: 10, pointerWidth: 8, dash: false, dashSize: 6, gapSize: 4, rotation: 0 },
+    Component: ({ props }) => (
+      <BezierArrow
+        endX={props.endX}
+        endY={props.endY}
+        curveStyle={props.curveStyle}
+        curvature={props.curvature}
+        stroke={props.stroke}
+        strokeWidth={props.strokeWidth}
+        pointerLength={props.pointerLength}
+        pointerWidth={props.pointerWidth}
+        dash={props.dash}
+        dashSize={props.dashSize}
+        gapSize={props.gapSize}
+      />
+    ),
+    properties: [
+      { name: 'endX', label: 'End X', type: 'number' },
+      { name: 'endY', label: 'End Y', type: 'number' },
+      { name: 'curveStyle', label: 'Curve Style', type: 'select', options: [
+        { value: 'auto', label: 'Auto (S-curve)' },
+        { value: 's-curve', label: 'S-Curve' },
+        { value: 'c-curve', label: 'C-Curve (Arc)' },
+      ]},
+      { name: 'curvature', label: 'Curvature', type: 'range', min: 0.1, max: 1.0, step: 0.05 },
+      { name: 'stroke', label: 'Color', type: 'color' },
+      { name: 'strokeWidth', label: 'Thickness', type: 'range', min: 1, max: 8 },
+      { name: 'pointerLength', label: 'Arrowhead Length', type: 'range', min: 0, max: 24 },
+      { name: 'pointerWidth', label: 'Arrowhead Width', type: 'range', min: 0, max: 24 },
+      { name: 'dash', label: 'Dashed', type: 'checkbox' },
+      { name: 'dashSize', label: 'Dash Size', type: 'range', min: 2, max: 20 },
+      { name: 'gapSize', label: 'Gap Size', type: 'range', min: 2, max: 20 },
+    ]
+  },
 };
 
 export const getCategories = () => {

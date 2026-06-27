@@ -32,7 +32,11 @@ export function saveGeminiApiKey(k) { localStorage.setItem('gemini_api_key', k);
  */
 export async function generateGeminiImage({ prompt, referenceImageBase64 = null, feedbackHistory = [], model = GEMINI_IMAGE_MODELS[0].id, apiKey }) {
   const preamble =
-    'A clear mathematics workbook diagram. Pure white background, clean black lines, strict 2D, all labels legible. ';
+    'A clear mathematics workbook diagram. Pure white background, clean black lines, strict 2D, all labels legible. ' +
+    'CRITICAL RULES — strictly enforce: ' +
+    '(1) Include ONLY the diagram itself — the grid, shapes, letters, arrows, and directional labels that are part of the diagram. ' +
+    '(2) DO NOT add any title, difficulty label, question text, hints, challenge questions, answer keys, footnotes, or any explanatory text whatsoever. ' +
+    '(3) The image must contain zero sentences or instructional prose — only diagram elements (shapes, grid lines, short single-word or single-letter labels). ';
 
   const parts = [];
 

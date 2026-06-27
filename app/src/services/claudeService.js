@@ -49,6 +49,10 @@ Available shape types (use these exact strings for the "type" field):
 - lengthMarker: { length, label, stroke, strokeWidth, rotation }
 - ruler: { width, units, stroke, strokeWidth }
 - text: { text, fontSize, fontStyle, fill, fontFamily }
+- spiderIcon: { size, fill, stroke, strokeWidth, label, labelPos } — stylised ant/spider creature with 6 legs; use for diagrams with insects/ants/spiders; label e.g. "(A)"
+- dottedLineArrow: { endX, endY, stroke, strokeWidth, dashSize, gapSize, pointerLength, pointerWidth } — dotted/dashed straight line with arrowhead from (0,0) to (endX,endY); use for dotted directional paths
+- elbowArrow: { endX, endY, elbowStyle, stroke, strokeWidth, dash, dashSize, gapSize, pointerLength, pointerWidth } — orthogonal/right-angle connector arrow (mermaid flowchart style); elbowStyle: 'h-v','v-h','mid'
+- bezierArrow: { endX, endY, curveStyle, curvature, stroke, strokeWidth, dash, dashSize, gapSize, pointerLength, pointerWidth } — smooth bezier curve arrow (plantuml style); curveStyle: 'auto','s-curve','c-curve'
 
 All shapes require: { type, x, y }
 Canvas is 800x600 logical pixels. Center is x=400, y=300.
@@ -360,6 +364,94 @@ export async function generateFromSampleImage(imageBase64, mimeType, apiKey, yea
   const normalised = normalise(raw);
   const verified = await verifyAndFix(normalised, apiKey);
   return { ...verified, classification };
+}
+
+// ─── Image-to-editable-shapes analysis ───────────────────────────────────────
+
+const REGISTERED_COMPONENT_TYPES = [
+  'rectangle','circle','triangle','polygon','line','rightTriangle','isoscelesTriangle',
+  'equilateralTriangle','fractionCircle','fractionRectangle','fractionBar','numberline',
+  'cartesianPlane','barGraph','vennDiagram','annulus','bearings','spinner','factorTree',
+  'angleMarker','point','rightAngleMarker','lengthMarker','ruler','text',
+  'road','roadJunction','bridge','tree','river','lake','sea','mountain','footpath',
+  'playground','airport','port','mapMarker','mapSprite','gridMap','scaleBar',
+  'compassRose','sunDirection','flag','dataTable','coordAxes',
+  'spiderIcon','dottedLineArrow','elbowArrow','bezierArrow',
+];
+
+const ANALYSE_FOR_EDITING_PROMPT = `You are analysing a primary/middle school maths diagram image.
+Your task: reconstruct it as a list of Konva shape objects using ONLY the registered component types listed below.
+
+REGISTERED COMPONENT TYPES (use EXACT strings):
+${REGISTERED_COMPONENT_TYPES.join(', ')}
+
+${SHAPE_CATALOGUE}
+
+Also identify any visual elements in the diagram that CANNOT be represented by the registered components.
+
+Respond ONLY with valid JSON in this exact structure:
+{
+  "description": "brief description of what the diagram shows",
+  "diagramType": "e.g. map, geometry, graph, fraction, number line, etc.",
+  "shapes": [ ...array of shape objects with type, x, y, and props... ],
+  "missingComponents": [
+    {
+      "name": "ComponentName",
+      "description": "what it should render",
+      "reason": "why it's needed / what visual element it represents"
+    }
+  ],
+  "coveragePercent": number 0-100 (how much of the diagram can be reproduced with registered components)
+}
+
+Canvas is 800x500 logical pixels. Place shapes to recreate the diagram layout as accurately as possible.
+If the diagram is fully reproducible, missingComponents should be an empty array.`;
+
+async function callClaudeWithImageUrl(imageUrl, systemPrompt, userText, apiKey, model, maxTokens = 1024) {
+  const response = await fetch(CLAUDE_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'url', url: imageUrl } },
+        { type: 'text', text: userText },
+      ]}],
+    }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Claude API error: ${response.status}`);
+  }
+  const data = await response.json();
+  const text = data.content?.[0]?.text || '';
+  const cleaned = text.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+  return JSON.parse(cleaned);
+}
+
+export async function analyseImageForEditing(imageUrl, apiKey) {
+  const result = await callClaudeWithImageUrl(
+    imageUrl,
+    ANALYSE_FOR_EDITING_PROMPT,
+    'Analyse this diagram and output the JSON reconstruction.',
+    apiKey,
+    'claude-haiku-4-5-20251001',
+    4096,
+  );
+  return {
+    description: result.description || '',
+    diagramType: result.diagramType || 'diagram',
+    shapes: Array.isArray(result.shapes) ? result.shapes : [],
+    missingComponents: Array.isArray(result.missingComponents) ? result.missingComponents : [],
+    coveragePercent: typeof result.coveragePercent === 'number' ? result.coveragePercent : 100,
+  };
 }
 
 // ─── Key helpers ──────────────────────────────────────────────────────────────

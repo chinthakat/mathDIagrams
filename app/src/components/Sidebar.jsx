@@ -10,7 +10,7 @@ export default function Sidebar({ mode, setMode, addShape, handleExport, handleS
   const categories = {};
   
   // Filter categories based on mode
-  const allowedCategories2D = ['Basic Shapes', 'Geometry', 'Triangles', 'Arrows', 'Logic & Problem Solving', 'Text & Annotation', 'Images & Icons', 'Measurement', 'Coordinate Geometry'];
+  const allowedCategories2D = ['Basic Shapes', 'Geometry', 'Triangles', 'Arrows', 'Diagram Annotations', 'Math Engines', 'Logic & Problem Solving', 'Text & Annotation', 'Images & Icons', 'Measurement', 'Coordinate Geometry'];
   const allowedCategoriesEq = ['Fractions', 'Graphs & Data', 'Number Lines', 'Text & Annotation'];
 
   Object.keys(rawCategories).forEach(cat => {

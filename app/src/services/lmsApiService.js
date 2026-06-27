@@ -103,6 +103,15 @@ export async function fetchMockExams() {
   }
 }
 
+function isMockExam(q) {
+  const tags = (q.tags || []).map(t => t.toLowerCase());
+  // Primary: tagged MockExam (matches admin page filter exactly)
+  if (tags.some(t => t === 'mockexam' || t === 'mock exam' || t === 'mock_exam')) return true;
+  // Secondary: title contains 'mock exam' or 'mock test' as a phrase
+  const title = (q.title || '').toLowerCase();
+  return title.includes('mock exam') || title.includes('mock test');
+}
+
 /**
  * Fetches all mock exams in paginated mode for faster load.
  * Shows results incrementally via onBatch callback.
@@ -117,23 +126,50 @@ export async function fetchMockExamsPaginated(onBatch) {
     }
   } catch {}
 
-  // Paginated quiz search
-  const searchData = await lmsGet('/search', { type: 'QUIZ' });
-  const ids = searchData?.ids || [];
-  const BATCH = 20;
+  // Try tag-filtered search (most efficient — matches admin page behaviour)
+  try {
+    const tagData = await lmsGet('/search', { type: 'QUIZ', tag: 'MockExam' });
+    const tagIds = tagData?.ids || tagData?.results?.map(r => r.id) || [];
+    if (tagIds.length > 0) {
+      console.log(`[LMS] Tag search returned ${tagIds.length} MockExam IDs`);
+      const BATCH = 20;
+      for (let i = 0; i < tagIds.length; i += BATCH) {
+        const chunk = tagIds.slice(i, i + BATCH);
+        const results = await Promise.allSettled(chunk.map(id => lmsGet(`/quizzes/${id}`)));
+        const batch = results
+          .filter(r => r.status === 'fulfilled' && r.value)
+          .map(r => r.value);
+        if (batch.length > 0) onBatch(batch, i + BATCH >= tagIds.length);
+      }
+      return;
+    }
+  } catch {}
 
-  for (let i = 0; i < ids.length; i += BATCH) {
-    const chunk = ids.slice(i, i + BATCH);
+  // Fallback: paginate through ALL quizzes and filter by MockExam tag
+  // The /search endpoint may paginate — follow nextToken/lastKey until exhausted
+  let allIds = [];
+  let nextToken = null;
+  do {
+    const params = { type: 'QUIZ', limit: 200 };
+    if (nextToken) params.nextToken = nextToken;
+    const searchData = await lmsGet('/search', params);
+    const pageIds = searchData?.ids || searchData?.results?.map(r => r.id) || [];
+    allIds = allIds.concat(pageIds);
+    nextToken = searchData?.nextToken || searchData?.lastKey || null;
+    console.log(`[LMS] Search page: ${pageIds.length} IDs, nextToken: ${!!nextToken}`);
+  } while (nextToken);
+
+  console.log(`[LMS] Total quiz IDs found: ${allIds.length}`);
+
+  const BATCH = 20;
+  for (let i = 0; i < allIds.length; i += BATCH) {
+    const chunk = allIds.slice(i, i + BATCH);
     const results = await Promise.allSettled(chunk.map(id => lmsGet(`/quizzes/${id}`)));
     const mockBatch = results
       .filter(r => r.status === 'fulfilled' && r.value)
       .map(r => r.value)
-      .filter(q => {
-        const title = (q.title || '').toLowerCase();
-        const tags = (q.tags || []).join(' ').toLowerCase();
-        return title.includes('mock') || tags.includes('mock') || title.includes('exam');
-      });
-    if (mockBatch.length > 0) onBatch(mockBatch, i + BATCH >= ids.length);
+      .filter(isMockExam);
+    if (mockBatch.length > 0) onBatch(mockBatch, i + BATCH >= allIds.length);
   }
 }
 
@@ -147,16 +183,33 @@ export async function fetchQuizWithQuestions(quizId) {
   const quiz = await lmsGet(`/quizzes/${quizId}`);
   if (!quiz) return null;
 
+  // Try a dedicated questions endpoint first (may return all questions in one call)
+  try {
+    const bulk = await lmsGet(`/quizzes/${quizId}/questions`);
+    const bulkItems = bulk?.items || bulk?.questions || (Array.isArray(bulk) ? bulk : null);
+    if (bulkItems?.length > 0) {
+      return { ...quiz, questionDetails: bulkItems };
+    }
+  } catch {}
+
   const questionIds = quiz.questionIds || quiz.questions?.map(q => q.id) || [];
-  const questions = await Promise.allSettled(
-    questionIds.map(id => lmsGet(`/questions/${id}`))
-  );
-  return {
-    ...quiz,
-    questionDetails: questions
-      .filter(r => r.status === 'fulfilled' && r.value)
-      .map(r => r.value),
-  };
+
+  // Fetch in parallel batches of 10 to avoid rate limits
+  const BATCH = 10;
+  const details = [];
+  for (let i = 0; i < questionIds.length; i += BATCH) {
+    const chunk = questionIds.slice(i, i + BATCH);
+    const results = await Promise.allSettled(chunk.map(id => lmsGet(`/questions/${id}`)));
+    results.forEach((r, idx) => {
+      if (r.status === 'fulfilled' && r.value) {
+        details.push(r.value);
+      } else {
+        console.warn(`[LMS] Failed to load question ${chunk[idx]}:`, r.reason?.message);
+      }
+    });
+  }
+
+  return { ...quiz, questionDetails: details };
 }
 
 // ── Questions ─────────────────────────────────────────────────────────────────

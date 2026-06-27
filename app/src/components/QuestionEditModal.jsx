@@ -31,9 +31,11 @@ function ProgressEntry({ entry }) {
   }[entry.stage] || <ChevronRight size={13} color="#64748b" />;
 
   const label = {
-    analyzing:     'Analysing existing diagram with Haiku vision…',
-    analyzed:      `Classified: ${entry.analysis?.diagramType || 'diagram'}`,
-    generating:    `Attempt ${entry.attempt}/${entry.maxAttempts} — Generating shapes with Sonnet…`,
+    analyzing:       'Analysing existing diagram with Haiku vision…',
+    analyzed:        `Classified: ${entry.analysis?.diagramType || 'diagram'}`,
+    refining_prompt: `Attempt ${entry.attempt}/${entry.maxAttempts} — Refining image prompt with Claude…`,
+    prompt_refined:  `Attempt ${entry.attempt} — Image prompt refined`,
+    generating:      `Attempt ${entry.attempt}/${entry.maxAttempts} — Generating shapes with Sonnet…`,
     generated:     entry.image
       ? `Attempt ${entry.attempt} — Gemini image generated`
       : `Attempt ${entry.attempt} — ${entry.shapes?.length || 0} shapes generated`,

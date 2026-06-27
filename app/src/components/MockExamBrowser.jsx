@@ -7,6 +7,7 @@ import {
   resolveImageUrl,
 } from '../services/lmsApiService.js';
 import QuestionEditModal from './QuestionEditModal.jsx';
+import DiagramEngineModal from './DiagramEngineModal.jsx';
 
 const S = {
   root: { display: 'flex', flexDirection: 'column', height: '100%', background: '#0f172a', color: '#e2e8f0', fontFamily: 'system-ui, sans-serif', overflow: 'hidden' },
@@ -69,7 +70,7 @@ function ApiKeyConfig({ onSaved }) {
   );
 }
 
-function QuestionCard({ question, examId, onEdit }) {
+function QuestionCard({ question, examId, onEdit, onEditCanvas }) {
   const imageUrl = resolveImageUrl(question.image || question.imageUrl || question.imageKey);
   const options = question.options || [];
   const correct = question.correctAnswer;
@@ -83,20 +84,40 @@ function QuestionCard({ question, examId, onEdit }) {
           ))}
         </div>
         {imageUrl && (
-          <button style={S.editBtn} onClick={() => onEdit(question)}>
-            <Edit3 size={11} /> Edit Diagram
-          </button>
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <button style={{ ...S.editBtn, background: '#0f766e' }} onClick={() => onEditCanvas(question)} title="Edit diagram in canvas using AI reconstruction">
+              <Edit3 size={11} /> Edit in Canvas
+            </button>
+            <button style={S.editBtn} onClick={() => onEdit(question)} title="Repair diagram via agentic pipeline">
+              <Edit3 size={11} /> Repair
+            </button>
+          </div>
         )}
       </div>
       <div style={S.qCardBody}>
         <p style={S.qText}>{question.text || question.stem || '(No question text)'}</p>
         {imageUrl && (
-          <img
-            src={imageUrl}
-            alt="question diagram"
-            style={S.qImg}
-            onError={e => { e.target.style.display = 'none'; }}
-          />
+          <div style={{ position: 'relative' }}>
+            <img
+              src={imageUrl}
+              alt="question diagram"
+              style={S.qImg}
+              onError={e => { e.target.style.display = 'none'; }}
+            />
+            <button
+              onClick={() => onEditCanvas(question)}
+              title="Edit this diagram in canvas"
+              style={{
+                position: 'absolute', top: '6px', right: '6px',
+                background: '#0f766ecc', border: '1px solid #14b8a6', borderRadius: '6px',
+                color: '#fff', cursor: 'pointer', padding: '4px 8px',
+                fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px',
+                backdropFilter: 'blur(4px)',
+              }}
+            >
+              <Edit3 size={10} /> Edit
+            </button>
+          </div>
         )}
         {options.length > 0 && (
           <div style={S.qOptions}>
@@ -116,6 +137,13 @@ function QuestionCard({ question, examId, onEdit }) {
   );
 }
 
+function extractGrade(exam) {
+  if (exam.gradeLevel) return String(exam.gradeLevel);
+  // Parse from title e.g. "Grade 3 Mock Exam 2", "Grade 5 Mock Exam 1 A"
+  const m = (exam.title || '').match(/grade\s+(\d+)/i);
+  return m ? `Grade ${m[1]}` : '';
+}
+
 export default function MockExamBrowser() {
   const [hasKeys, setHasKeys] = useState(!!(getLmsApiKey() || import.meta.env.VITE_LMS_API_KEY));
   const [exams, setExams] = useState([]);
@@ -125,7 +153,9 @@ export default function MockExamBrowser() {
   const [examQuestions, setExamQuestions] = useState(null);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [search, setSearch] = useState('');
+  const [gradeFilter, setGradeFilter] = useState('');
   const [editingQuestion, setEditingQuestion] = useState(null);
+  const [canvasEditingQuestion, setCanvasEditingQuestion] = useState(null);
 
   const loadExams = useCallback(async () => {
     setLoading(true);
@@ -162,9 +192,19 @@ export default function MockExamBrowser() {
     }
   };
 
-  const filteredExams = exams.filter(e =>
-    !search || (e.title || '').toLowerCase().includes(search.toLowerCase())
-  );
+  // Derive grade levels from loaded exams
+  const gradeOptions = [...new Set(
+    exams.map(e => extractGrade(e)).filter(Boolean)
+  )].sort((a, b) => {
+    const na = parseInt(a), nb = parseInt(b);
+    return isNaN(na) || isNaN(nb) ? a.localeCompare(b) : na - nb;
+  });
+
+  const filteredExams = exams.filter(e => {
+    if (search && !(e.title || '').toLowerCase().includes(search.toLowerCase())) return false;
+    if (gradeFilter && extractGrade(e) !== gradeFilter) return false;
+    return true;
+  });
 
   const filteredQuestions = (examQuestions || []).filter(q =>
     !search || (q.text || q.stem || '').toLowerCase().includes(search.toLowerCase())
@@ -196,6 +236,14 @@ export default function MockExamBrowser() {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
+        <select
+          value={gradeFilter}
+          onChange={e => setGradeFilter(e.target.value)}
+          style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', padding: '6px 10px', color: gradeFilter ? '#e2e8f0' : '#64748b', fontSize: '13px', cursor: 'pointer', outline: 'none' }}
+        >
+          <option value=''>All Grades</option>
+          {gradeOptions.map(g => <option key={g} value={g}>{g}</option>)}
+        </select>
         <button style={{ ...S.btn, ...S.btnGhost }} onClick={loadExams} title="Refresh">
           <RefreshCw size={13} /> Refresh
         </button>
@@ -233,7 +281,7 @@ export default function MockExamBrowser() {
                 <div>
                   <div style={S.examTitle}>{exam.title}</div>
                   <div style={S.examMeta}>
-                    {exam.gradeLevel && <span>{exam.gradeLevel} · </span>}
+                    {extractGrade(exam) && <span>{extractGrade(exam)} · </span>}
                     {(exam.questionIds?.length || exam.questions?.length || 0)} questions
                   </div>
                 </div>
@@ -274,6 +322,7 @@ export default function MockExamBrowser() {
                       question={q}
                       examId={selectedExam.id}
                       onEdit={q => setEditingQuestion(q)}
+                      onEditCanvas={q => setCanvasEditingQuestion(q)}
                     />
                   ))}
                 </div>
@@ -283,7 +332,7 @@ export default function MockExamBrowser() {
         </div>
       </div>
 
-      {/* Edit modal */}
+      {/* Agentic repair modal */}
       {editingQuestion && (
         <QuestionEditModal
           question={editingQuestion}
@@ -291,6 +340,18 @@ export default function MockExamBrowser() {
           onSaved={(updated) => {
             setExamQuestions(prev => prev.map(q => q.id === updated.id ? updated : q));
             setEditingQuestion(null);
+          }}
+        />
+      )}
+
+      {/* Multi-engine diagram editor (Konva / JSXGraph / TikZ) */}
+      {canvasEditingQuestion && (
+        <DiagramEngineModal
+          question={canvasEditingQuestion}
+          onClose={() => setCanvasEditingQuestion(null)}
+          onSaved={(updated) => {
+            setExamQuestions(prev => prev.map(q => q.id === updated.id ? updated : q));
+            setCanvasEditingQuestion(null);
           }}
         />
       )}
