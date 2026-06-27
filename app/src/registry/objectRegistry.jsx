@@ -1506,6 +1506,94 @@ export const ObjectRegistry = {
     ],
   },
 
+  dashedConnector: {
+    id: 'dashedConnector',
+    category: 'Arrows',
+    name: 'Dashed Connector',
+    icon: <ArrowRight size={18} />,
+    defaultProps: {
+      x1: 0, y1: 0, x2: 160, y2: 0,
+      startBinding: null, endBinding: null,
+      waypoints: [],
+      stroke: '#64748b', strokeWidth: 2,
+      startArrow: 'none', endArrow: 'filled',
+      dash: true,
+    },
+    Component: null,
+    properties: [
+      { name: 'stroke',      label: 'Color',       type: 'color' },
+      { name: 'strokeWidth', label: 'Thickness',   type: 'range', min: 1, max: 10 },
+      { name: 'startArrow',  label: 'Start Arrow', type: 'select', options: [{ value:'none',label:'None' },{ value:'filled',label:'Filled' },{ value:'open',label:'Open' },{ value:'circle',label:'Circle' },{ value:'diamond',label:'Diamond' }] },
+      { name: 'endArrow',    label: 'End Arrow',   type: 'select', options: [{ value:'none',label:'None' },{ value:'filled',label:'Filled' },{ value:'open',label:'Open' },{ value:'circle',label:'Circle' },{ value:'diamond',label:'Diamond' }] },
+    ],
+  },
+
+  doubleHeadedConnector: {
+    id: 'doubleHeadedConnector',
+    category: 'Arrows',
+    name: 'Double-Headed Arrow',
+    icon: <ArrowRight size={18} />,
+    defaultProps: {
+      x1: 0, y1: 0, x2: 160, y2: 0,
+      startBinding: null, endBinding: null,
+      waypoints: [],
+      stroke: '#334155', strokeWidth: 2,
+      startArrow: 'filled', endArrow: 'filled',
+      dash: false,
+    },
+    Component: null,
+    properties: [
+      { name: 'stroke',      label: 'Color',       type: 'color' },
+      { name: 'strokeWidth', label: 'Thickness',   type: 'range', min: 1, max: 10 },
+      { name: 'dash',        label: 'Dashed',      type: 'checkbox' },
+    ],
+  },
+
+  thickArrow: {
+    id: 'thickArrow',
+    category: 'Arrows',
+    name: 'Thick Arrow',
+    icon: <ArrowRight size={18} />,
+    defaultProps: {
+      x1: 0, y1: 0, x2: 160, y2: 0,
+      startBinding: null, endBinding: null,
+      waypoints: [],
+      stroke: '#1e40af', strokeWidth: 4,
+      startArrow: 'none', endArrow: 'filled',
+      dash: false,
+    },
+    Component: null,
+    properties: [
+      { name: 'stroke',      label: 'Color',       type: 'color' },
+      { name: 'strokeWidth', label: 'Thickness',   type: 'range', min: 2, max: 12 },
+      { name: 'startArrow',  label: 'Start Arrow', type: 'select', options: [{ value:'none',label:'None' },{ value:'filled',label:'Filled' }] },
+      { name: 'endArrow',    label: 'End Arrow',   type: 'select', options: [{ value:'none',label:'None' },{ value:'filled',label:'Filled' }] },
+    ],
+  },
+
+  annotationArrow: {
+    id: 'annotationArrow',
+    category: 'Arrows',
+    name: 'Annotation Arrow',
+    icon: <ArrowRight size={18} />,
+    defaultProps: {
+      x1: 0, y1: 0, x2: 160, y2: 0,
+      startBinding: null, endBinding: null,
+      waypoints: [],
+      stroke: '#94a3b8', strokeWidth: 1,
+      startArrow: 'none', endArrow: 'open',
+      dash: false,
+    },
+    Component: null,
+    properties: [
+      { name: 'stroke',      label: 'Color',       type: 'color' },
+      { name: 'strokeWidth', label: 'Thickness',   type: 'range', min: 1, max: 6 },
+      { name: 'startArrow',  label: 'Start Arrow', type: 'select', options: [{ value:'none',label:'None' },{ value:'open',label:'Open' },{ value:'filled',label:'Filled' }] },
+      { name: 'endArrow',    label: 'End Arrow',   type: 'select', options: [{ value:'none',label:'None' },{ value:'open',label:'Open' },{ value:'filled',label:'Filled' }] },
+      { name: 'dash',        label: 'Dashed',      type: 'checkbox' },
+    ],
+  },
+
   // ── Diagram Annotations ────────────────────────────────────────────────────
 
   spiderIcon: {

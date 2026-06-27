@@ -14,9 +14,15 @@ import {
 const GRID_SIZE = 20;
 
 // Types rendered with endpoint handles instead of a Transformer box
-const ENDPOINT_EDITABLE = new Set(['connectorArrow', 'orthoConnector', 'dottedLineArrow', 'elbowArrow', 'bezierArrow']);
-// Pure connector types (no ShapeElement Group)
-const CONNECTOR_TYPES   = new Set(['connectorArrow', 'orthoConnector']);
+const ENDPOINT_EDITABLE = new Set([
+  'connectorArrow', 'orthoConnector', 'dottedLineArrow', 'elbowArrow', 'bezierArrow',
+  'dashedConnector', 'doubleHeadedConnector', 'thickArrow', 'annotationArrow',
+]);
+// All connector types — rendered natively (no ShapeElement Group)
+const CONNECTOR_TYPES = new Set([
+  'connectorArrow', 'orthoConnector', 'dottedLineArrow', 'elbowArrow', 'bezierArrow',
+  'dashedConnector', 'doubleHeadedConnector', 'thickArrow', 'annotationArrow',
+]);
 
 // ── Arrowhead renderer ────────────────────────────────────────────────────────
 function ArrowHead({ x, y, angle, style = 'filled', color = '#64748b', size = 11 }) {
@@ -25,19 +31,35 @@ function ArrowHead({ x, y, angle, style = 'filled', color = '#64748b', size = 11
   if (style === 'filled') {
     const len = size, wid = size * 0.6;
     const d = `M ${x} ${y} L ${x - c*len + s*wid} ${y - s*len - c*wid} L ${x - c*len - s*wid} ${y - s*len + c*wid} Z`;
-    return <Path data={d} fill={color} listening={false} />;
+    return <Path data={d} fill={color} listening={true} />;
   }
   if (style === 'open') {
     const len = size, wid = size * 0.6;
-    return <Line points={[x - c*len + s*wid, y - s*len - c*wid, x, y, x - c*len - s*wid, y - s*len + c*wid]} stroke={color} strokeWidth={2} listening={false} />;
+    return <Line points={[x - c*len + s*wid, y - s*len - c*wid, x, y, x - c*len - s*wid, y - s*len + c*wid]} stroke={color} strokeWidth={2} listening={true} />;
   }
   if (style === 'circle') {
-    return <Circle x={x - c*size*0.5} y={y - s*size*0.5} radius={size * 0.5} fill={color} listening={false} />;
+    return <Circle x={x - c*size*0.5} y={y - s*size*0.5} radius={size * 0.5} fill={color} listening={true} />;
   }
   if (style === 'diamond') {
     const len = size, half = size * 0.45;
     const d = `M ${x} ${y} L ${x - c*len + s*half} ${y - s*len - c*half} L ${x - c*len*2} ${y - s*len*2} L ${x - c*len - s*half} ${y - s*len + c*half} Z`;
-    return <Path data={d} fill={color} listening={false} />;
+    return <Path data={d} fill={color} listening={true} />;
+  }
+  if (style === 'square') {
+    const h = size * 0.5;
+    const d = `M ${x - s*h} ${y + c*h} L ${x - c*size - s*h} ${y - s*size + c*h} L ${x - c*size + s*h} ${y - s*size - c*h} L ${x + s*h} ${y - c*h} Z`;
+    return <Path data={d} fill={color} listening={true} />;
+  }
+  if (style === 'bar') {
+    const h = size * 0.6;
+    return <Line points={[x - s*h, y + c*h, x + s*h, y - c*h]} stroke={color} strokeWidth={3} listening={true} />;
+  }
+  if (style === 'double') {
+    const len = size, wid = size * 0.6;
+    const offset = size * 0.7;
+    const x2 = x - c*offset, y2 = y - s*offset;
+    const d = `M ${x} ${y} L ${x - c*len + s*wid} ${y - s*len - c*wid} L ${x - c*len - s*wid} ${y - s*len + c*wid} Z M ${x2} ${y2} L ${x2 - c*len + s*wid} ${y2 - s*len - c*wid} L ${x2 - c*len - s*wid} ${y2 - s*len + c*wid} Z`;
+    return <Path data={d} fill={color} listening={true} />;
   }
   return null;
 }
@@ -204,10 +226,16 @@ export default function CanvasEditor2D({
 
   // Connector / overlay state
   const [hoveredShapeId, setHoveredShapeId]       = useState(null);
+  const [hoveredConnId, setHoveredConnId]         = useState(null);
   const [isDraggingEndpoint, setIsDraggingEndpoint] = useState(false);
   const [guides, setGuides]                         = useState([]);        // alignment guides
   const [drawingConn, setDrawingConn]               = useState(null);      // { x1,y1,startBinding }
   const [connPreview, setConnPreview]               = useState(null);      // { x,y,snap }
+  // Imperative ref to connector Konva Line nodes keyed by connector id.
+  // Used to live-update the connector line during pivot-handle drag without triggering React re-renders.
+  const connLineRefs = useRef({});           // { [connId]: Konva.Line }
+  // Captures the last dragged position during onDragMove so onDragEnd always reads the correct coords.
+  const lastDragPosRef = useRef({ x: 0, y: 0 });
   const snapIndicatorRef = useRef(null);
 
   // Drawing tools
@@ -221,30 +249,7 @@ export default function CanvasEditor2D({
   const mapTheme  = externalMapTheme  !== undefined ? externalMapTheme  : localMapTheme;
   const setMapTheme = externalSetMapTheme !== undefined ? externalSetMapTheme : setLocalMapTheme;
 
-  // ── Sync relative-endpoint bindings when target shapes move ─────────────────
-  useEffect(() => {
-    const RELATIVE = new Set(['dottedLineArrow', 'elbowArrow', 'bezierArrow']);
-    const updates = [];
-    shapes.forEach(shape => {
-      if (!RELATIVE.has(shape.type)) return;
-      const sx = shape.x ?? 0, sy = shape.y ?? 0;
-      const absEndX = sx + (shape.endX ?? 150);
-      const absEndY = sy + (shape.endY ?? 0);
-      if (shape.endBinding) {
-        const r = resolveEndpoint(shape.endBinding, absEndX, absEndY, shapes);
-        const newEndX = r.x - sx, newEndY = r.y - sy;
-        if (Math.abs(newEndX - (shape.endX ?? 150)) > 0.5 || Math.abs(newEndY - (shape.endY ?? 0)) > 0.5)
-          updates.push({ id: shape.id, endX: newEndX, endY: newEndY });
-      }
-      if (shape.startBinding) {
-        const r = resolveEndpoint(shape.startBinding, sx, sy, shapes);
-        if (Math.abs(r.x - sx) > 0.5 || Math.abs(r.y - sy) > 0.5)
-          updates.push({ id: shape.id, x: r.x, y: r.y, endX: absEndX - r.x, endY: absEndY - r.y });
-      }
-    });
-    if (updates.length > 0)
-      setShapes(prev => prev.map(s => { const u = updates.find(u => u.id === s.id); return u ? { ...s, ...u } : s; }));
-  }, [shapes]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ── (binding sync removed — all CONNECTOR_TYPES resolve endpoints at render time) ──
 
   // ── Resize observer ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -427,62 +432,133 @@ export default function CanvasEditor2D({
 
   // ── Connector rendering helper ───────────────────────────────────────────────
   const renderConnector = conn => {
-    const isOrtho = conn.type === 'orthoConnector';
-    const start   = resolveEndpoint(conn.startBinding, conn.x1 ?? conn.x ?? 0, conn.y1 ?? conn.y ?? 0, shapes);
-    const end     = resolveEndpoint(conn.endBinding,   conn.x2 ?? (conn.x ?? 0) + 150, conn.y2 ?? conn.y ?? 0, shapes);
-    const isSel   = conn.id === selectedId;
-    const color   = isSel ? '#3b82f6' : (conn.stroke || '#64748b');
-    const sw      = conn.strokeWidth || 2;
+    const isOrtho  = conn.type === 'orthoConnector' || conn.type === 'elbowArrow';
+    const isBezier = conn.type === 'bezierArrow';
+    const isDotted = conn.type === 'dottedLineArrow' || conn.type === 'dashedConnector';
+    const isDouble = conn.type === 'doubleHeadedConnector';
+    const isThick  = conn.type === 'thickArrow';
+    const isAnnot  = conn.type === 'annotationArrow';
 
+    // Support both absolute (x1/y1/x2/y2) and legacy relative (x/y + endX/endY) formats
+    const sx  = conn.x1 !== undefined ? conn.x1 : (conn.x ?? 0);
+    const sy  = conn.y1 !== undefined ? conn.y1 : (conn.y ?? 0);
+    const ex  = conn.x2 !== undefined ? conn.x2 : (conn.x ?? 0) + (conn.endX ?? 150);
+    const ey  = conn.y2 !== undefined ? conn.y2 : (conn.y ?? 0) + (conn.endY ?? 0);
+
+    const start = resolveEndpoint(conn.startBinding, sx, sy, shapes);
+    const end   = resolveEndpoint(conn.endBinding,   ex, ey, shapes);
+
+    const isSel     = conn.id === selectedId;
+    const isHovered = conn.id === hoveredConnId && !isSel;
+    const color     = isSel ? '#3b82f6' : (conn.stroke || '#64748b');
+    const sw        = conn.strokeWidth || 2;
+
+    // pts: always compute from stored waypoints (live updates are done imperatively via connLineRefs)
     let pts;
     if (isOrtho) {
       pts = computeOrthoPath(start, end, conn.waypoints || []);
+    } else if (conn.waypoints && conn.waypoints.length > 0) {
+      // Non-ortho with user-placed waypoints: build poly-line through waypoints
+      pts = [start.x, start.y];
+      conn.waypoints.forEach(wp => pts.push(wp.x, wp.y));
+      pts.push(end.x, end.y);
     } else {
       pts = [start.x, start.y, end.x, end.y];
     }
 
-    // End direction angle (for arrowhead)
     const n = pts.length;
     const endAngle   = Math.atan2(pts[n-1] - pts[n-3], pts[n-2] - pts[n-4]);
     const startAngle = Math.atan2(pts[1] - pts[3], pts[0] - pts[2]);
 
-    const startArrow = conn.startArrow || 'none';
-    const endArrow   = conn.endArrow   ?? (isOrtho ? 'filled' : (conn.pointerAtEnd !== false ? 'filled' : 'none'));
+    const startArrow = conn.startArrow || (isDouble ? 'filled' : 'none');
+    const endArrow   = conn.endArrow   ?? (conn.pointerAtEnd !== false ? 'filled' : 'none');
+    const lineStrokeWidth = isThick ? (sw * 2.5) : sw;
+    const arrowSize = isThick ? 16 : (isAnnot ? 9 : 11);
 
-    // Shorten line so it doesn't overlap arrowhead
-    const shortenEnd   = endArrow   !== 'none' ? 10 : 0;
-    const shortenStart = startArrow !== 'none' ? 10 : 0;
+    const getShortenAmt = (arrowType) => {
+      if (!arrowType || arrowType === 'none') return 0;
+      if (arrowType === 'bar') return 0;
+      if (arrowType === 'circle' || arrowType === 'square' || arrowType === 'diamond') return arrowSize * 0.8;
+      if (arrowType === 'double') return arrowSize * 1.6;
+      return arrowSize * 0.9;
+    };
 
-    // Adjusted first/last points
+    const shortenEnd   = getShortenAmt(endArrow);
+    const shortenStart = getShortenAmt(startArrow);
     const ae = endAngle, as2 = startAngle;
     const adjPts = [...pts];
-    if (shortenEnd > 0) {
-      adjPts[n-2] = pts[n-2] - Math.cos(ae) * shortenEnd;
-      adjPts[n-1] = pts[n-1] - Math.sin(ae) * shortenEnd;
+    if (shortenEnd > 0)   { adjPts[n-2] = pts[n-2] - Math.cos(ae)  * shortenEnd;   adjPts[n-1] = pts[n-1] - Math.sin(ae)  * shortenEnd; }
+    if (shortenStart > 0) { adjPts[0]   = pts[0]   - Math.cos(as2) * shortenStart; adjPts[1]   = pts[1]   - Math.sin(as2) * shortenStart; }
+
+    const lineStyle = conn.lineStyle || (conn.dash ? 'dashed' : (isDotted ? 'dashed' : 'solid'));
+    let dashPattern = undefined;
+    if (lineStyle === 'dashed') {
+      dashPattern = [8, 4];
+    } else if (lineStyle === 'dotted') {
+      dashPattern = [2, 3];
     }
-    if (shortenStart > 0) {
-      adjPts[0] = pts[0] - Math.cos(as2) * shortenStart;
-      adjPts[1] = pts[1] - Math.sin(as2) * shortenStart;
-    }
+    const tension     = isBezier ? 0.5 : 0;
+    const opacity     = isAnnot ? 0.85 : 1;
+
+    const connClickHandler = () => {
+      if (drawMode === 'select') { setSelectedId(conn.id); setHoveredShapeId(null); setHoveredConnId(null); }
+      if (drawMode === 'eraser') deleteShape(conn.id);
+    };
+
+    const onConnDragEnd = e => {
+      const dx = e.target.x();  // Group always starts at (0,0) so final pos = delta
+      const dy = e.target.y();
+      // Reset group back to origin (all coords are stored absolutely)
+      e.target.x(0); e.target.y(0);
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return; // treat as click, not drag
+      // Translate all connector coordinates by the delta
+      const newWps = (conn.waypoints || []).map(wp => ({ x: wp.x + dx, y: wp.y + dy }));
+      const updates = { waypoints: newWps, startBinding: null, endBinding: null };
+      if (conn.x1 !== undefined) {
+        updates.x1 = conn.x1 + dx; updates.y1 = conn.y1 + dy;
+        updates.x2 = conn.x2 + dx; updates.y2 = conn.y2 + dy;
+      } else {
+        updates.x = (conn.x ?? 0) + dx; updates.y = (conn.y ?? 0) + dy;
+      }
+      updateShape(conn.id, updates);
+    };
 
     return (
-      <React.Fragment key={conn.id}>
+      <Group
+        key={conn.id}
+        listening={drawMode === 'select' || drawMode === 'eraser'}
+        draggable={isSel && drawMode === 'select'}
+        onDragEnd={onConnDragEnd}
+        onClick={connClickHandler}
+        onTap={() => drawMode === 'select' && setSelectedId(conn.id)}
+        onMouseEnter={e => {
+          drawMode === 'select' && setHoveredConnId(conn.id);
+          if (isSel && drawMode === 'select') e.target.getStage().container().style.cursor = 'move';
+        }}
+        onMouseLeave={e => {
+          setHoveredConnId(null);
+          e.target.getStage().container().style.cursor = 'default';
+        }}
+      >
+        {/* Selection / hover glow — wide semi-transparent hit area behind the connector */}
+        {(isHovered || isSel) && (
+          <Line points={adjPts} stroke="#3b82f6" strokeWidth={sw + 12} opacity={isSel ? 0.08 : 0.18} listening={false} tension={tension} />
+        )}
+
         <Line
+          ref={node => { if (node) connLineRefs.current[conn.id] = node; else delete connLineRefs.current[conn.id]; }}
           points={adjPts}
           stroke={color}
-          strokeWidth={sw}
-          dash={conn.dash ? [8, 4] : undefined}
-          hitStrokeWidth={16}
-          listening={drawMode === 'select' || drawMode === 'eraser'}
-          onClick={() => {
-            if (drawMode === 'select') { setSelectedId(conn.id); setHoveredShapeId(null); }
-            if (drawMode === 'eraser') deleteShape(conn.id);
-          }}
-          onTap={() => drawMode === 'select' && setSelectedId(conn.id)}
+          strokeWidth={lineStrokeWidth}
+          dash={dashPattern}
+          hitStrokeWidth={20}
+          listening
+          tension={tension}
+          opacity={opacity}
         />
-        <ArrowHead x={end.x}   y={end.y}   angle={endAngle}   style={endArrow}   color={color} />
-        <ArrowHead x={start.x} y={start.y} angle={startAngle} style={startArrow} color={color} />
-      </React.Fragment>
+        <ArrowHead x={end.x}   y={end.y}   angle={endAngle}   style={endArrow}   color={color} size={arrowSize} />
+        <ArrowHead x={start.x} y={start.y} angle={startAngle} style={startArrow} color={color} size={arrowSize} />
+      </Group>
     );
   };
 
@@ -490,39 +566,36 @@ export default function CanvasEditor2D({
   const makeEndpointHandles = () => {
     if (!selectedId || drawMode !== 'select') return null;
     const shape = shapes.find(s => s.id === selectedId);
-    if (!shape || !ENDPOINT_EDITABLE.has(shape.type)) return null;
+    if (!shape || !CONNECTOR_TYPES.has(shape.type)) return null;
 
-    let start, end, onStartCommit, onEndCommit;
+    // Support both absolute (x1/y1/x2/y2) and legacy relative (x/y + endX/endY) formats
+    const useAbsCoords = shape.x1 !== undefined;
+    const sx  = useAbsCoords ? shape.x1 : (shape.x ?? 0);
+    const sy  = useAbsCoords ? shape.y1 : (shape.y ?? 0);
+    const ex  = useAbsCoords ? shape.x2 : (shape.x ?? 0) + (shape.endX ?? 150);
+    const ey  = useAbsCoords ? shape.y2 : (shape.y ?? 0) + (shape.endY ?? 0);
 
-    if (CONNECTOR_TYPES.has(shape.type)) {
-      start = resolveEndpoint(shape.startBinding, shape.x1 ?? shape.x ?? 0, shape.y1 ?? shape.y ?? 0, shapes);
-      end   = resolveEndpoint(shape.endBinding,   shape.x2 ?? (shape.x ?? 0) + 150, shape.y2 ?? shape.y ?? 0, shapes);
-      onStartCommit = (p, snap) => {
-        const binding = snap ? { shapeId: snap.shapeId, pointIndex: snap.pointIndex } : null;
-        updateShape(shape.id, { x1: snap?.x ?? p.x, y1: snap?.y ?? p.y, startBinding: binding, waypoints: [] });
-      };
-      onEndCommit = (p, snap) => {
-        const binding = snap ? { shapeId: snap.shapeId, pointIndex: snap.pointIndex } : null;
-        updateShape(shape.id, { x2: snap?.x ?? p.x, y2: snap?.y ?? p.y, endBinding: binding, waypoints: [] });
-      };
-    } else {
-      // Relative-endpoint types
-      const sx = shape.x ?? 0, sy = shape.y ?? 0;
-      const absEndX = sx + (shape.endX ?? 150);
-      const absEndY = sy + (shape.endY ?? 0);
-      start = resolveEndpoint(shape.startBinding ?? null, sx, sy, shapes);
-      end   = resolveEndpoint(shape.endBinding   ?? null, absEndX, absEndY, shapes);
-      onStartCommit = (p, snap) => {
-        const fx = snap?.x ?? p.x, fy = snap?.y ?? p.y;
-        const binding = snap ? { shapeId: snap.shapeId, pointIndex: snap.pointIndex } : null;
-        updateShape(shape.id, { x: fx, y: fy, endX: absEndX - fx, endY: absEndY - fy, startBinding: binding });
-      };
-      onEndCommit = (p, snap) => {
-        const fx = snap?.x ?? p.x, fy = snap?.y ?? p.y;
-        const binding = snap ? { shapeId: snap.shapeId, pointIndex: snap.pointIndex } : null;
-        updateShape(shape.id, { endX: fx - sx, endY: fy - sy, endBinding: binding });
-      };
-    }
+    const start = resolveEndpoint(shape.startBinding, sx, sy, shapes);
+    const end   = resolveEndpoint(shape.endBinding,   ex, ey, shapes);
+
+    const onStartCommit = (p, snap) => {
+      const binding = snap ? { shapeId: snap.shapeId, pointIndex: snap.pointIndex } : null;
+      const fx = snap?.x ?? p.x, fy = snap?.y ?? p.y;
+      if (useAbsCoords) {
+        updateShape(shape.id, { x1: fx, y1: fy, startBinding: binding, waypoints: [] });
+      } else {
+        updateShape(shape.id, { x: fx, y: fy, endX: ex - fx, endY: ey - fy, startBinding: binding, waypoints: [] });
+      }
+    };
+    const onEndCommit = (p, snap) => {
+      const binding = snap ? { shapeId: snap.shapeId, pointIndex: snap.pointIndex } : null;
+      const fx = snap?.x ?? p.x, fy = snap?.y ?? p.y;
+      if (useAbsCoords) {
+        updateShape(shape.id, { x2: fx, y2: fy, endBinding: binding, waypoints: [] });
+      } else {
+        updateShape(shape.id, { endX: fx - sx, endY: fy - sy, endBinding: binding, waypoints: [] });
+      }
+    };
 
     const makeHandle = (pos, endKey, onCommit) => (
       <Circle
@@ -553,15 +626,67 @@ export default function CanvasEditor2D({
     return [makeHandle(start, 'start', onStartCommit), makeHandle(end, 'end', onEndCommit)];
   };
 
-  // ── orthoConnector pivot handles ─────────────────────────────────────────────
+  // ── Pivot handles for any selected connector with waypoints ─────────────────
   const makePivotHandles = () => {
     if (!selectedId || drawMode !== 'select') return null;
-    const conn = shapes.find(s => s.id === selectedId && s.type === 'orthoConnector');
+    const conn = shapes.find(s => s.id === selectedId && CONNECTOR_TYPES.has(s.type));
     if (!conn) return null;
-    const start = resolveEndpoint(conn.startBinding, conn.x1 ?? 0, conn.y1 ?? 0, shapes);
-    const end   = resolveEndpoint(conn.endBinding,   conn.x2 ?? 150, conn.y2 ?? 0, shapes);
-    const pts   = computeOrthoPath(start, end, conn.waypoints || []);
+    const sx    = conn.x1 !== undefined ? conn.x1 : (conn.x ?? 0);
+    const sy    = conn.y1 !== undefined ? conn.y1 : (conn.y ?? 0);
+    const ex    = conn.x2 !== undefined ? conn.x2 : (conn.x ?? 0) + (conn.endX ?? 150);
+    const ey    = conn.y2 !== undefined ? conn.y2 : (conn.y ?? 0) + (conn.endY ?? 0);
+    const start = resolveEndpoint(conn.startBinding, sx, sy, shapes);
+    const end   = resolveEndpoint(conn.endBinding,   ex, ey, shapes);
+
+    // Ortho connectors have truly horizontal/vertical segments → constrain to perpendicular axis.
+    // Non-ortho connectors (straight / bezier / dotted) have diagonal segments → allow free 2D drag.
+    const isOrthoConn = conn.type === 'orthoConnector' || conn.type === 'elbowArrow';
+
+    // Compute pts the same way renderConnector does so handles line up with the visual path
+    let pts;
+    if (isOrthoConn) {
+      pts = computeOrthoPath(start, end, conn.waypoints || []);
+    } else if (conn.waypoints && conn.waypoints.length > 0) {
+      pts = [start.x, start.y];
+      conn.waypoints.forEach(wp => pts.push(wp.x, wp.y));
+      pts.push(end.x, end.y);
+    } else {
+      pts = [start.x, start.y, end.x, end.y];
+    }
     const mids  = getSegmentMidpoints(pts);
+
+    const computeNewPts = (mid, nx, ny) => {
+      if (isOrthoConn) {
+        const newPts = [...pts];
+        const si = mid.segIndex;
+        if (mid.isHorizontal) {
+          // horizontal segment → moving vertically → update Y of both endpoints in segment
+          newPts[si*2+1] = ny; newPts[si*2+3] = ny;
+        } else {
+          // vertical segment → moving horizontally → update X of both endpoints in segment
+          newPts[si*2] = nx; newPts[si*2+2] = nx;
+        }
+        return newPts;
+      } else {
+        // Non-ortho: splice/move a free waypoint at the dragged position.
+        // pts = [x0,y0, ...waypoints..., xN,yN]
+        // The waypoint for segment si sits at index si (0-based into the waypoint array).
+        // Rebuild: keep start, replace/insert waypoint[si], keep end.
+        const startPt = [pts[0], pts[1]];
+        const endPt   = [pts[pts.length-2], pts[pts.length-1]];
+        // Extract existing waypoints (pts minus first and last point)
+        const existingWps = [];
+        for (let i = 2; i < pts.length - 2; i += 2) existingWps.push([pts[i], pts[i+1]]);
+        // If this segment is between existing waypoints, update that waypoint;
+        // otherwise (si === existingWps.length, dragging the last segment mid) insert.
+        if (si < existingWps.length) {
+          existingWps[si] = [nx, ny];
+        } else {
+          existingWps.push([nx, ny]);
+        }
+        return [...startPt, ...existingWps.flat(), ...endPt];
+      }
+    };
 
     return mids.map((mid, mi) => (
       <Circle
@@ -570,8 +695,8 @@ export default function CanvasEditor2D({
         radius={5}
         fill="#ffffff" stroke="#3b82f6" strokeWidth={2}
         draggable
-        dragBoundFunc={pos => {
-          // Constrain to the perpendicular axis of this segment
+        dragBoundFunc={isOrthoConn ? (pos => {
+          // Ortho-only: constrain handle to the perpendicular axis of its segment
           const stage = stageRef.current;
           if (!stage) return pos;
           const lp = stage.getAbsoluteTransform().copy().invert().point(pos);
@@ -580,17 +705,40 @@ export default function CanvasEditor2D({
               ? { x: mid.x, y: lp.y }   // horizontal seg → drag vertically only
               : { x: lp.x, y: mid.y }   // vertical seg  → drag horizontally only
           );
+        }) : undefined /* non-ortho: free 2D drag */}
+        onDragMove={e => {
+          // Imperatively update the connector line — NO state change, so Circle handle stays at drag position
+          const nx = e.target.x(), ny = e.target.y();
+          lastDragPosRef.current = { x: nx, y: ny };
+          const livePts = computeNewPts(mid, nx, ny);
+          const lineNode = connLineRefs.current[conn.id];
+          if (lineNode) {
+            const n = livePts.length;
+            const ae = Math.atan2(livePts[n-1] - livePts[n-3], livePts[n-2] - livePts[n-4]);
+            const adjLive = [...livePts];
+            const isThick  = conn.type === 'thickArrow';
+            const isAnnot  = conn.type === 'annotationArrow';
+            const arrowSize = isThick ? 16 : (isAnnot ? 9 : 11);
+            const endArrow = conn.endArrow ?? (conn.pointerAtEnd !== false ? 'filled' : 'none');
+            const getShortenAmt = (arrowType) => {
+              if (!arrowType || arrowType === 'none') return 0;
+              if (arrowType === 'bar') return 0;
+              if (arrowType === 'circle' || arrowType === 'square' || arrowType === 'diamond') return arrowSize * 0.8;
+              if (arrowType === 'double') return arrowSize * 1.6;
+              return arrowSize * 0.9;
+            };
+            const shortenEnd = getShortenAmt(endArrow);
+            if (shortenEnd > 0) { adjLive[n-2] = livePts[n-2] - Math.cos(ae) * shortenEnd; adjLive[n-1] = livePts[n-1] - Math.sin(ae) * shortenEnd; }
+            lineNode.points(adjLive);
+            lineNode.getLayer()?.batchDraw();
+          }
         }}
         onDragEnd={e => {
-          const nx = e.target.x(), ny = e.target.y();
-          const newPts = [...pts];
-          const si = mid.segIndex;
-          if (mid.isHorizontal) {
-            // Adjust Y of both pts in this segment
-            newPts[si*2+1] = ny; newPts[si*2+3] = ny;
-          } else {
-            newPts[si*2] = nx; newPts[si*2+2] = nx;
-          }
+          // Use lastDragPosRef (captured in onDragMove) — guaranteed to be the true dragged position
+          // even if Konva resets e.target.x()/y() after drag completes.
+          const pos = lastDragPosRef.current;
+          const nx = pos.x, ny = pos.y;
+          const newPts = computeNewPts(mid, nx, ny);
           // Store intermediate points as waypoints (exclude first and last)
           const wps = [];
           for (let i = 2; i < newPts.length - 2; i += 2) wps.push({ x: newPts[i], y: newPts[i+1] });
@@ -648,7 +796,7 @@ export default function CanvasEditor2D({
       onKeyDown={handleKeyDown}
       style={{
         width: '100%', height: '100%', outline: 'none',
-        cursor: drawMode === 'connector' ? 'crosshair' : 'default',
+        cursor: drawMode === 'connector' ? 'crosshair' : hoveredConnId ? 'pointer' : 'default',
         backgroundColor: currentTheme.bgColor,
         backgroundImage: showGrid ? `linear-gradient(${currentTheme.gridColor} 1px, transparent 1px), linear-gradient(90deg, ${currentTheme.gridColor} 1px, transparent 1px)` : 'none',
         backgroundSize: bgSize, backgroundPosition: bgPos,
@@ -731,12 +879,16 @@ export default function CanvasEditor2D({
           {isShapesMenuOpen && (
             <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 10, background: '#1e293b', border: '1px solid #334155', borderRadius: 8, padding: 8, display: 'flex', flexDirection: 'column', gap: 4, boxShadow: '0 10px 25px -5px rgba(0,0,0,.5)', zIndex: 20 }}>
               {[
-                { type: 'triangle',       icon: <Triangle size={16} />,   label: 'Triangle' },
-                { type: 'polygon', overrides: { sides: 5 }, icon: <Star size={16} />, label: 'Pentagon' },
+                { type: 'triangle',              icon: <Triangle size={16} />,         label: 'Triangle' },
+                { type: 'polygon', overrides: { sides: 5 }, icon: <Star size={16} />,  label: 'Pentagon' },
                 { type: 'polygon', overrides: { sides: 6 }, icon: <Hexagon size={16} />, label: 'Hexagon' },
-                { type: 'orthoConnector', icon: <Workflow size={16} />,   label: 'Ortho Connector' },
-                { type: 'connectorArrow', icon: <ArrowRight size={16} />, label: 'Straight Arrow' },
-                { type: 'point',          icon: <CircleIcon size={16} fill="currentColor" />, label: 'Point' },
+                { type: 'orthoConnector',         icon: <Workflow size={16} />,         label: 'Ortho Connector' },
+                { type: 'connectorArrow',         icon: <ArrowRight size={16} />,       label: 'Straight Arrow' },
+                { type: 'dashedConnector',        icon: <ArrowRight size={16} />,       label: 'Dashed Arrow' },
+                { type: 'doubleHeadedConnector',  icon: <ArrowRight size={16} />,       label: 'Double Arrow' },
+                { type: 'thickArrow',             icon: <ArrowRight size={16} />,       label: 'Thick Arrow' },
+                { type: 'annotationArrow',        icon: <ArrowRight size={16} />,       label: 'Annotation Arrow' },
+                { type: 'point',                  icon: <CircleIcon size={16} fill="currentColor" />, label: 'Point' },
               ].map(s => (
                 <button key={s.label} onClick={() => stampShape(s.type, s.overrides || {})}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', border: 'none', color: '#cbd5e1', padding: '6px 12px', borderRadius: 4, cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}

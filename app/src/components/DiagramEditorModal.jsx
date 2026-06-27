@@ -369,6 +369,7 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
           reorderShape={reorderShape}
           mode="2D"
           openIconPicker={() => {}}
+          allShapes={shapes}
         />
       </div>
 

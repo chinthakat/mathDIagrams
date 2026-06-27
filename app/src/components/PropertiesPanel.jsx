@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { Trash2, ArrowUp, ArrowDown, AlignCenter, AlignLeft, AlignRight, AlignHorizontalSpaceBetween, AlignVerticalSpaceBetween, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { Trash2, ArrowUp, ArrowDown, AlignCenter, AlignLeft, AlignRight, AlignHorizontalSpaceBetween, AlignVerticalSpaceBetween, Image as ImageIcon, Sparkles, Plus, Minus } from 'lucide-react';
 import { ObjectRegistry } from '../registry/objectRegistry';
 import { GET_ICON } from '../registry/iconRegistry';
+import { resolveEndpoint, computeOrthoPath } from '../utils/connectionUtils';
+
+const ENDPOINT_EDITABLE = new Set(['connectorArrow', 'orthoConnector', 'dottedLineArrow', 'elbowArrow', 'bezierArrow']);
 
 const PRESET_COLORS = [
   'transparent', '#ffffff', '#000000', '#94a3b8', 
@@ -9,7 +12,7 @@ const PRESET_COLORS = [
   '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'
 ];
 
-export default function PropertiesPanel({ selectedShape, updateShape, updateAllShapes, deleteShape, reorderShape, mode, openIconPicker }) {
+export default function PropertiesPanel({ selectedShape, updateShape, updateAllShapes, deleteShape, reorderShape, mode, openIconPicker, allShapes = [] }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [genError, setGenError] = useState('');
   const [isGeneratingProp, setIsGeneratingProp] = useState(false);
@@ -21,6 +24,172 @@ export default function PropertiesPanel({ selectedShape, updateShape, updateAllS
         <div className="empty-state">
           <div>Select a shape to view properties</div>
         </div>
+      </div>
+    );
+  }
+
+  // ── Connector panel (minimal) ─────────────────────────────────────────────────
+  if (ENDPOINT_EDITABLE.has(selectedShape.type)) {
+    const shape = selectedShape;
+    const regObj = ObjectRegistry[shape.type];
+    const wps = shape.waypoints ?? [];
+    const supportsWaypoints = true; // all connector types support waypoints
+
+    const handleConnChange = (e) => {
+      const { name, value, type } = e.target;
+      let v = type === 'range' || type === 'number' ? parseFloat(value) : value;
+      if (type === 'checkbox') v = e.target.checked;
+      updateShape(shape.id, { [name]: v });
+    };
+
+    const handleAddWaypoint = () => {
+      // Resolve endpoints — support both absolute (x1/y1/x2/y2) and legacy (x/y+endX/endY) formats
+      const useAbs = shape.x1 !== undefined;
+      const sx = useAbs ? (shape.x1 ?? 0) : (shape.x ?? 0);
+      const sy = useAbs ? (shape.y1 ?? 0) : (shape.y ?? 0);
+      const ex = useAbs ? (shape.x2 ?? 150) : (shape.x ?? 0) + (shape.endX ?? 150);
+      const ey = useAbs ? (shape.y2 ?? 0)   : (shape.y ?? 0) + (shape.endY ?? 0);
+      const start = resolveEndpoint(shape.startBinding, sx, sy, allShapes);
+      const end   = resolveEndpoint(shape.endBinding,   ex, ey, allShapes);
+
+      if (shape.type === 'connectorArrow') {
+        // Convert straight connector to ortho so it becomes bendable
+        const mx = (start.x + end.x) / 2;
+        const my = (start.y + end.y) / 2;
+        updateShape(shape.id, { type: 'orthoConnector', x1: sx, y1: sy, x2: ex, y2: ey, waypoints: [{ x: mx, y: my }] });
+        return;
+      }
+
+      // For all other connector types: compute current path and insert waypoint at midpoint of longest segment
+      const pts = computeOrthoPath(start, end, wps);
+      let maxLen = 0, maxSi = 0;
+      for (let i = 0; i < pts.length - 2; i += 2) {
+        const len = Math.hypot(pts[i+2]-pts[i], pts[i+3]-pts[i+1]);
+        if (len > maxLen) { maxLen = len; maxSi = i; }
+      }
+      const midX = (pts[maxSi] + pts[maxSi+2]) / 2;
+      const midY = (pts[maxSi+1] + pts[maxSi+3]) / 2;
+      const newWps = [...wps];
+      newWps.splice(maxSi / 2, 0, { x: midX, y: midY });
+
+      // Ensure legacy-format shapes also store absolute start/end for rendering
+      if (!useAbs) {
+        updateShape(shape.id, { x1: sx, y1: sy, x2: ex, y2: ey, waypoints: newWps });
+      } else {
+        updateShape(shape.id, { waypoints: newWps });
+      }
+    };
+
+    const handleRemoveWaypoint = () => {
+      if (wps.length > 0) updateShape(shape.id, { waypoints: wps.slice(0, -1) });
+    };
+
+    const inputStyle = { width: '100%', padding: '8px', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px' };
+
+    return (
+      <div className="properties-panel">
+        <div className="section-title">Connector</div>
+
+        {/* Stroke color */}
+        <div className="input-group">
+          <label><span>Color</span></label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '6px' }}>
+            {['#64748b','#000000','#ffffff','#ef4444','#3b82f6','#22c55e','#eab308','#8b5cf6'].map(c => (
+              <div key={c} onClick={() => updateShape(shape.id, { stroke: c })}
+                style={{ width: 24, height: 24, borderRadius: 4, background: c, border: shape.stroke === c ? '2px solid var(--accent)' : '1px solid var(--border-color)', cursor: 'pointer' }} />
+            ))}
+          </div>
+          <input type="color" value={shape.stroke || '#64748b'} onChange={e => updateShape(shape.id, { stroke: e.target.value })}
+            style={{ width: '100%', height: 32, padding: 0, cursor: 'pointer', border: '1px solid var(--border-color)', borderRadius: 4 }} />
+        </div>
+
+        {/* Stroke width */}
+        <div className="input-group">
+          <label><span>Thickness</span><span>{shape.strokeWidth ?? 2}</span></label>
+          <input type="range" name="strokeWidth" min={1} max={12} value={shape.strokeWidth ?? 2} onChange={handleConnChange} />
+        </div>
+
+        {/* Start arrow */}
+        <div className="input-group">
+          <label><span>Start Arrow</span></label>
+          <select name="startArrow" value={shape.startArrow || 'none'} onChange={handleConnChange} style={inputStyle}>
+            {[
+              { value: 'none', label: 'None' },
+              { value: 'filled', label: 'Classic (Filled)' },
+              { value: 'open', label: 'Stealth (Open)' },
+              { value: 'circle', label: 'Dot (Circle)' },
+              { value: 'diamond', label: 'Diamond' },
+              { value: 'square', label: 'Box (Square)' },
+              { value: 'bar', label: 'T-Bar (Bar)' },
+              { value: 'double', label: 'Double (Double)' }
+            ].map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* End arrow */}
+        <div className="input-group">
+          <label><span>End Arrow</span></label>
+          <select name="endArrow" value={shape.endArrow ?? 'filled'} onChange={handleConnChange} style={inputStyle}>
+            {[
+              { value: 'none', label: 'None' },
+              { value: 'filled', label: 'Classic (Filled)' },
+              { value: 'open', label: 'Stealth (Open)' },
+              { value: 'circle', label: 'Dot (Circle)' },
+              { value: 'diamond', label: 'Diamond' },
+              { value: 'square', label: 'Box (Square)' },
+              { value: 'bar', label: 'T-Bar (Bar)' },
+              { value: 'double', label: 'Double (Double)' }
+            ].map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Line Style */}
+        <div className="input-group">
+          <label><span>Line Style</span></label>
+          <select name="lineStyle" value={shape.lineStyle || (shape.dash ? 'dashed' : 'solid')} onChange={handleConnChange} style={inputStyle}>
+            {[
+              { value: 'solid', label: 'Continuous (Solid)' },
+              { value: 'dashed', label: 'Broken (Dashed)' },
+              { value: 'dotted', label: 'Dotted' }
+            ].map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Midpoints / waypoints */}
+        {supportsWaypoints && (
+          <>
+            <div className="section-title" style={{ marginTop: 24 }}>Midpoints</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg-dark)', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--border-color)' }}>
+              <span style={{ flex: 1, fontSize: 13, color: 'var(--text-muted)' }}>
+                {wps.length === 0 ? 'No midpoints' : `${wps.length} midpoint${wps.length > 1 ? 's' : ''}`}
+              </span>
+              <button onClick={handleRemoveWaypoint} disabled={wps.length === 0}
+                title="Remove last midpoint"
+                style={{ width: 28, height: 28, borderRadius: 4, border: '1px solid var(--border-color)', background: 'transparent', color: wps.length === 0 ? '#475569' : '#f87171', cursor: wps.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Minus size={14} />
+              </button>
+              <button onClick={handleAddWaypoint}
+                title="Add midpoint"
+                style={{ width: 28, height: 28, borderRadius: 4, border: '1px solid var(--border-color)', background: 'transparent', color: '#3b82f6', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Plus size={14} />
+              </button>
+            </div>
+            <p style={{ fontSize: 11, color: '#475569', marginTop: 6, lineHeight: 1.5 }}>
+              Drag the white segment handles on the canvas to reshape the connector.
+            </p>
+          </>
+        )}
+
+        <div className="section-title" style={{ marginTop: 32 }}>Actions</div>
+        <button className="btn" style={{ width: '100%', backgroundColor: '#ef4444', color: 'white' }} onClick={() => deleteShape(shape.id)}>
+          <Trash2 size={16} /> Delete Connector
+        </button>
       </div>
     );
   }
