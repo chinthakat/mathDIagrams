@@ -6,6 +6,11 @@ import { MousePointer2, Pen, Highlighter, Square as SquareIcon, Circle as Circle
 
 const GRID_SIZE = 20;
 
+// Arrow/connector types that get draggable endpoint handles instead of a Transformer.
+// 'connectorArrow' → absolute x1/y1/x2/y2 + optional startBinding/endBinding
+// others           → Group(x,y) + relative endX/endY + optional endBinding
+const ENDPOINT_EDITABLE = new Set(['connectorArrow', 'dottedLineArrow', 'elbowArrow', 'bezierArrow']);
+
 const ShapeElement = ({ shapeProps, isSelected, onSelect, onDelete, onChange, snapToGrid, allShapes, drawMode, onHoverChange }) => {
   const shapeRef = useRef();
   const trRef = useRef();
@@ -131,7 +136,7 @@ const ShapeElement = ({ shapeProps, isSelected, onSelect, onDelete, onChange, sn
       <Group {...commonProps}>
         {ComponentToRender && <ComponentToRender props={shapeProps} />}
       </Group>
-      {isSelected && (
+      {isSelected && !ENDPOINT_EDITABLE.has(shapeProps.type) && (
         <Transformer
           ref={trRef}
           boundBoxFunc={(oldBox, newBox) => {
@@ -287,6 +292,44 @@ export default function CanvasEditor2D({
   const [localMapTheme, setLocalMapTheme] = useState("paper");
   const mapTheme = externalMapTheme !== undefined ? externalMapTheme : localMapTheme;
   const setMapTheme = externalSetMapTheme !== undefined ? externalSetMapTheme : setLocalMapTheme;
+
+  // When a shape that a relative-endpoint arrow is bound to moves,
+  // sync endX/endY (and x/y for start bindings) so the Component renders correctly.
+  // Converges in ≤2 iterations because the second pass finds no difference.
+  useEffect(() => {
+    const RELATIVE = new Set(['dottedLineArrow', 'elbowArrow', 'bezierArrow']);
+    const updates = [];
+
+    shapes.forEach(shape => {
+      if (!RELATIVE.has(shape.type)) return;
+      const sx = shape.x ?? 0, sy = shape.y ?? 0;
+      const absEndX = sx + (shape.endX ?? 150);
+      const absEndY = sy + (shape.endY ?? 0);
+
+      if (shape.endBinding) {
+        const resolved = resolveEndpoint(shape.endBinding, absEndX, absEndY, shapes);
+        const newEndX = resolved.x - sx;
+        const newEndY = resolved.y - sy;
+        if (Math.abs(newEndX - (shape.endX ?? 150)) > 0.5 || Math.abs(newEndY - (shape.endY ?? 0)) > 0.5) {
+          updates.push({ id: shape.id, endX: newEndX, endY: newEndY });
+        }
+      }
+
+      if (shape.startBinding) {
+        const resolved = resolveEndpoint(shape.startBinding, sx, sy, shapes);
+        if (Math.abs(resolved.x - sx) > 0.5 || Math.abs(resolved.y - sy) > 0.5) {
+          updates.push({ id: shape.id, x: resolved.x, y: resolved.y, endX: absEndX - resolved.x, endY: absEndY - resolved.y });
+        }
+      }
+    });
+
+    if (updates.length > 0) {
+      setShapes(prev => prev.map(s => {
+        const u = updates.find(u => u.id === s.id);
+        return u ? { ...s, ...u } : s;
+      }));
+    }
+  }, [shapes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resize Observer for full-bleed canvas
   useEffect(() => {
@@ -728,18 +771,61 @@ export default function CanvasEditor2D({
             listening={false}
           />
 
-          {/* Endpoint handles for the selected connector */}
+          {/* Endpoint handles for selected connectors / arrow shapes */}
           {(() => {
             if (!selectedId || drawMode !== 'select') return null;
-            const conn = shapes.find(s => s.id === selectedId && s.type === 'connectorArrow');
-            if (!conn) return null;
+            const shape = shapes.find(s => s.id === selectedId);
+            if (!shape || !ENDPOINT_EDITABLE.has(shape.type)) return null;
 
-            const start = resolveEndpoint(conn.startBinding, conn.x1 ?? conn.x ?? 0, conn.y1 ?? conn.y ?? 0, shapes);
-            const end   = resolveEndpoint(conn.endBinding,   conn.x2 ?? (conn.x ?? 0) + 150, conn.y2 ?? conn.y ?? 0, shapes);
+            // ── Resolve absolute start & end positions ─────────────────────
+            let start, end, onStartCommit, onEndCommit;
 
-            const makeHandle = (pos, endKey) => (
+            if (shape.type === 'connectorArrow') {
+              start = resolveEndpoint(shape.startBinding, shape.x1 ?? shape.x ?? 0, shape.y1 ?? shape.y ?? 0, shapes);
+              end   = resolveEndpoint(shape.endBinding,   shape.x2 ?? (shape.x ?? 0) + 150, shape.y2 ?? shape.y ?? 0, shapes);
+
+              onStartCommit = (p, snap) => {
+                const binding = snap ? { shapeId: snap.shapeId, pointIndex: snap.pointIndex } : null;
+                updateShape(shape.id, { x1: snap?.x ?? p.x, y1: snap?.y ?? p.y, startBinding: binding });
+              };
+              onEndCommit = (p, snap) => {
+                const binding = snap ? { shapeId: snap.shapeId, pointIndex: snap.pointIndex } : null;
+                updateShape(shape.id, { x2: snap?.x ?? p.x, y2: snap?.y ?? p.y, endBinding: binding });
+              };
+            } else {
+              // Relative-endpoint types: dottedLineArrow, elbowArrow, bezierArrow
+              // Group is at (x, y); arrow tip is at (x + endX, y + endY).
+              const sx = shape.x ?? 0, sy = shape.y ?? 0;
+              const absEndX = sx + (shape.endX ?? 150);
+              const absEndY = sy + (shape.endY ?? 0);
+
+              start = resolveEndpoint(shape.startBinding ?? null, sx, sy, shapes);
+              end   = resolveEndpoint(shape.endBinding   ?? null, absEndX, absEndY, shapes);
+
+              onStartCommit = (p, snap) => {
+                const fx = snap?.x ?? p.x, fy = snap?.y ?? p.y;
+                const binding = snap ? { shapeId: snap.shapeId, pointIndex: snap.pointIndex } : null;
+                // Keep absolute end fixed while moving start
+                updateShape(shape.id, {
+                  x: fx, y: fy,
+                  endX: absEndX - fx, endY: absEndY - fy,
+                  startBinding: binding,
+                });
+              };
+              onEndCommit = (p, snap) => {
+                const fx = snap?.x ?? p.x, fy = snap?.y ?? p.y;
+                const binding = snap ? { shapeId: snap.shapeId, pointIndex: snap.pointIndex } : null;
+                updateShape(shape.id, {
+                  endX: fx - sx, endY: fy - sy,
+                  endBinding: binding,
+                });
+              };
+            }
+
+            // ── Shared draggable handle factory ────────────────────────────
+            const makeHandle = (pos, endKey, onCommit) => (
               <Circle
-                key={`ep-${conn.id}-${endKey}`}
+                key={`ep-${shape.id}-${endKey}`}
                 x={pos.x}
                 y={pos.y}
                 radius={7}
@@ -747,16 +833,12 @@ export default function CanvasEditor2D({
                 stroke="#ffffff"
                 strokeWidth={2.5}
                 draggable
-                onDragStart={() => {
-                  setIsDraggingEndpoint(true);
-                  setHoveredShapeId(null);
-                }}
+                onDragStart={() => { setIsDraggingEndpoint(true); setHoveredShapeId(null); }}
                 onDragMove={(e) => {
                   const p = { x: e.target.x(), y: e.target.y() };
-                  const snap = findNearestConnectionPoint(p, shapes, conn.id);
+                  const snap = findNearestConnectionPoint(p, shapes, shape.id);
                   if (snap) {
-                    e.target.x(snap.x);
-                    e.target.y(snap.y);
+                    e.target.x(snap.x); e.target.y(snap.y);
                     if (snapIndicatorRef.current) {
                       snapIndicatorRef.current.x(snap.x);
                       snapIndicatorRef.current.y(snap.y);
@@ -772,20 +854,16 @@ export default function CanvasEditor2D({
                   setIsDraggingEndpoint(false);
                   if (snapIndicatorRef.current) snapIndicatorRef.current.visible(false);
                   const p = { x: e.target.x(), y: e.target.y() };
-                  const snap = findNearestConnectionPoint(p, shapes, conn.id);
-                  const binding = snap ? { shapeId: snap.shapeId, pointIndex: snap.pointIndex } : null;
-                  const fx = snap?.x ?? p.x;
-                  const fy = snap?.y ?? p.y;
-                  if (endKey === 'start') {
-                    updateShape(conn.id, { x1: fx, y1: fy, startBinding: binding });
-                  } else {
-                    updateShape(conn.id, { x2: fx, y2: fy, endBinding: binding });
-                  }
+                  const snap = findNearestConnectionPoint(p, shapes, shape.id);
+                  onCommit(p, snap ?? null);
                 }}
               />
             );
 
-            return [makeHandle(start, 'start'), makeHandle(end, 'end')];
+            return [
+              makeHandle(start, 'start', onStartCommit),
+              makeHandle(end,   'end',   onEndCommit),
+            ];
           })()}
         </Layer>
       </Stage>
