@@ -582,7 +582,7 @@ export async function repairDiagramWithRetry({
   await logEvent({ stage: 'start', message: 'Repair pipeline started', data: { questionId: questionData.id, generationMode, validationMode, maxRetries, pipelineProvider } });
 
   // Step 1: Analyze with chosen provider
-  onProgress({ stage: 'analyzing', attempt: 0, maxAttempts: maxRetries });
+  onProgress({ stage: 'analyzing', attempt: 0, maxAttempts: maxRetries, pipelineProvider, geminiVisionModel });
   const analysis = await analyzeQuestionImage({
     imageUrl,
     questionText: questionData.text,
@@ -592,11 +592,11 @@ export async function repairDiagramWithRetry({
     model: geminiVisionModel || 'gemini-3.5-flash',
   });
   await logEvent({ stage: 'analyzed', message: 'Image analysis complete', data: analysis });
-  onProgress({ stage: 'analyzed', analysis, attempt: 0, maxAttempts: maxRetries });
+  onProgress({ stage: 'analyzed', analysis, attempt: 0, maxAttempts: maxRetries, pipelineProvider, geminiVisionModel });
 
   // Step 1b: Vision OCR — extract the exact values visible in the image
   // This is the primary source of truth; question text is used as a fallback supplement.
-  onProgress({ stage: 'extracting_values', attempt: 0, maxAttempts: maxRetries });
+  onProgress({ stage: 'extracting_values', attempt: 0, maxAttempts: maxRetries, pipelineProvider, geminiVisionModel });
   const imageExtracted = await extractImageValues({
     imageUrl,
     apiKey,
@@ -636,7 +636,7 @@ export async function repairDiagramWithRetry({
         const prompt = await refineImagePrompt(analysis, userInstructions, feedbackHistory, apiKey);
         await logEvent({ stage: 'prompt_refined', attempt, message: 'Image prompt refined', data: { prompt } });
 
-        onProgress({ stage: 'generating', attempt, maxAttempts: maxRetries, analysis, mode: 'gemini' });
+        onProgress({ stage: 'generating', attempt, maxAttempts: maxRetries, analysis, mode: 'gemini', pipelineProvider, geminiVisionModel });
 
         const imageDataUri = await generateGeminiImage({
           prompt,
@@ -657,7 +657,7 @@ export async function repairDiagramWithRetry({
 
       } else {
         // ── Konva shape generation path ──────────────────────────────────────
-        onProgress({ stage: 'generating', attempt, maxAttempts: maxRetries, analysis, mode: 'konva' });
+        onProgress({ stage: 'generating', attempt, maxAttempts: maxRetries, analysis, mode: 'konva', pipelineProvider, geminiVisionModel });
         const shapes = await generateRepairShapes({
           analysis,
           feedbackHistory,

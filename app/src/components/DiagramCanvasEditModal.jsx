@@ -6,6 +6,7 @@ import {
 import { ObjectRegistry } from '../registry/objectRegistry';
 import { getApiKey, saveApiKey, analyseImageForEditing } from '../services/claudeService';
 import { resolveImageUrl, uploadDiagramImage, updateQuestion } from '../services/lmsApiService';
+import { exportCroppedDataUrl } from '../utils/canvasUtils';
 import Sidebar from './Sidebar';
 import PropertiesPanel from './PropertiesPanel';
 import CanvasEditor2D from './CanvasEditor2D';
@@ -254,7 +255,7 @@ export default function DiagramCanvasEditModal({ question, onClose, onSaved }) {
     setSaving(true);
     setSaveError(null);
     try {
-      const dataUrl = stageRef.current.toDataURL({ pixelRatio: 2 });
+      const dataUrl = exportCroppedDataUrl(stageRef.current, shapes, { pixelRatio: 2 });
       const imagePublicUrl = await uploadDiagramImage(dataUrl, 'diagram-editor/canvas-edit');
       const updates = { diagramShapes: shapes, image: imagePublicUrl };
       const updated = await updateQuestion(question.id, updates);

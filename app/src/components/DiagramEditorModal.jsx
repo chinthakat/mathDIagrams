@@ -31,6 +31,7 @@ import {
 import { repairDiagramWithRetry, regenerateQuestionText } from '../services/diagramRepairService';
 import { generateTikZFromPrompt, analyseImageToTikZ, tikzSvgToPng } from '../services/tikzService';
 import { resolveImageUrl, uploadDiagramImage, updateQuestion } from '../services/lmsApiService';
+import { computeShapesBoundingBox } from '../utils/canvasUtils';
 import Sidebar from './Sidebar';
 import PropertiesPanel from './PropertiesPanel';
 import CanvasEditor2D from './CanvasEditor2D';
@@ -562,6 +563,9 @@ Canvas is 800x500 logical pixels. Respond with ONLY valid JSON array of shapes.`
     if (!stageRef.current) return;
 
     if (!cropMode) {
+      // Auto-fit crop box to content before showing the overlay
+      const auto = computeShapesBoundingBox(shapes, { padding: 24, stageW: 800, stageH: 600 });
+      setCropBox(auto);
       setCropMode(true);
       return;
     }

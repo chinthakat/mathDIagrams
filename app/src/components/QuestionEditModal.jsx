@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { Stage, Layer, Group as KonvaGroup } from 'react-konva';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { Stage, Layer, Group as KonvaGroup, Rect, Transformer } from 'react-konva';
 import {
   X, Sparkles, CheckCircle, XCircle, Loader, Save, RotateCcw,
   ChevronRight, Image as ImageIcon, Key, Download, Trash2,
@@ -30,17 +30,23 @@ function ProgressEntry({ entry }) {
     attempt_error: <XCircle size={13} color="#f87171" />,
   }[entry.stage] || <ChevronRight size={13} color="#64748b" />;
 
+  const isGemini = entry.pipelineProvider === 'gemini';
+  const visionModel = entry.geminiVisionModel || 'Gemini';
+  const analysisModel = isGemini ? visionModel : 'Claude Haiku';
+  const generationModel = isGemini ? visionModel : 'Claude Sonnet';
+
   const label = {
-    analyzing:       'Analysing existing diagram with Haiku vision…',
-    analyzed:        `Classified: ${entry.analysis?.diagramType || 'diagram'}`,
-    refining_prompt: `Attempt ${entry.attempt}/${entry.maxAttempts} — Refining image prompt with Claude…`,
-    prompt_refined:  `Attempt ${entry.attempt} — Image prompt refined`,
-    generating:      `Attempt ${entry.attempt}/${entry.maxAttempts} — Generating shapes with Sonnet…`,
+    analyzing:         `Analysing existing diagram with ${analysisModel}…`,
+    analyzed:          `Classified: ${entry.analysis?.diagramType || 'diagram'}`,
+    extracting_values: `Reading exact values from image (${analysisModel} OCR)…`,
+    refining_prompt:   `Attempt ${entry.attempt}/${entry.maxAttempts} — Refining image prompt with Claude…`,
+    prompt_refined:    `Attempt ${entry.attempt} — Image prompt refined`,
+    generating:        `Attempt ${entry.attempt}/${entry.maxAttempts} — Generating shapes with ${generationModel}…`,
     generated:     entry.image
       ? `Attempt ${entry.attempt} — Gemini image generated`
       : `Attempt ${entry.attempt} — ${entry.shapes?.length || 0} shapes generated`,
     rendering:     `Attempt ${entry.attempt} — Rendering Konva canvas…`,
-    validating:    `Attempt ${entry.attempt} — Validating screenshot with Haiku vision…`,
+    validating:    `Attempt ${entry.attempt} — Validating screenshot with ${analysisModel}…`,
     validated:     entry.validation?.isCorrect
       ? `Attempt ${entry.attempt} — ✓ PASSED (score: ${entry.validation?.score ?? '—'})`
       : `Attempt ${entry.attempt} — ✗ FAILED: ${entry.validation?.feedback || ''}`,
@@ -118,20 +124,36 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
   const [apiKey, setApiKeyState] = useState(getApiKey);
   const [geminiKey, setGeminiKeyState] = useState(getGeminiApiKey);
   const [userInstructions, setUserInstructions] = useState('');
+  const [pipelineProvider, setPipelineProvider] = useState('gemini');
   const [generationMode, setGenerationMode] = useState('konva');
   const [validationMode, setValidationMode] = useState('claude');
-  const [geminiImageModel, setGeminiImageModel] = useState(GEMINI_IMAGE_MODELS[0].id);
-  const [geminiVisionModel, setGeminiVisionModel] = useState(GEMINI_VISION_MODELS[0].id);
-  const [shapes, setShapes] = useState([]);
+  const [analysis, setAnalysis] = useState(null);
+  const [shapes, setShapes] = useState(() => {
+    return question.diagramShapes || question.shapes || [];
+  });
+  const [cropMode, setCropMode] = useState(false);
+  const [cropBox, setCropBox] = useState({ x: 50, y: 50, width: 700, height: 400 });
+  const cropRectRef = useRef();
+  const cropTransformerRef = useRef();
+
+  useEffect(() => {
+    if (cropMode && cropTransformerRef.current && cropRectRef.current) {
+      cropTransformerRef.current.nodes([cropRectRef.current]);
+      cropTransformerRef.current.getLayer().batchDraw();
+    }
+  }, [cropMode]);
   const [generatedImage, setGeneratedImage] = useState(null); // base64 for Gemini mode
   const [progressLog, setProgressLog] = useState([]);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [geminiImageModel, setGeminiImageModel] = useState(GEMINI_IMAGE_MODELS[0].id);
+  const [geminiVisionModel, setGeminiVisionModel] = useState(GEMINI_VISION_MODELS[0].id);
   const stageRef = useRef(null);
 
-  const needsGeminiKey = generationMode === 'gemini' || validationMode === 'gemini';
+  const needsGeminiKey = generationMode === 'gemini' || validationMode === 'gemini' || pipelineProvider === 'gemini';
+
 
   const imageUrl = resolveImageUrl(question.image || question.imageUrl || question.imageKey);
 
@@ -144,16 +166,17 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
   }, []);
 
   const runPipeline = async () => {
-    if (!apiKey) return;
+    if (pipelineProvider === 'claude' && !apiKey) { alert('Claude API key is required.'); return; }
     if (needsGeminiKey && !geminiKey) { alert('Gemini API key is required for the selected mode.'); return; }
     if (!imageUrl) { alert('This question has no image to repair.'); return; }
-    saveApiKey(apiKey);
+    if (apiKey) saveApiKey(apiKey);
     if (geminiKey) saveGeminiApiKey(geminiKey);
     setRunning(true);
     setProgressLog([]);
     setResult(null);
     setShapes([]);
     setGeneratedImage(null);
+    setAnalysis(null);
 
     try {
       const outcome = await repairDiagramWithRetry({
@@ -164,6 +187,7 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
         geminiApiKey: geminiKey,
         generationMode,
         validationMode,
+        pipelineProvider,
         geminiImageModel,
         geminiVisionModel,
         onProgress: entry => {
@@ -187,6 +211,12 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
 
   const handleSave = async () => {
     if (!shapes.length && !generatedImage) return;
+
+    if (!cropMode && !generatedImage) {
+      setCropMode(true);
+      return;
+    }
+
     setSaving(true);
     setSaveError(null);
     try {
@@ -195,8 +225,22 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
         // Gemini mode — upload raster image directly
         imagePublicUrl = await uploadDiagramImage(generatedImage, 'diagram-editor/repaired');
       } else if (stageRef.current) {
-        // Konva mode — capture stage
-        const dataUrl = stageRef.current.toDataURL({ pixelRatio: 2 });
+        // Hide crop overlay to prevent blue dashed box from being printed in the final image
+        setCropMode(false);
+        await new Promise(r => setTimeout(r, 100)); // wait for paint
+
+        const cx = Math.max(0, Math.min(cropBox.x, 800));
+        const cy = Math.max(0, Math.min(cropBox.y, 500));
+        const cw = Math.max(40, Math.min(cropBox.width, 800 - cx));
+        const ch = Math.max(40, Math.min(cropBox.height, 500 - cy));
+
+        const dataUrl = stageRef.current.toDataURL({
+          x: cx,
+          y: cy,
+          width: cw,
+          height: ch,
+          pixelRatio: 2
+        });
         imagePublicUrl = await uploadDiagramImage(dataUrl, 'diagram-editor/repaired');
       }
       const updates = {
@@ -205,8 +249,10 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
       };
       const updated = await updateQuestion(question.id, updates);
       onSaved?.(updated || { ...question, ...updates });
+      setCropMode(false);
     } catch (e) {
       setSaveError(e.message);
+      setCropMode(true);
     } finally {
       setSaving(false);
     }
@@ -267,6 +313,18 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
               </div>
             )}
 
+            {/* Pipeline Provider */}
+            <ModeToggle
+              label="Pipeline AI Provider"
+              disabled={running}
+              value={pipelineProvider}
+              onChange={setPipelineProvider}
+              options={[
+                { value: 'gemini', label: 'Gemini (Default)', activeColor: '#1a73e8' },
+                { value: 'claude', label: 'Claude', activeColor: '#7c3aed' },
+              ]}
+            />
+
             {/* Generation mode */}
             <ModeToggle
               label="Image Generation"
@@ -274,10 +332,11 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
               value={generationMode}
               onChange={setGenerationMode}
               options={[
-                { value: 'konva', label: 'Konva (Claude)', activeColor: '#7c3aed' },
+                { value: 'konva', label: 'Konva Canvas', activeColor: '#7c3aed' },
                 { value: 'gemini', label: 'Gemini Image', activeColor: '#1a73e8' },
               ]}
             />
+
 
             {/* Gemini image model selector */}
             {generationMode === 'gemini' && (
@@ -307,7 +366,7 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
             />
 
             {/* Gemini vision model selector */}
-            {validationMode === 'gemini' && (
+            {(validationMode === 'gemini' || pipelineProvider === 'gemini') && (
               <div>
                 <div style={S.label}>Gemini Vision Model</div>
                 <select
@@ -320,6 +379,7 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
                 </select>
               </div>
             )}
+
 
             {/* User instructions */}
             <div>
@@ -334,10 +394,12 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
             </div>
 
             {/* Claude API key */}
-            <div>
-              <div style={S.label}><Key size={10} style={{ display: 'inline', marginRight: '4px' }} />Claude API Key</div>
-              <input type="password" value={apiKey} onChange={e => setApiKeyState(e.target.value)} placeholder="sk-ant-…" style={S.input} />
-            </div>
+            {(pipelineProvider === 'claude' || validationMode === 'claude') && (
+              <div>
+                <div style={S.label}><Key size={10} style={{ display: 'inline', marginRight: '4px' }} />Claude API Key</div>
+                <input type="password" value={apiKey} onChange={e => setApiKeyState(e.target.value)} placeholder="sk-ant-…" style={S.input} />
+              </div>
+            )}
 
             {/* Gemini API key */}
             {needsGeminiKey && (
@@ -346,6 +408,7 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
                 <input type="password" value={geminiKey} onChange={e => setGeminiKeyState(e.target.value)} placeholder="AIza…" style={S.input} />
               </div>
             )}
+
 
           </div>
 
@@ -377,6 +440,40 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
               )}
             </div>
 
+            {/* Library Suitability Warning Box */}
+            {analysis?.librarySuitability?.hasEnoughObjects === false && (
+              <div style={{
+                background: 'rgba(245,158,11,0.1)',
+                border: '1px solid #f59e0b',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                color: '#fef3c7',
+                fontSize: '13px',
+                lineHeight: 1.5,
+                marginTop: '10px',
+                marginBottom: '10px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, color: '#f59e0b', marginBottom: '6px' }}>
+                  ⚠️ Missing Library Components Detected
+                </div>
+                <div style={{ fontSize: '12px', color: '#fbbf24', marginBottom: '8px' }}>
+                  The AI detected that our shape library does not have native support for some objects in the original image. You may need to build these objects and add them to the library:
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {analysis.librarySuitability.missingObjects.map((obj, idx) => (
+                    <div key={idx} style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', padding: '8px 10px' }}>
+                      <div style={{ fontWeight: 600, color: '#fbbf24', fontSize: '12px' }}>{obj.name}</div>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{obj.description}</div>
+                      <div style={{ fontSize: '11px', color: '#34d399', fontFamily: 'monospace', background: '#1e293b', padding: '6px', borderRadius: '4px', marginTop: '6px', whiteSpace: 'pre-wrap' }}>
+                        {obj.instructions}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+
             {/* Result banner */}
             {result && (
               <div style={{
@@ -393,6 +490,20 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
                     <div style={{ fontSize: '11px', color: '#f87171', marginTop: '3px' }}>{result.validation.feedback}</div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {cropMode && (
+              <div style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid #3b82f6', borderRadius: '8px', padding: '10px 14px', marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', color: '#93c5fd' }}>
+                  <strong>Crop Mode Active:</strong> Drag and resize the blue dashed box to select the area of the diagram to save.
+                </span>
+                <button
+                  onClick={() => setCropMode(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', fontSize: '12px', textDecoration: 'underline' }}
+                >
+                  Cancel Crop
+                </button>
               </div>
             )}
 
@@ -430,6 +541,45 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
                           );
                         })}
                       </Layer>
+                      {cropMode && (
+                        <Layer>
+                          <Rect
+                            ref={cropRectRef}
+                            x={cropBox.x}
+                            y={cropBox.y}
+                            width={cropBox.width}
+                            height={cropBox.height}
+                            stroke="#3b82f6"
+                            strokeWidth={2.5}
+                            dash={[6, 4]}
+                            draggable
+                            onDragEnd={e => {
+                              setCropBox(prev => ({ ...prev, x: e.target.x(), y: e.target.y() }));
+                            }}
+                            onTransformEnd={e => {
+                              const node = e.target;
+                              setCropBox({
+                                x: node.x(),
+                                y: node.y(),
+                                width: node.width() * node.scaleX(),
+                                height: node.height() * node.scaleY(),
+                              });
+                              node.scaleX(1);
+                              node.scaleY(1);
+                            }}
+                          />
+                          <Transformer
+                            ref={cropTransformerRef}
+                            rotateEnabled={false}
+                            borderDash={[3, 3]}
+                            keepRatio={false}
+                            boundBoxFunc={(oldBox, newBox) => {
+                              if (newBox.width < 40 || newBox.height < 40) return oldBox;
+                              return newBox;
+                            }}
+                          />
+                        </Layer>
+                      )}
                     </Stage>
                   </div>
                 )}
@@ -463,7 +613,7 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
               disabled={saving}
             >
               {saving ? <Loader size={14} className="spin" /> : <Save size={14} />}
-              {saving ? 'Saving…' : 'Save to DB'}
+              {saving ? 'Saving…' : cropMode ? 'Confirm Crop & Save' : 'Save to DB'}
             </button>
           )}
 

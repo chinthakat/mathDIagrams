@@ -25,6 +25,7 @@ import { getApiKey, saveApiKey, analyseImageForEditing, generateDiagramFromPromp
 import { generateJSXGraphFromPrompt, analyseImageToJSXGraph } from '../services/jsxgraphService';
 import { generateTikZFromPrompt, analyseImageToTikZ, tikzSvgToPng } from '../services/tikzService';
 import { resolveImageUrl, uploadDiagramImage, updateQuestion } from '../services/lmsApiService';
+import { exportCroppedDataUrl } from '../utils/canvasUtils';
 import Sidebar from './Sidebar';
 import PropertiesPanel from './PropertiesPanel';
 import CanvasEditor2D from './CanvasEditor2D';
@@ -312,7 +313,7 @@ export default function DiagramEngineModal({ question, onClose, onSaved }) {
     try {
       let dataUrl = null;
       if (engine === 'konva' && stageRef.current) {
-        dataUrl = stageRef.current.toDataURL({ pixelRatio: 2 });
+        dataUrl = exportCroppedDataUrl(stageRef.current, shapes, { pixelRatio: 2 });
       } else if (engine === 'tikz' && tikzSvg) {
         dataUrl = await tikzSvgToPng(tikzSvg, 1600, 1200);
       } else if (engine === 'jsxgraph') {
