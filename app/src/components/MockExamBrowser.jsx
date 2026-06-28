@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, ChevronDown, ChevronRight, Image, Edit3, AlertCircle, RefreshCw, Key, Loader } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, Image, Edit3, AlertCircle, RefreshCw, Key, Loader, Eye } from 'lucide-react';
 import {
   getLmsApiKey, saveLmsApiKey,
   getLmsWriteKey, saveLmsWriteKey,
   fetchMockExamsPaginated, fetchQuizWithQuestions,
   resolveImageUrl,
 } from '../services/lmsApiService.js';
-import QuestionEditModal from './QuestionEditModal.jsx';
 import DiagramEditorModal from './DiagramEditorModal.jsx';
+import QuestionEditorModal from './QuestionEditorModal.jsx';
 
 const S = {
   root: { display: 'flex', flexDirection: 'column', height: '100%', background: '#0f172a', color: '#e2e8f0', fontFamily: 'system-ui, sans-serif', overflow: 'hidden' },
@@ -70,7 +70,7 @@ function ApiKeyConfig({ onSaved }) {
   );
 }
 
-function QuestionCard({ question, examId, onEdit, onEditCanvas }) {
+function QuestionCard({ question, examId, onEditRepair, onView }) {
   const imageUrl = resolveImageUrl(question.image || question.imageUrl || question.imageKey);
   const options = question.options || [];
   const correct = question.correctAnswer;
@@ -83,16 +83,20 @@ function QuestionCard({ question, examId, onEdit, onEditCanvas }) {
             <span key={t} style={{ ...S.badge, marginRight: '4px' }}>{t}</span>
           ))}
         </div>
-        {imageUrl && (
-          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-            <button style={{ ...S.editBtn, background: '#0f766e' }} onClick={() => onEditCanvas(question)} title="Edit diagram in canvas using AI reconstruction">
-              <Edit3 size={11} /> Edit in Canvas
+        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+          {imageUrl && (
+            <button style={{ ...S.editBtn, background: '#1e293b', border: '1px solid #475569', color: '#cbd5e1' }} onClick={() => onView(question)} title="View question details">
+              <Eye size={11} /> View
             </button>
-            <button style={S.editBtn} onClick={() => onEdit(question)} title="Repair diagram via agentic pipeline">
-              <Edit3 size={11} /> Repair
-            </button>
-          </div>
-        )}
+          )}
+          <button
+            style={{ ...S.editBtn, background: 'linear-gradient(135deg, #7c3aed, #0f766e)', color: '#fff' }}
+            onClick={() => onEditRepair(question)}
+            title="Edit diagram and question details, or run AI repair"
+          >
+            <Edit3 size={11} /> Edit / Repair
+          </button>
+        </div>
       </div>
       <div style={S.qCardBody}>
         <p style={S.qText}>{question.text || question.stem || '(No question text)'}</p>
@@ -105,17 +109,17 @@ function QuestionCard({ question, examId, onEdit, onEditCanvas }) {
               onError={e => { e.target.style.display = 'none'; }}
             />
             <button
-              onClick={() => onEditCanvas(question)}
-              title="Edit this diagram in canvas"
+              onClick={() => onEditRepair(question)}
+              title="Edit / Repair this question"
               style={{
                 position: 'absolute', top: '6px', right: '6px',
-                background: '#0f766ecc', border: '1px solid #14b8a6', borderRadius: '6px',
+                background: 'rgba(124,58,237,0.85)', border: '1px solid #7c3aed', borderRadius: '6px',
                 color: '#fff', cursor: 'pointer', padding: '4px 8px',
                 fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px',
                 backdropFilter: 'blur(4px)',
               }}
             >
-              <Edit3 size={10} /> Edit
+              <Edit3 size={10} /> Edit / Repair
             </button>
           </div>
         )}
@@ -154,8 +158,8 @@ export default function MockExamBrowser() {
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [search, setSearch] = useState('');
   const [gradeFilter, setGradeFilter] = useState('');
-  const [editingQuestion, setEditingQuestion] = useState(null);
-  const [canvasEditingQuestion, setCanvasEditingQuestion] = useState(null);
+  const [editRepairQuestion, setEditRepairQuestion] = useState(null);
+  const [viewQuestion, setViewQuestion] = useState(null);
 
   const loadExams = useCallback(async () => {
     setLoading(true);
@@ -321,8 +325,8 @@ export default function MockExamBrowser() {
                       key={q.id}
                       question={q}
                       examId={selectedExam.id}
-                      onEdit={q => setEditingQuestion(q)}
-                      onEditCanvas={q => setCanvasEditingQuestion(q)}
+                      onEditRepair={q => setEditRepairQuestion(q)}
+                      onView={q => setViewQuestion(q)}
                     />
                   ))}
                 </div>
@@ -332,26 +336,27 @@ export default function MockExamBrowser() {
         </div>
       </div>
 
-      {/* Agentic repair modal */}
-      {editingQuestion && (
-        <QuestionEditModal
-          question={editingQuestion}
-          onClose={() => setEditingQuestion(null)}
+      {/* Unified Edit / Repair modal */}
+      {editRepairQuestion && (
+        <QuestionEditorModal
+          question={editRepairQuestion}
+          onClose={() => setEditRepairQuestion(null)}
           onSaved={(updated) => {
             setExamQuestions(prev => prev.map(q => q.id === updated.id ? updated : q));
-            setEditingQuestion(null);
+            setEditRepairQuestion(null);
           }}
         />
       )}
 
-      {/* Single-engine Konva diagram editor (beta) */}
-      {canvasEditingQuestion && (
+      {/* View Question in Empty Editor */}
+      {viewQuestion && (
         <DiagramEditorModal
-          question={canvasEditingQuestion}
-          onClose={() => setCanvasEditingQuestion(null)}
+          question={viewQuestion}
+          onClose={() => setViewQuestion(null)}
+          viewMode={true}
           onSaved={(updated) => {
             setExamQuestions(prev => prev.map(q => q.id === updated.id ? updated : q));
-            setCanvasEditingQuestion(null);
+            setViewQuestion(null);
           }}
         />
       )}
