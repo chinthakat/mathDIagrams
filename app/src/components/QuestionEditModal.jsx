@@ -126,7 +126,7 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
   const [userInstructions, setUserInstructions] = useState('');
   const [pipelineProvider, setPipelineProvider] = useState('gemini');
   const [generationMode, setGenerationMode] = useState('konva');
-  const [validationMode, setValidationMode] = useState('claude');
+  const [validationMode, setValidationMode] = useState('gemini');
   const [analysis, setAnalysis] = useState(null);
   const [shapes, setShapes] = useState(() => {
     return question.diagramShapes || question.shapes || [];
