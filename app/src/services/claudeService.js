@@ -31,6 +31,7 @@ Available shape types (use these exact strings for the "type" field):
 - triangle: { radius, fill, stroke, strokeWidth, rotation }
 - polygon: { sides, radius, fill, stroke, strokeWidth, rotation }
 - customPolygon: { points: [x1, y1, x2, y2, ...], fill, stroke, strokeWidth, closed, rotation } — closed custom polygon defined by relative coordinates; use this to draw custom irregular/composite shapes like L-shapes, T-shapes, or cut-corner rectangles (e.g. points relative to shape's x,y center)
+- rasterImage: { src, width, height, opacity?, flipX?, flipY?, rotation } — renders a clipart/illustration (use for animals, items, vehicles, food). Set "src" to a lowercase word matching the item (e.g. "fishBlue", "butterfly", "apple", "car", "dog", "pencil", "clock", "house", "tree"). The system will automatically resolve the name to a high-quality Twemoji SVG.
 - line: { length, stroke, strokeWidth, rotation }
 - rightTriangle: { base, height, fill, stroke, strokeWidth, rotation }
 - isoscelesTriangle: { base, height, fill, stroke, strokeWidth, rotation }
@@ -53,11 +54,39 @@ Available shape types (use these exact strings for the "type" field):
 - ruler: { width, units, stroke, strokeWidth }
 - text: { text, fontSize, fontStyle, fill, fontFamily }
 - spiderIcon: { size, fill, stroke, strokeWidth, label, labelPos } — stylised ant/spider creature with 6 legs; use for diagrams with insects/ants/spiders; label e.g. "(A)"
+- robot: { width, height, label, fill, stroke, strokeWidth } — renders a customizable 2D robot figure. Set label to "A", "B", etc. Use for scale balance problems involving robots.
+- weighingScale: { width, height, weightText, fill, stroke, strokeWidth } — renders a platform balance scale with a digital weight readout (e.g. weightText="85 kg").
 - dottedLineArrow: { endX, endY, stroke, strokeWidth, dashSize, gapSize, pointerLength, pointerWidth } — dotted/dashed straight line with arrowhead from (0,0) to (endX,endY); use for dotted directional paths
 - elbowArrow: { endX, endY, elbowStyle, stroke, strokeWidth, dash, dashSize, gapSize, pointerLength, pointerWidth } — orthogonal/right-angle connector arrow (mermaid flowchart style); elbowStyle: 'h-v','v-h','mid'
 - bezierArrow: { endX, endY, curveStyle, curvature, stroke, strokeWidth, dash, dashSize, gapSize, pointerLength, pointerWidth } — smooth bezier curve arrow (plantuml style); curveStyle: 'auto','s-curve','c-curve'
 
+CLOCK & TIME SHAPES — use these for any time/clock related questions:
+- analogClock: { radius, hours, minutes, seconds, showSeconds, showNumbers, showTicks, faceColor, rimColor, handColor, secondColor, label, rimWidth, style }
+    • hours: integer 0–11 (hour hand position), minutes: integer 0–59, seconds: integer 0–59
+    • style: 'classic' (default) | 'minimal' | 'roman' (Roman numerals)
+    • showSeconds: true to draw red second hand
+    • Use for: "What time does this clock show?", elapsed time, half-past/quarter-to questions, reading time
+    • Example: { type:'analogClock', x:300, y:250, radius:90, hours:3, minutes:30, label:'Clock A' }
+- digitalClock: { timeText, width, height, style, bgColor, textColor, borderColor, label, fontSize }
+    • timeText: exact string to display e.g. "3:15 PM", "09:45", "2:30 AM"
+    • style: 'lcd' (green, default) | 'led' (red glow) | 'alarm' (cyan) | 'station' (amber, departure board style)
+    • Use for: digital time reading, patterns of times, sequences of departure/arrival times as single-clock option shapes
+    • Example: { type:'digitalClock', x:200, y:200, timeText:'10:15 AM', style:'lcd', width:160, height:80, label:'Bus departs' }
+- departureBoard: { title, times, width, height, bgColor, textColor, titleColor, label }
+    • title: board heading e.g. "DEPARTURES", "ARRIVALS", "TRAIN TIMES"
+    • times: comma-separated list of time strings, use "?" for the missing entry e.g. "08:15,08:45,09:15,?"
+    • Use for: train/bus departure pattern questions, time sequence puzzles with a question mark entry
+    • Example: { type:'departureBoard', x:400, y:300, title:'DEPARTURES', times:'08:15,08:45,09:15,?', width:220, height:160 }
+
+CLOCK QUESTION GUIDANCE:
+  ✓ For "what time does this clock show?" → use analogClock with specified hours/minutes
+  ✓ For "which clock shows 3:30?" → use analogClock for options (small radius ~50)
+  ✓ For digital sequence/pattern questions → use departureBoard or multiple digitalClock shapes
+  ✓ For elapsed time questions → show two analogClock or digitalClock shapes side by side
+  ✓ Always label clocks if there are multiple (label: 'Clock A', 'Start', 'Finish', etc.)
+
 All shapes require: { type, x, y }
+
 Canvas is 800x600 logical pixels. Center is x=400, y=300.
 For option diagrams the canvas is 400x300 — centre at x=200, y=150. Keep option shapes small and centred there.
 `;
@@ -107,6 +136,7 @@ Example for a bearings question — correctAnswer and each distractor should be:
 Rules for all questions:
 - "question" must be a clean stem only — it must NOT list or describe the options inside it
 - Use CONCRETE numbers (e.g. "side = 10 m") NOT abstract variables like "s", "a × b"
+- Clipart / Illustrations: When generating diagrams that involve objects, animals, vehicles, or fruit, you MUST use rasterImage with a descriptive src (e.g. "fishBlue", "butterfly", "apple", "car", "dog") rather than drawing them manually with vectors. This makes diagrams look highly polished and premium.
 - correctAnswer must be mathematically correct — double-check your arithmetic before writing it
 - distractors must be plausible but wrong — common student errors
 - Do NOT include any explanation, markdown, or text outside the JSON
@@ -371,7 +401,89 @@ export async function generateFromSampleImage(imageBase64, mimeType, apiKey, yea
 
 // ─── Image-to-editable-shapes analysis ───────────────────────────────────────
 
-const REGISTERED_COMPONENT_TYPES = [
+// Pass 1: Extract every visible text/number/time value from the image via OCR.
+async function extractImageValues(base64, mimeType, apiKey) {
+  const system = `You are a precise OCR assistant for educational maths diagrams.
+Extract text exactly as it appears — do not paraphrase or normalise.`;
+  const user = `Look at this diagram image carefully.
+Extract ALL visible text, numbers, times, and labels EXACTLY as they appear.
+
+Return ONLY valid JSON with this structure:
+{
+  "allTexts": ["every visible string, exactly as shown in the image"],
+  "times": ["time values e.g. '10:15 AM', '08:30', '2:15 PM'"],
+  "numbers": ["numeric values e.g. '42', '3.14', '?'"],
+  "labels": ["letter/word labels e.g. 'A', 'B', 'DEPARTURES', 'ARRIVALS'"],
+  "missingSlots": ["slots showing '?' that represent the unknown"],
+  "diagramDescription": "one sentence describing the diagram type and what it shows"
+}
+
+Critical: copy every string character-for-character including AM/PM, colons, spaces, and question marks.`;
+
+  try {
+    return await callClaudeWithImage(base64, mimeType, system, user, apiKey, 'claude-sonnet-4-6', 1024);
+  } catch {
+    return { allTexts: [], times: [], numbers: [], labels: [], missingSlots: [], diagramDescription: '' };
+  }
+}
+
+// Pass 3: Verify that generated shapes use the extracted values, fix any mismatches.
+function verifyAndFixExtractedValues(shapes, extracted) {
+  if (!extracted || !Array.isArray(extracted.allTexts) || extracted.allTexts.length === 0) return { shapes, issues: [] };
+
+  const allValid = new Set(extracted.allTexts.map(t => String(t).trim()));
+  const issues = [];
+
+  const fixed = shapes.map(s => {
+    const out = { ...s };
+
+    // Check digitalClock timeText
+    if (s.type === 'digitalClock' && s.timeText && !allValid.has(String(s.timeText).trim())) {
+      // Find a time from extracted that's not already used by another shape
+      const usedTimes = shapes.filter(o => o !== s && o.type === 'digitalClock').map(o => o.timeText);
+      const candidate = (extracted.times || []).find(t => !usedTimes.includes(t));
+      if (candidate) {
+        issues.push({ type: 'digitalClock', field: 'timeText', was: s.timeText, fixed: candidate });
+        out.timeText = candidate;
+      } else {
+        issues.push({ type: 'digitalClock', field: 'timeText', was: s.timeText, fixed: null });
+      }
+    }
+
+    // Check departureBoard times string
+    if (s.type === 'departureBoard' && s.times) {
+      const slots = s.times.split(',').map(t => t.trim());
+      const extractedTimes = extracted.times || [];
+      if (extractedTimes.length > 0) {
+        // Replace all non-'?' slots with extracted times in order
+        const knownTimes = extractedTimes.filter(t => t !== '?');
+        let ti = 0;
+        const fixedSlots = slots.map(slot => {
+          if (slot === '?') return '?';
+          if (!allValid.has(slot) && ti < knownTimes.length) {
+            const replacement = knownTimes[ti++];
+            issues.push({ type: 'departureBoard', field: 'times', was: slot, fixed: replacement });
+            return replacement;
+          }
+          ti++;
+          return slot;
+        });
+        out.times = fixedSlots.join(',');
+      }
+    }
+
+    // Check text shapes
+    if (s.type === 'text' && s.text && !allValid.has(String(s.text).trim())) {
+      issues.push({ type: 'text', field: 'text', was: s.text, fixed: null });
+    }
+
+    return out;
+  });
+
+  return { shapes: fixed, issues };
+}
+
+export const REGISTERED_COMPONENT_TYPES = [
   'rasterImage',
   'rectangle','circle','triangle','polygon','customPolygon','line','rightTriangle','isoscelesTriangle',
   'equilateralTriangle','fractionCircle','fractionRectangle','fractionBar','numberline',
@@ -381,10 +493,37 @@ const REGISTERED_COMPONENT_TYPES = [
   'playground','airport','port','mapMarker','mapSprite','gridMap','scaleBar',
   'compassRose','sunDirection','flag','dataTable','coordAxes',
   'spiderIcon','dottedLineArrow','elbowArrow','bezierArrow',
+  'robot', 'weighingScale',
+  'analogClock', 'digitalClock', 'departureBoard',
 ];
 
-const makeAnalyseForEditingPrompt = (imageUrl) => `You are analysing a primary/middle school maths diagram image.
+
+const makeAnalyseForEditingPrompt = (imageUrl, extractedValues) => {
+const extractedBlock = extractedValues && (extractedValues.allTexts || []).length > 0 ? `
+━━━ EXACT VALUES EXTRACTED FROM THE ORIGINAL IMAGE — MANDATORY ━━━
+These values were OCR-extracted from the image with high precision.
+You MUST use these EXACT strings in the corresponding shape fields.
+DO NOT substitute, round, invent, or paraphrase any of these values.
+
+All visible texts:  ${(extractedValues.allTexts || []).map(t => `"${t}"`).join(', ')}
+Time values:        ${(extractedValues.times || []).length ? (extractedValues.times || []).map(t => `"${t}"`).join(', ') : '(none)'}
+Numbers:            ${(extractedValues.numbers || []).length ? (extractedValues.numbers || []).map(n => `"${n}"`).join(', ') : '(none)'}
+Labels:             ${(extractedValues.labels || []).length ? (extractedValues.labels || []).map(l => `"${l}"`).join(', ') : '(none)'}
+Missing slots (?):  ${(extractedValues.missingSlots || []).length ? (extractedValues.missingSlots || []).join(', ') : '(none)'}
+Diagram type:       ${extractedValues.diagramDescription || ''}
+
+ENFORCEMENT RULES:
+• Every digitalClock "timeText" MUST be one of the time values listed above.
+• Every departureBoard "times" field MUST contain only the time values above (comma-separated).
+• Every text shape "text" field MUST match one of the allTexts values above.
+• If the diagram shows a question mark "?" in a slot, keep that slot as "?" in the shape data.
+• If a value appears in the image but you are unsure of exact formatting, use what is listed above.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+` : '';
+
+return `You are analysing a primary/middle school maths diagram image.
 Your task: reconstruct it as editable Konva shape objects using ONLY the registered component types below.
+${extractedBlock}
 
 REGISTERED COMPONENT TYPES (use EXACT strings):
 ${REGISTERED_COMPONENT_TYPES.join(', ')}
@@ -455,6 +594,7 @@ Respond ONLY with valid JSON:
 
 If fully reproducible, missingComponents = [].
 Image URL (for reference): ${imageUrl}`;
+};
 
 async function callClaudeWithImageUrl(imageUrl, systemPrompt, userText, apiKey, model, maxTokens = 1024) {
   const response = await fetch(CLAUDE_API_URL, {
@@ -503,32 +643,42 @@ async function fetchImageBase64(url) {
 }
 
 export async function analyseImageForEditing(imageUrl, apiKey) {
-  const prompt = makeAnalyseForEditingPrompt(imageUrl);
-
-  // Try to fetch image as base64 first (works when S3 has CORS headers).
-  // Fall back to URL-type if the fetch is blocked.
+  // Fetch image as base64 first (avoids CORS in Konva canvas, also needed for Pass 1).
   const b64 = await fetchImageBase64(imageUrl);
+
+  // ── Pass 1: Extract exact values (OCR) ───────────────────────────────────────
+  let extractedValues = { allTexts: [], times: [], numbers: [], labels: [], missingSlots: [], diagramDescription: '' };
+  if (b64) {
+    extractedValues = await extractImageValues(b64.base64, b64.mimeType, apiKey);
+  }
+
+  // ── Pass 2: Generate shapes, injecting extracted values as hard constraints ──
+  const prompt = makeAnalyseForEditingPrompt(imageUrl, extractedValues);
   const result = b64
     ? await callClaudeWithImage(b64.base64, b64.mimeType, prompt,
-        'Analyse this diagram and output the JSON reconstruction.',
+        'Analyse this diagram and output the JSON reconstruction. Use ONLY the exact values listed in the MANDATORY section.',
         apiKey, 'claude-haiku-4-5-20251001', 4096)
     : await callClaudeWithImageUrl(imageUrl, prompt,
         'Analyse this diagram and output the JSON reconstruction.',
         apiKey, 'claude-haiku-4-5-20251001', 4096);
 
-  // Replace 'ORIGINAL' placeholder with a data URL (preferred — no CORS in Konva canvas)
-  // or fall back to the raw URL if base64 fetch failed.
+  // Replace 'ORIGINAL' placeholder with a data URL.
   const dataUrlSrc = b64 ? `data:${b64.mimeType};base64,${b64.base64}` : imageUrl;
-  const shapes = (Array.isArray(result.shapes) ? result.shapes : []).map(s =>
+  let shapes = (Array.isArray(result.shapes) ? result.shapes : []).map(s =>
     s.type === 'rasterImage' && s.src === 'ORIGINAL' ? { ...s, src: dataUrlSrc } : s
   );
+
+  // ── Pass 3: Verify & fix value mismatches ────────────────────────────────────
+  const { shapes: verifiedShapes, issues } = verifyAndFixExtractedValues(shapes, extractedValues);
 
   return {
     description: result.description || '',
     diagramType: result.diagramType || 'diagram',
-    shapes,
+    shapes: verifiedShapes,
     missingComponents: Array.isArray(result.missingComponents) ? result.missingComponents : [],
     coveragePercent: typeof result.coveragePercent === 'number' ? result.coveragePercent : 100,
+    extractedValues,
+    valueVerification: issues,
   };
 }
 

@@ -16,16 +16,20 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   X, Sparkles, Loader, Save, ChevronDown, ChevronUp,
   Key, RotateCcw, Image as ImageIcon, Code, CheckCircle,
-  AlertTriangle, PlusSquare,
+  AlertTriangle, PlusSquare, RefreshCw,
 } from 'lucide-react';
 import { ObjectRegistry } from '../registry/objectRegistry';
 import {
   getApiKey, saveApiKey,
   analyseImageForEditing, generateDiagramFromPrompt,
+  SHAPE_CATALOGUE,
 } from '../services/claudeService';
 import {
-  generateTikZFromPrompt, analyseImageToTikZ, tikzSvgToPng,
-} from '../services/tikzService';
+  getGeminiApiKey, saveGeminiApiKey,
+  generateRepairShapesWithGemini,
+} from '../services/geminiService';
+import { repairDiagramWithRetry, regenerateQuestionText } from '../services/diagramRepairService';
+import { generateTikZFromPrompt, analyseImageToTikZ, tikzSvgToPng } from '../services/tikzService';
 import { resolveImageUrl, uploadDiagramImage, updateQuestion } from '../services/lmsApiService';
 import Sidebar from './Sidebar';
 import PropertiesPanel from './PropertiesPanel';
@@ -90,6 +94,82 @@ function ImageRef({ imageUrl }) {
   );
 }
 
+// ── Collapsible Question Reference Panel ─────────────────────────────────────
+
+function QuestionReferencePanel({ question, imageUrl, defaultExpanded = false }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+
+  if (!expanded) {
+    return (
+      <div style={{
+        width: '40px', background: C.surface, borderLeft: `1px solid ${C.border}`,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '14px', gap: '12px', flexShrink: 0
+      }}>
+        <button
+          onClick={() => setExpanded(true)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}
+          title="Expand Question Reference"
+        >
+          <ImageIcon size={18} />
+          <span style={{ fontSize: '10px', fontWeight: 700, writingMode: 'vertical-rl', textTransform: 'uppercase', letterSpacing: '0.05em', color: C.muted, marginTop: '8px' }}>
+            Question
+          </span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      width: '280px', background: C.surface, borderLeft: `1px solid ${C.border}`,
+      display: 'flex', flexDirection: 'column', overflowY: 'auto', flexShrink: 0
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: `1px solid ${C.border}`, background: C.bg }}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: C.text, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Question Reference</span>
+        <button onClick={() => setExpanded(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted }} title="Retract">
+          <X size={14} />
+        </button>
+      </div>
+
+      <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        {imageUrl && (
+          <div>
+            <div style={S.label}>Original Image</div>
+            <div style={{ background: '#0a0f1c', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${C.border}`, padding: '4px', marginTop: '6px' }}>
+              <img src={imageUrl} alt="original" style={{ width: '100%', objectFit: 'contain', maxHeight: '180px', background: '#fff', borderRadius: '4px' }} />
+            </div>
+          </div>
+        )}
+
+        <div>
+          <div style={S.label}>Question Text</div>
+          <div style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: 1.5, marginTop: '6px', background: '#0a0f1c', padding: '8px 10px', borderRadius: '6px', border: `1px solid ${C.border}`, whiteSpace: 'pre-wrap' }}>
+            {question.text || question.stem || '(No text)'}
+          </div>
+        </div>
+
+        {((question.correctAnswer || question.distractors) && (
+          <div>
+            <div style={S.label}>Answer Options</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
+              {question.correctAnswer && (
+                <div style={{ fontSize: '11px', color: '#34d399', background: 'rgba(52,211,153,0.06)', padding: '6px 8px', borderRadius: '4px', border: '1px solid rgba(52,211,153,0.2)' }}>
+                  <strong style={{ color: '#34d399', marginRight: '4px' }}>Correct:</strong> {question.correctAnswer.text || String(question.correctAnswer)}
+                </div>
+              )}
+              {question.distractors?.map((dist, idx) => (
+                <div key={idx} style={{ fontSize: '11px', color: '#94a3b8', background: '#0a0f1c', padding: '6px 8px', borderRadius: '4px', border: `1px solid ${C.border}` }}>
+                  <strong style={{ color: '#f87171', marginRight: '4px' }}>Wrong:</strong> {dist.text || String(dist)}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── TikZ drawer ──────────────────────────────────────────────────────────────
 
 function TikZDrawer({ tikzCode, setTikzCode, onInsert, inserting }) {
@@ -142,21 +222,26 @@ function TikZDrawer({ tikzCode, setTikzCode, onInsert, inserting }) {
 
 // ── Main modal ────────────────────────────────────────────────────────────────
 
-export default function DiagramEditorModal({ question, onClose, onSaved }) {
+export default function DiagramEditorModal({ question, onClose, onSaved, viewMode = false }) {
   const [apiKey, setApiKeyState]   = useState(getApiKey);
   const [aiMode, setAiMode]        = useState('shapes'); // 'shapes' | 'tikz'
   const [prompt, setPrompt]        = useState('');
   const [generating, setGenerating]= useState(false);
   const [genError, setGenError]    = useState(null);
   const [analysisStatus, setAnalysisStatus] = useState(null); // null | 'analysing' | 'done' | 'error'
+  const [analysisStatusText, setAnalysisStatusText] = useState('Analysing diagram…');
   const [tikzDrawerOpen, setTikzDrawerOpen] = useState(false);
   const [tikzCode, setTikzCode]    = useState('');
   const [inserting, setInserting]  = useState(false);
 
   // Konva state
-  const [shapes, setShapes]        = useState([]);
+  const [shapes, setShapes]        = useState(() => {
+    return question.diagramShapes || question.shapes || [];
+  });
   const [selectedId, setSelectedId]= useState(null);
   const [recentlyUsed, setRecentlyUsed] = useState([]);
+  const [cropMode, setCropMode] = useState(false);
+  const [cropBox, setCropBox] = useState({ x: 50, y: 50, width: 700, height: 500 });
 
   // Save state
   const [saving, setSaving]        = useState(false);
@@ -164,50 +249,199 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
   const [saved, setSaved]          = useState(false);
   const stageRef = useRef(null);
 
+  // Value mismatch / sync state
+  const [valueMismatch, setValueMismatch]     = useState(false); // true when diagram may have different values from question
+  const [syncingQuestion, setSyncingQuestion] = useState(false);
+  const [syncError, setSyncError]             = useState(null);
+  const [syncedQuestion, setSyncedQuestion]   = useState(null);  // updated question text after sync
+
   const imageUrl = resolveImageUrl(question.image || question.imageUrl || question.imageKey);
 
   const doSaveKey = k => { setApiKeyState(k); saveApiKey(k); };
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
-  const assignIds = arr => arr.map((s, i) => ({ ...s, id: s.id || `ai_${Date.now()}_${i}` }));
+  const assignIds = useCallback(arr => arr.map((s, i) => ({ ...s, id: s.id || `ai_${Date.now()}_${i}` })), []);
 
   const loadShapes = useCallback(result => {
-    const loaded = assignIds(result.shapes || result.objects || []);
+    const loaded = assignIds(result.shapes || result.objects || result || []);
     setShapes(loaded);
-  }, []);
+  }, [assignIds]);
+
+  const renderAndCapture = useCallback(async (newShapes) => {
+    setShapes(assignIds(newShapes));
+    await new Promise(r => setTimeout(r, 250)); // let React paint
+    if (stageRef.current) return stageRef.current.toDataURL({ pixelRatio: 1 });
+    throw new Error('Canvas not ready');
+  }, [assignIds]);
 
   // ── AI generation ────────────────────────────────────────────────────────────
 
   const analyseImage = useCallback(async () => {
-    if (!apiKey || !imageUrl) {
-      setAnalysisStatus(!apiKey ? 'no-key' : 'no-image');
+    const claudeKey = apiKey || getApiKey();
+    const geminiKey = getGeminiApiKey();
+
+    if (!claudeKey && !geminiKey) {
+      setAnalysisStatus('no-key');
       return;
     }
+    if (!imageUrl) {
+      setAnalysisStatus('no-image');
+      return;
+    }
+
     setGenerating(true);
     setGenError(null);
     setAnalysisStatus('analysing');
+    setAnalysisStatusText('Starting reconstruction pipeline…');
+
     try {
-      const result = await analyseImageForEditing(imageUrl, apiKey);
-      loadShapes(result);
-      setAnalysisStatus('done');
+      const outcome = await repairDiagramWithRetry({
+        questionData: question,
+        imageUrl,
+        userInstructions: prompt,
+        apiKey: claudeKey,
+        geminiApiKey: geminiKey,
+        generationMode: 'konva',
+        validationMode: geminiKey ? 'gemini' : 'claude',
+        geminiImageModel: 'gemini-3.1-flash-image-preview', // not used
+        geminiVisionModel: 'gemini-3.5-flash',
+        onProgress: entry => {
+          if (entry.stage === 'extracting_values') {
+            setAnalysisStatusText('Reading exact values from image (OCR)…');
+          } else if (entry.stage === 'analyzing') {
+            setAnalysisStatusText('Analysing image layout…');
+          } else if (entry.stage === 'generating') {
+            setAnalysisStatusText(`Attempt ${entry.attempt}/3 — Reconstructing shapes…`);
+          } else if (entry.stage === 'rendering') {
+            setAnalysisStatusText(`Attempt ${entry.attempt}/3 — Rendering preview…`);
+          } else if (entry.stage === 'validating') {
+            setAnalysisStatusText(`Attempt ${entry.attempt}/3 — Checking against checklist…`);
+          } else if (entry.stage === 'retry') {
+            setAnalysisStatusText(`Attempt ${entry.attempt} failed — retrying with feedback…`);
+          }
+          if (entry.shapes) {
+            setShapes(assignIds(entry.shapes));
+          }
+        },
+        renderAndCapture,
+        maxRetries: 3,
+        pipelineProvider: geminiKey ? 'gemini' : 'claude',
+      });
+
+      if (outcome.shapes) {
+        setShapes(assignIds(outcome.shapes));
+      }
+
+      if (outcome.success) {
+        setAnalysisStatus('done');
+        // Detect potential value mismatch between the generated diagram and the original question
+        detectValueMismatch(outcome.shapes || [], outcome.analysis);
+      } else {
+        setGenError(outcome.validation?.feedback || 'Verification failed after 3 attempts');
+        setAnalysisStatus('error');
+      }
     } catch (e) {
       setGenError(e.message);
       setAnalysisStatus('error');
     } finally {
       setGenerating(false);
     }
-  }, [apiKey, imageUrl, loadShapes]);
+  }, [apiKey, imageUrl, prompt, question, renderAndCapture, assignIds]);
+
+  // ── Value mismatch detection ─────────────────────────────────────────────────
+
+  const detectValueMismatch = useCallback((generatedShapes, analysis) => {
+    if (!question.text) return; // no question to compare against
+
+    // Extract all numeric-looking tokens and time strings from the question text
+    const questionText = question.text || '';
+    const questionTokens = new Set([
+      ...(questionText.match(/\b\d{1,2}:\d{2}(?:\s*[APap][Mm])?\b/g) || []),  // times like 08:15
+      ...(questionText.match(/\b\d+(?:\.\d+)?\b/g) || []),                     // numbers
+    ]);
+
+    if (questionTokens.size === 0) return; // no concrete values to compare
+
+    // Extract values from generated shapes (text labels, timeText, times, etc.)
+    const shapeText = JSON.stringify(generatedShapes);
+    const shapeTokens = new Set([
+      ...(shapeText.match(/\b\d{1,2}:\d{2}(?:\s*[APap][Mm])?\b/g) || []),
+      ...(shapeText.match(/\b\d+(?:\.\d+)?\b/g) || []),
+    ]);
+
+    // Check if any question tokens are MISSING from the shapes
+    const criticalMissing = [...questionTokens].filter(tok => {
+      if (['0','1','2','3','4','5','6','7','8','9','10'].includes(tok)) return false; // skip trivial single digits
+      return !shapeTokens.has(tok);
+    });
+
+    if (criticalMissing.length > 0) {
+      setValueMismatch(true);
+    } else {
+      setValueMismatch(false);
+    }
+  }, [question]);
+
+  // ── Sync Question handler ────────────────────────────────────────────────────
+
+  const handleSyncQuestion = useCallback(async () => {
+    const claudeKey = apiKey || getApiKey();
+    const geminiKey = getGeminiApiKey();
+    if (!claudeKey && !geminiKey) return;
+
+    setSyncingQuestion(true);
+    setSyncError(null);
+
+    // Build a diagram description from the current shapes
+    const shapesSummary = shapes.map(s => {
+      if (s.type === 'departureBoard') return `Departure board titled "${s.title || 'DEPARTURES'}" with times: ${s.times || ''}`;
+      if (s.type === 'digitalClock') return `Digital clock showing "${s.timeText || ''}" in ${s.style || 'lcd'} style`;
+      if (s.type === 'analogClock') return `Analogue clock at ${s.hours || 0}:${String(s.minutes || 0).padStart(2,'0')}`;
+      if (s.type === 'text') return `Text label: "${s.text || ''}"`;
+      if (s.label) return `${s.type} labelled "${s.label}"`;
+      return s.type;
+    }).join('; ');
+
+    const diagramDescription = `The diagram contains: ${shapesSummary}.`;
+
+    try {
+      const result = await regenerateQuestionText({
+        diagramDescription,
+        originalQuestion: question,
+        apiKey: claudeKey,
+        geminiApiKey: geminiKey,
+      });
+      setSyncedQuestion(result);
+      setValueMismatch(false);
+    } catch (e) {
+      setSyncError(e.message);
+    } finally {
+      setSyncingQuestion(false);
+    }
+  }, [apiKey, shapes, question]);
+
 
   // Auto-analyse on open
   useEffect(() => {
-    if (apiKey && imageUrl) analyseImage();
-    else if (!apiKey) setAnalysisStatus('no-key');
+    if (viewMode) {
+      setAnalysisStatus(null);
+      return;
+    }
+    const claudeKey = apiKey || getApiKey();
+    const geminiKey = getGeminiApiKey();
+    if ((claudeKey || geminiKey) && imageUrl) {
+      analyseImage();
+    } else if (!claudeKey && !geminiKey) {
+      setAnalysisStatus('no-key');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [viewMode]);
 
   const handleGenerate = async () => {
-    if (!apiKey) return;
+    const claudeKey = apiKey || getApiKey();
+    const geminiKey = getGeminiApiKey();
+    if (!claudeKey && !geminiKey) return;
     const p = prompt.trim();
     setGenerating(true);
     setGenError(null);
@@ -219,7 +453,22 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
           await analyseImage();
           return; // analyseImage sets its own status
         } else if (p) {
-          const result = await generateDiagramFromPrompt(p, apiKey);
+          const provider = geminiKey ? 'gemini' : 'claude';
+          let result;
+          if (provider === 'gemini') {
+            const systemPrompt = `You are a mathematics diagram generator for primary and middle school.
+Recreate a diagram based on the prompt using ONLY the available shape types below:
+${SHAPE_CATALOGUE}
+Canvas is 800x500 logical pixels. Respond with ONLY valid JSON array of shapes.`;
+            result = await generateRepairShapesWithGemini({
+              prompt: p,
+              systemPrompt,
+              apiKey: geminiKey,
+              model: 'gemini-3.5-flash'
+            });
+          } else {
+            result = await generateDiagramFromPrompt(p, claudeKey);
+          }
           loadShapes(result);
           setAnalysisStatus('done');
         }
@@ -227,9 +476,9 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
         // TikZ mode
         let code;
         if (!p && imageUrl) {
-          code = await analyseImageToTikZ(imageUrl, apiKey);
+          code = await analyseImageToTikZ(imageUrl, claudeKey);
         } else if (p) {
-          code = await generateTikZFromPrompt(p, apiKey);
+          code = await generateTikZFromPrompt(p, claudeKey);
         }
         if (code) {
           setTikzCode(code);
@@ -311,11 +560,32 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
 
   const handleSave = async () => {
     if (!stageRef.current) return;
+
+    if (!cropMode) {
+      setCropMode(true);
+      return;
+    }
+
     setSaving(true);
     setSaveError(null);
     setSaved(false);
     try {
-      const dataUrl = stageRef.current.toDataURL({ pixelRatio: 2 });
+      // Hide crop overlay to prevent blue dashed box from being printed in the final image
+      setCropMode(false);
+      await new Promise(r => setTimeout(r, 100)); // wait for paint
+
+      const cx = Math.max(0, Math.min(cropBox.x, 800));
+      const cy = Math.max(0, Math.min(cropBox.y, 600));
+      const cw = Math.max(40, Math.min(cropBox.width, 800 - cx));
+      const ch = Math.max(40, Math.min(cropBox.height, 600 - cy));
+
+      const dataUrl = stageRef.current.toDataURL({
+        x: cx,
+        y: cy,
+        width: cw,
+        height: ch,
+        pixelRatio: 2
+      });
       const imagePublicUrl = await uploadDiagramImage(dataUrl, 'diagram-editor/beta');
       const updates = { diagramShapes: shapes, image: imagePublicUrl };
       const updated  = await updateQuestion(question.id, updates);
@@ -323,6 +593,7 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
       setSaved(true);
     } catch (e) {
       setSaveError(e.message);
+      setCropMode(true);
     } finally {
       setSaving(false);
     }
@@ -400,13 +671,13 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
                                                 '#c4b5fd',
                 flex: 1,
               }}>
-                {analysisStatus === 'analysing' && 'Analysing diagram with Claude…'}
+                {analysisStatus === 'analysing' && analysisStatusText}
                 {analysisStatus === 'done'      && `Analysis complete — ${shapes.length} shape${shapes.length !== 1 ? 's' : ''} placed on canvas`}
                 {analysisStatus === 'error'     && `Analysis failed: ${genError}`}
-                {analysisStatus === 'no-key'    && 'No Claude API key — paste your sk-ant-… key in the header, then click Re-analyse'}
+                {analysisStatus === 'no-key'    && 'No API key — paste your sk-ant-… key in the header or save a Gemini key in settings, then click Re-analyse'}
               </span>
 
-              {(analysisStatus === 'error' || analysisStatus === 'no-key') && apiKey && (
+              {(analysisStatus === 'error' || analysisStatus === 'no-key') && (apiKey || getGeminiApiKey()) && (
                 <button
                   style={{ ...S.btn, background: 'rgba(124,58,237,0.3)', color: '#c4b5fd', border: '1px solid #4c1d95', padding: '3px 10px', fontSize: '11px' }}
                   onClick={analyseImage}
@@ -416,11 +687,31 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
                 </button>
               )}
 
+
               <button
                 onClick={() => setAnalysisStatus(null)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '0 2px', lineHeight: 1 }}
                 title="Dismiss"
               >×</button>
+            </div>
+          )}
+
+          {cropMode && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '6px 14px', flexShrink: 0,
+              background: 'rgba(59,130,246,0.12)',
+              borderBottom: '1px solid #1d4ed8'
+            }}>
+              <span style={{ fontSize: '12px', color: '#93c5fd', flex: 1 }}>
+                <strong>Crop Mode Active:</strong> Adjust the blue dashed rectangle on the canvas to define the final cropped area to save.
+              </span>
+              <button
+                onClick={() => setCropMode(false)}
+                style={{ ...S.btn, background: 'rgba(239,68,68,0.2)', color: '#fca5a5', border: '1px solid #991b1b', padding: '2px 8px', fontSize: '11px' }}
+              >
+                Cancel Crop
+              </button>
             </div>
           )}
 
@@ -432,6 +723,9 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
                 setSelectedId={setSelectedId}
                 stageRef={stageRef}
                 showGrid={false}
+                cropMode={cropMode}
+                cropBox={cropBox}
+                setCropBox={setCropBox}
               />
               {imageUrl && <ImageRef imageUrl={imageUrl} />}
 
@@ -443,9 +737,10 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
                   pointerEvents: 'none',
                 }}>
                   <Loader size={32} color="#7c3aed" className="spin" />
-                  <div style={{ fontSize: '13px', color: '#94a3b8' }}>Analysing diagram with Claude…</div>
+                  <div style={{ fontSize: '13px', color: '#94a3b8' }}>{analysisStatusText}</div>
                 </div>
               )}
+
             </div>
           </div>
 
@@ -458,7 +753,14 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
           openIconPicker={() => {}}
           allShapes={shapes}
         />
+
+        <QuestionReferencePanel
+          question={question}
+          imageUrl={imageUrl}
+          defaultExpanded={viewMode}
+        />
       </div>
+
 
       {/* ── TikZ drawer (collapsible) ── */}
       {tikzDrawerOpen && (
@@ -477,6 +779,73 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
             onInsert={insertTikzAsImage}
             inserting={inserting}
           />
+        </div>
+      )}
+
+      {/* ── Value Mismatch Warning Banner ── */}
+      {valueMismatch && !syncedQuestion && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '8px 14px', flexShrink: 0,
+          background: 'rgba(217,119,6,0.12)', borderTop: '1px solid rgba(217,119,6,0.4)',
+        }}>
+          <AlertTriangle size={15} color="#f59e0b" />
+          <span style={{ fontSize: '12px', color: '#fbbf24', flex: 1 }}>
+            <strong style={{ color: '#f59e0b' }}>⚠ Possible value mismatch</strong> — the diagram may show different values than the original question. Click <em>Sync Question</em> to regenerate the question text, correct answer, and distractors to match the diagram.
+          </span>
+          <button
+            style={{ ...S.btn, background: 'rgba(217,119,6,0.3)', color: '#fbbf24', border: '1px solid rgba(217,119,6,0.5)', opacity: syncingQuestion ? 0.6 : 1 }}
+            onClick={handleSyncQuestion}
+            disabled={syncingQuestion}
+          >
+            {syncingQuestion ? <Loader size={13} className="spin" /> : <RefreshCw size={13} />}
+            {syncingQuestion ? 'Syncing…' : '⚠ Sync Question'}
+          </button>
+          {syncError && <span style={{ fontSize: '11px', color: '#f87171' }}>{syncError}</span>}
+          <button
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '2px' }}
+            onClick={() => setValueMismatch(false)}
+            title="Dismiss warning"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* ── Synced Question Result Panel ── */}
+      {syncedQuestion && (
+        <div style={{
+          padding: '10px 14px', flexShrink: 0,
+          background: 'rgba(5,150,105,0.10)', borderTop: '1px solid rgba(5,150,105,0.35)',
+          display: 'flex', flexDirection: 'column', gap: '6px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CheckCircle size={14} color="#34d399" />
+            <span style={{ fontSize: '12px', color: '#34d399', fontWeight: 700 }}>Question synced to diagram values</span>
+            <button style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }} onClick={() => setSyncedQuestion(null)}>
+              <X size={13} />
+            </button>
+          </div>
+          <div style={{ fontSize: '12px', color: '#e2e8f0', background: '#0a0f1c', padding: '8px 10px', borderRadius: '6px', border: `1px solid ${C.border}` }}>
+            <div style={{ color: '#94a3b8', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>New Question</div>
+            {syncedQuestion.question}
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <div style={{ fontSize: '11px', color: '#34d399', background: 'rgba(52,211,153,0.08)', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(52,211,153,0.25)' }}>
+              ✓ {syncedQuestion.correctAnswer}
+            </div>
+            {(syncedQuestion.distractors || []).map((d, i) => (
+              <div key={i} style={{ fontSize: '11px', color: '#94a3b8', background: '#0a0f1c', padding: '4px 8px', borderRadius: '4px', border: `1px solid ${C.border}` }}>
+                ✗ {d}
+              </div>
+            ))}
+          </div>
+          <button
+            style={{ ...S.btn, background: 'rgba(5,150,105,0.3)', color: '#34d399', border: '1px solid rgba(5,150,105,0.4)', alignSelf: 'flex-start', fontSize: '11px' }}
+            onClick={() => { navigator.clipboard?.writeText(JSON.stringify(syncedQuestion, null, 2)); }}
+          >
+            Copy as JSON
+          </button>
         </div>
       )}
 
@@ -554,7 +923,7 @@ export default function DiagramEditorModal({ question, onClose, onSaved }) {
             disabled={saving}
           >
             {saving ? <Loader size={13} className="spin" /> : <Save size={13} />}
-            {saving ? 'Saving…' : 'Save to DB'}
+            {saving ? 'Saving…' : cropMode ? 'Confirm Crop & Save' : 'Save to DB'}
           </button>
           <button style={{ ...S.btn, ...S.btnGhost }} onClick={onClose}>Close</button>
         </div>

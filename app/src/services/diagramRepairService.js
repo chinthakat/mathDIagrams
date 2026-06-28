@@ -10,9 +10,10 @@
  * Every model call is logged via pipelineLogger (→ server/logs/repair_pipeline.log).
  */
 
-import { SHAPE_CATALOGUE } from './claudeService.js';
+import { SHAPE_CATALOGUE, REGISTERED_COMPONENT_TYPES } from './claudeService.js';
 import { logModelCall, logEvent, clearSessionLog } from './pipelineLogger.js';
-import { generateGeminiImage, validateWithGemini } from './geminiService.js';
+import { generateGeminiImage, validateWithGemini, analyzeQuestionImageWithGemini, generateRepairShapesWithGemini } from './geminiService.js';
+
 
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 
@@ -97,27 +98,50 @@ function buildImageContent(imageUrlOrBase64) {
 
 // ── Step 1: Analyze existing image ────────────────────────────────────────────
 
-const ANALYZE_SYSTEM = `You are a mathematics diagram analyst for primary and middle school questions.
+const makeAnalyzeSystemPrompt = () => `You are a mathematics diagram analyst for primary and middle school questions.
 Analyse the image carefully and return ONLY valid JSON (no markdown, no preamble):
 {
   "diagramType": "short name e.g. 'bar graph', 'number line', 'fraction comparison grid'",
   "shapeComponents": ["list of visible shape types: rectangle, circle, line, text, etc."],
   "diagramDescription": "precise description of every element — positions, labels, colours, how many parts each shape is divided into and how many are shaded",
   "questionContext": "what the question is asking",
-  "generationInstructions": "Step-by-step Konva-shape instructions for recreating this diagram. Include ALL shapes, exact division counts, shading counts, colours, and labels.",
-  "imagePrompt": "Detailed pixel-level instructions for an image AI to draw this diagram from scratch on a white background with black outlines. Describe the exact layout, each shape's position, size, colour, how many sections it is divided into, exactly which sections are shaded and which are white, and any text labels. Be exhaustive and unambiguous — e.g. 'Top row, second shape: a circle divided into 4 equal quarters by two perpendicular lines. The top-left, top-right and bottom-left quarters are shaded blue. The bottom-right quarter is white.'",
+  "generationInstructions": "Step-by-step Konva-shape instructions for recreating this diagram. Include ALL shapes, exact division counts, shading counts, colours, and labels. IMPORTANT: When the image contains illustrations of animals, vehicles, fruit, or common objects (e.g. fish, butterflies, cars, apples), suggest using rasterImage with the corresponding clipart name/id (e.g. 'fishBlue', 'butterfly', 'apple', 'car') rather than drawing them with vectors. CLOCK & TIME SHAPES: When the image contains an analogue clock face (round, with hands), use type 'analogClock' with hours/minutes props. When it contains a digital clock display (rectangular LED/LCD screen with digits), use type 'digitalClock' with timeText prop. When it contains a departure/arrival board (dark board listing multiple times), use type 'departureBoard' with title and times (comma-separated, '?' for missing entry) props.",
+  "imagePrompt": "Detailed pixel-level instructions for an image AI to draw this diagram from scratch on a white background with black outlines. Describe the exact layout, each shape's position, size, colour, how many sections it is divided into, exactly which sections are shaded and which are white, and any text labels.",
   "verificationChecklist": [
     "VISUAL checks only — describe exactly what must be physically visible in a correct rendering. No maths, no fraction answers, no ✓ or ✗.",
-    "Format every item as a factual statement about pixels/colours/counts, e.g.:",
-    "'6 distinct shapes arranged in 2 rows of 3, evenly spaced'",
-    "'Shape 1 (top-left): a 2×2 grid of 4 equal squares; exactly 3 squares filled green, 1 square white'",
-    "'Shape 2 (top-center): a circle split into exactly 4 equal sectors by two perpendicular diameters; exactly 3 sectors filled blue, 1 sector white'",
-    "'Shape 4 (bottom-left): a regular hexagon split into 6 triangles from the center; exactly 3 alternate triangles filled pink, 3 white'",
+    "Format every item as a factual statement about pixels/colours/counts",
     "Each item must be independently verifiable by looking at the image — no logic, no fractions as answers."
-  ]
-}`;
+  ],
+  "librarySuitability": {
+    "hasEnoughObjects": true,
+    "missingObjects": [
+      {
+        "name": "lowercase component name e.g. 'robot', 'weighingScale'",
+        "description": "precise visual description of the missing object in the image",
+        "instructions": "conceptual React-Konva instructions on how to code this component"
+      }
+    ]
+  }
+}
 
-export async function analyzeQuestionImage(imageUrl, questionText, apiKey) {
+AVAILABLE SHAPE COMPONENTS in the editor library:
+${REGISTERED_COMPONENT_TYPES.join(', ')}
+
+Compare the original image against the available shape components. If the original image contains complex objects (such as a balance scale, a robot, etc.) that cannot be natively drawn using the basic shape components, list them in "librarySuitability" and set "hasEnoughObjects" to false. If all objects can be natively represented, set "hasEnoughObjects" to true and leave "missingObjects" empty.`;
+
+export async function analyzeQuestionImage({ imageUrl, questionText, apiKey, pipelineProvider = 'claude', geminiApiKey = '', model = 'gemini-3.5-flash' }) {
+  const systemPrompt = makeAnalyzeSystemPrompt();
+
+  if (pipelineProvider === 'gemini') {
+    return analyzeQuestionImageWithGemini({
+      imageUrl,
+      questionText,
+      systemPrompt,
+      apiKey: geminiApiKey,
+      model,
+    });
+  }
+
   const messages = [{
     role: 'user',
     content: [
@@ -129,7 +153,7 @@ export async function analyzeQuestionImage(imageUrl, questionText, apiKey) {
   const text = await callClaude({
     stage: 'analyze', attempt: 0,
     model: 'claude-haiku-4-5-20251001',
-    system: ANALYZE_SYSTEM,
+    system: systemPrompt,
     messages,
     apiKey, maxTokens: 2048,
   });
@@ -149,11 +173,101 @@ export async function analyzeQuestionImage(imageUrl, questionText, apiKey) {
       generationInstructions: grab('generationInstructions') || 'Recreate the diagram visible in the image.',
       verificationChecklist: ['Diagram is visible and complete'],
       shapeComponents: ['rectangle', 'text'],
+      librarySuitability: { hasEnoughObjects: true, missingObjects: [] }
     };
     await logEvent({ stage: 'analyze', attempt: 0, message: `Analyze JSON truncated — using partial fallback. Error: ${e.message}` });
     return partial;
   }
 }
+
+
+// ── Step 1b: Vision value extraction ──────────────────────────────────────────
+// A dedicated, laser-focused pass that reads the image and returns ONLY the
+// exact concrete values visible: times, numbers, sequences, labels.
+// These become hard-locked constraints injected into every generation prompt.
+
+const EXTRACT_VALUES_PROMPT = `You are a precise data-extraction assistant for mathematics diagrams.
+
+Look at this image and extract EVERY specific value you can see: times, numbers, sequences, labels, text strings.
+Return ONLY valid JSON — no markdown, no explanation:
+{
+  "times": ["list of every time string visible, e.g. \"08:15\", \"09:30 AM\", \"?\""],
+  "numbers": ["list of every number visible, e.g. \"42\", \"3.5\", \"1/4\""],
+  "labels": ["list of every text label visible, e.g. \"DEPARTURES\", \"Clock A\", \"Height = 8 cm\""],
+  "sequences": ["list of any ordered sequences visible, comma-separated, e.g. \"08:15, 08:30, 08:45, ?, 09:15\""],
+  "rawLock": "A single instruction string listing ALL values that MUST appear verbatim in the recreated diagram. Example: 'The diagram MUST show exactly these times in this order: 08:15, 08:30, 08:45, ?, 09:15. Do NOT change, reorder, or replace any value.'"
+}
+
+Be exhaustive. If no times are visible, return an empty array for times. Same for numbers and labels.
+The rawLock string is the most important output — make it unambiguous and actionable.`;
+
+async function extractImageValues({ imageUrl, apiKey, geminiApiKey, pipelineProvider, model }) {
+  try {
+    const imageContent = buildImageContent(imageUrl);
+
+    if (pipelineProvider === 'gemini' && geminiApiKey) {
+      const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+      const vModel = model || 'gemini-3.5-flash';
+      const url = `${GEMINI_BASE}/${vModel}:generateContent?key=${geminiApiKey}`;
+
+      // Build multipart content with image + prompt
+      let imagePart;
+      if (imageUrl.startsWith('data:')) {
+        const [header, b64] = imageUrl.split(',');
+        const mimeType = header.match(/data:(image\/\w+)/)?.[1] || 'image/jpeg';
+        imagePart = { inlineData: { mimeType, data: b64 } };
+      } else {
+        imagePart = { fileData: { mimeType: 'image/jpeg', fileUri: imageUrl } };
+      }
+
+      const body = {
+        contents: [{ role: 'user', parts: [imagePart, { text: EXTRACT_VALUES_PROMPT }] }],
+        generationConfig: { responseMimeType: 'application/json' },
+      };
+
+      const resp = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) throw new Error(`Gemini value extraction failed: ${resp.status}`);
+      const data = await resp.json();
+      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      const cleaned = extractJson(raw);
+      return JSON.parse(cleaned);
+    }
+
+    // Claude path
+    if (!apiKey) return null;
+    const resp = await fetch(CLAUDE_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: 'You extract exact values from math diagram images. Return only valid JSON.',
+        messages: [{
+          role: 'user',
+          content: [imageContent, { type: 'text', text: EXTRACT_VALUES_PROMPT }],
+        }],
+      }),
+    });
+    if (!resp.ok) throw new Error(`Claude value extraction failed: ${resp.status}`);
+    const data = await resp.json();
+    const raw = data.content?.[0]?.text || '{}';
+    const cleaned = extractJson(raw);
+    return JSON.parse(cleaned);
+  } catch (e) {
+    // Non-fatal — if extraction fails, fall back to question text values
+    await logEvent({ stage: 'extract_values', attempt: 0, message: `Value extraction failed (non-fatal): ${e.message}` });
+    return null;
+  }
+}
+
 
 // ── Step 2: Generate MathsDiagram shapes ─────────────────────────────────────
 
@@ -168,10 +282,26 @@ Respond with ONLY valid JSON — an array of shape objects:
 Canvas is 800×500 logical pixels. Centre is x=400, y=250.
 Keep all shapes within x: 20–780, y: 20–480 so nothing is clipped.
 Use concrete positions and sizes. Include text labels where needed.
-Do NOT include any explanation, markdown, or text outside the JSON array.`;
 
-export async function generateRepairShapes(analysis, feedbackHistory, userInstructions, apiKey, attempt) {
+IMPORTANT — VALUES FIDELITY (CRITICAL):
+- When a QUESTION CONTEXT is provided below with exact numbers, times, values, or labels — you MUST use those EXACT values in the diagram. Do NOT invent or change any numerical values, times, or labels.
+- If the question says "08:15, 08:45, 09:15, ?" those exact times must appear in the diagram.
+- If the question says "side = 8 cm" then the diagram must show "8 cm" not "10 cm".
+- Changing values will make the question's answer WRONG — this is unacceptable.
+
+Important Rules:
+- If the diagram contains animals, vehicles, food, or common objects (e.g. fish, butterflies, cars, apples), you MUST use a rasterImage shape with the src set to the lowercase clipart ID (e.g. { "type": "rasterImage", "src": "fishBlue", "width": 80, "height": 80 }) rather than drawing it using customPolygon/vectors. This is critical for visual quality.
+- Do NOT include any explanation, markdown, or text outside the JSON array.`;
+
+export async function generateRepairShapes({ analysis, feedbackHistory, userInstructions, apiKey, attempt, pipelineProvider = 'claude', geminiApiKey = '', model = 'gemini-3.5-flash', questionValues = null }) {
   let prompt = `Diagram type: ${analysis.diagramType}\nDescription: ${analysis.diagramDescription}\n\nInstructions:\n${analysis.generationInstructions}`;
+
+  // Inject hard-coded question values as a non-negotiable constraint
+  if (questionValues) {
+    prompt = `CRITICAL — EXACT VALUES FROM THE QUESTION (you MUST use these exact values in the diagram, do NOT change any of them):\n${questionValues}\n\n` + prompt;
+  } else if (analysis.questionContext) {
+    prompt = `QUESTION CONTEXT (extract and use all exact numerical values, times, and labels from this):\n${analysis.questionContext}\n\n` + prompt;
+  }
 
   if (userInstructions?.trim()) {
     prompt += `\n\nADDITIONAL USER INSTRUCTIONS (apply these precisely):\n${userInstructions.trim()}`;
@@ -183,6 +313,15 @@ export async function generateRepairShapes(analysis, feedbackHistory, userInstru
       prompt += `Attempt ${i + 1}: ${fb}\n`;
     });
     prompt += `\nRedraw from scratch. Fix ALL issues listed above. Each shape must be fully within the canvas bounds (x: 20–780, y: 20–480).`;
+  }
+
+  if (pipelineProvider === 'gemini') {
+    return generateRepairShapesWithGemini({
+      prompt,
+      systemPrompt: GENERATE_SYSTEM,
+      apiKey: geminiApiKey,
+      model,
+    });
   }
 
   const text = await callClaude({
@@ -197,6 +336,7 @@ export async function generateRepairShapes(analysis, feedbackHistory, userInstru
   if (!Array.isArray(parsed)) throw new Error('Generator returned non-array JSON');
   return parsed;
 }
+
 
 // ── Step 2b: Refine image-generation prompt (Gemini path only) ───────────────
 
@@ -289,6 +429,120 @@ export async function validateRenderedDiagram(screenshotBase64, analysis, apiKey
   return JSON.parse(text);
 }
 
+// ── Value extraction helper ───────────────────────────────────────────────────
+
+/**
+ * Builds a concise block of exact values extracted from the question data
+ * that the AI must reproduce verbatim in the diagram.
+ */
+function buildQuestionValuesBlock(questionData) {
+  const lines = [];
+
+  // Question text
+  if (questionData.text) {
+    lines.push(`Question text: "${questionData.text}"`);
+  }
+
+  // Correct answer
+  const ca = questionData.correctAnswer || questionData.answer;
+  if (ca) {
+    const caText = typeof ca === 'string' ? ca : (ca.text || JSON.stringify(ca));
+    lines.push(`Correct answer: ${caText}`);
+  }
+
+  // Distractors / options
+  const opts = questionData.distractors || questionData.options || questionData.choices;
+  if (Array.isArray(opts) && opts.length > 0) {
+    const optTexts = opts.map(o => typeof o === 'string' ? o : (o.text || JSON.stringify(o)));
+    lines.push(`Wrong options: ${optTexts.join(' | ')}`);
+  }
+
+  return lines.join('\n');
+}
+
+// ── Question text re-generation ───────────────────────────────────────────────
+
+const REGEN_QUESTION_SYSTEM = `You are a mathematics question writer for primary and middle school (Years 2–8).
+
+A diagram has been drawn with SPECIFIC VALUES that may differ from the original question text.
+Your job: rewrite the question stem, correct answer, and distractors so they match the diagram values EXACTLY.
+
+Rules:
+- Keep the same question type and mathematical concept.
+- Use ONLY the values visible in the new diagram description — do not use any values from the original question.
+- The correct answer must be mathematically correct given the new diagram values.
+- The 3 distractors must be plausible but wrong (common student errors).
+- Return ONLY valid JSON:
+{ "question": "...", "correctAnswer": "...", "distractors": ["...", "...", "..."] }
+No markdown, no explanation.`;
+
+/**
+ * Re-generates question text / correct answer / distractors to match
+ * the values actually present in the newly drawn diagram.
+ *
+ * @param {string} diagramDescription - Human-readable description of what the diagram now shows
+ * @param {object} originalQuestion   - { text, correctAnswer, distractors }
+ * @param {string} apiKey             - Claude API key
+ * @param {string} geminiApiKey       - Gemini API key (optional fallback)
+ * @returns {{ question, correctAnswer, distractors }}
+ */
+export async function regenerateQuestionText({ diagramDescription, originalQuestion, apiKey, geminiApiKey = '' }) {
+  const userMsg = `Original question: "${originalQuestion.text || ''}"
+Original correct answer: ${typeof originalQuestion.correctAnswer === 'string' ? originalQuestion.correctAnswer : (originalQuestion.correctAnswer?.text || '')}
+
+NEW DIAGRAM VALUES (rewrite the question to match these exactly):
+${diagramDescription}
+
+Rewrite the question, correct answer, and 3 distractors to match the NEW diagram values above.`;
+
+  // Try Claude first
+  if (apiKey) {
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1024,
+          system: REGEN_QUESTION_SYSTEM,
+          messages: [{ role: 'user', content: userMsg }],
+        }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const text = data.content?.[0]?.text || '';
+        const cleaned = text.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+        return JSON.parse(cleaned);
+      }
+    } catch { /* fall through to Gemini */ }
+  }
+
+  // Fallback: Gemini
+  if (geminiApiKey) {
+    const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+    const model = 'gemini-3.5-flash';
+    const url = `${GEMINI_BASE}/${model}:generateContent?key=${geminiApiKey}`;
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: REGEN_QUESTION_SYSTEM + '\n\n' + userMsg }] }],
+      generationConfig: { responseMimeType: 'application/json' },
+    };
+    const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (response.ok) {
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const cleaned = text.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+      return JSON.parse(cleaned);
+    }
+  }
+
+  throw new Error('No API key available for question text regeneration.');
+}
+
 // ── Main repair pipeline ──────────────────────────────────────────────────────
 
 /**
@@ -318,19 +572,48 @@ export async function repairDiagramWithRetry({
   onProgress,
   renderAndCapture,
   maxRetries = 5,
+  pipelineProvider = 'gemini',
 }) {
   clearSessionLog();
 
   const isGeminiGen = generationMode === 'gemini';
-  const isGeminiVal = validationMode === 'gemini';
+  const isGeminiVal = validationMode === 'gemini' || pipelineProvider === 'gemini';
 
-  await logEvent({ stage: 'start', message: 'Repair pipeline started', data: { questionId: questionData.id, generationMode, validationMode, maxRetries } });
+  await logEvent({ stage: 'start', message: 'Repair pipeline started', data: { questionId: questionData.id, generationMode, validationMode, maxRetries, pipelineProvider } });
 
-  // Step 1: Analyze with Claude Haiku (always — gives us structured description for both pipelines)
+  // Step 1: Analyze with chosen provider
   onProgress({ stage: 'analyzing', attempt: 0, maxAttempts: maxRetries });
-  const analysis = await analyzeQuestionImage(imageUrl, questionData.text, apiKey);
+  const analysis = await analyzeQuestionImage({
+    imageUrl,
+    questionText: questionData.text,
+    apiKey,
+    pipelineProvider,
+    geminiApiKey,
+    model: geminiVisionModel || 'gemini-3.5-flash',
+  });
   await logEvent({ stage: 'analyzed', message: 'Image analysis complete', data: analysis });
   onProgress({ stage: 'analyzed', analysis, attempt: 0, maxAttempts: maxRetries });
+
+  // Step 1b: Vision OCR — extract the exact values visible in the image
+  // This is the primary source of truth; question text is used as a fallback supplement.
+  onProgress({ stage: 'extracting_values', attempt: 0, maxAttempts: maxRetries });
+  const imageExtracted = await extractImageValues({
+    imageUrl,
+    apiKey,
+    geminiApiKey,
+    pipelineProvider,
+    model: geminiVisionModel || 'gemini-3.5-flash',
+  });
+  await logEvent({ stage: 'image_values_extracted', message: 'Image OCR complete', data: imageExtracted });
+
+  // Build constraint block: vision-extracted values + question text values
+  const questionValuesFromText = buildQuestionValuesBlock(questionData);
+  const visionValuesBlock = imageExtracted?.rawLock
+    ? `VISION-EXTRACTED VALUES (read directly from the image — highest priority):\n${imageExtracted.rawLock}\n\nTimes visible: ${(imageExtracted.times || []).join(', ') || '(none)'}\nNumbers visible: ${(imageExtracted.numbers || []).join(', ') || '(none)'}\nLabels visible: ${(imageExtracted.labels || []).join(', ') || '(none)'}\nSequences: ${(imageExtracted.sequences || []).join(' | ') || '(none)'}`
+    : '';
+  const questionValues = [visionValuesBlock, questionValuesFromText].filter(Boolean).join('\n\n');
+  await logEvent({ stage: 'values_combined', message: 'Combined values block ready', data: { questionValues } });
+
 
   let feedbackHistory = [];
   let lastShapes = null;
@@ -375,10 +658,21 @@ export async function repairDiagramWithRetry({
       } else {
         // ── Konva shape generation path ──────────────────────────────────────
         onProgress({ stage: 'generating', attempt, maxAttempts: maxRetries, analysis, mode: 'konva' });
-        const shapes = await generateRepairShapes(analysis, feedbackHistory, userInstructions, apiKey, attempt);
+        const shapes = await generateRepairShapes({
+          analysis,
+          feedbackHistory,
+          userInstructions,
+          apiKey,
+          attempt,
+          pipelineProvider,
+          geminiApiKey,
+          model: geminiVisionModel || 'gemini-3.5-flash',
+          questionValues,
+        });
         lastShapes = shapes;
         await logEvent({ stage: 'generated', attempt, message: `${shapes.length} shapes generated`, data: { shapeTypes: shapes.map(s => s.type) } });
         onProgress({ stage: 'generated', attempt, maxAttempts: maxRetries, shapes, analysis });
+
 
         onProgress({ stage: 'rendering', attempt, maxAttempts: maxRetries, shapes });
         screenshot = await renderAndCapture(shapes);
