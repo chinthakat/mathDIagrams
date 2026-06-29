@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Stage, Layer, Transformer, Group, Rect, Circle, Line, Path, Arrow, Text } from 'react-konva';
 import {
   getConnectionPoints, resolveEndpoint, findNearestConnectionPoint,
@@ -8,7 +8,7 @@ import { ObjectRegistry } from '../registry/objectRegistry';
 import {
   MousePointer2, Pen, Highlighter, Square as SquareIcon, Circle as CircleIcon,
   Minus, Shapes, Triangle, Star, Hexagon, ArrowRight, Eraser, Workflow,
-  ChevronUp, ChevronDown,
+  ChevronUp, ChevronDown, Undo2, Redo2,
 } from 'lucide-react';
 
 const GRID_SIZE = 20;
@@ -68,6 +68,7 @@ function ArrowHead({ x, y, angle, style = 'filled', color = '#64748b', size = 11
 const ShapeElement = ({
   shapeProps, isSelected, onSelect, onDelete, onChange,
   snapToGrid, allShapes, drawMode, onHoverChange, onDragGuide, onDragEnd: onDragEndCb,
+  onDblClick,
 }) => {
   const shapeRef = useRef();
   const trRef    = useRef();
@@ -148,8 +149,9 @@ const ShapeElement = ({
 
   const isConnMode = drawMode === 'connector';
   const commonProps = {
-    onClick:  (drawMode === 'select' || isConnMode) ? onSelect : drawMode === 'eraser' ? onDelete : undefined,
-    onTap:    (drawMode === 'select' || isConnMode) ? onSelect : drawMode === 'eraser' ? onDelete : undefined,
+    onClick:    (drawMode === 'select' || isConnMode) ? onSelect : drawMode === 'eraser' ? onDelete : undefined,
+    onTap:      (drawMode === 'select' || isConnMode) ? onSelect : drawMode === 'eraser' ? onDelete : undefined,
+    onDblClick: onDblClick,
     onMouseEnter: drawMode === 'eraser'
       ? e => { if (e.evt.buttons === 1) onDelete(); onHoverChange?.(shapeProps.id); }
       : () => onHoverChange?.(shapeProps.id),
@@ -222,12 +224,28 @@ const ShapeElement = ({
   };
 
   const ComponentToRender = ObjectRegistry[shapeProps.type]?.Component;
+  const hasLabel = shapeProps.label && shapeProps.label.trim();
+  const labelW   = shapeProps.width  ?? 100;
+  const labelH   = shapeProps.height ?? 60;
 
   return (
     <React.Fragment>
       <Group {...commonProps}>
         {ComponentToRender && <ComponentToRender props={shapeProps} />}
         {renderPolygonHandles()}
+        {hasLabel && (
+          <Text
+            text={shapeProps.label}
+            x={-labelW / 2} y={-labelH / 2}
+            width={labelW} height={labelH}
+            align="center" verticalAlign="middle"
+            fontSize={shapeProps.fontSize ?? 13}
+            fill={shapeProps.fontColor || '#ffffff'}
+            fontStyle="bold"
+            listening={false}
+            shadowColor="rgba(0,0,0,0.6)" shadowBlur={3} shadowOffsetX={0} shadowOffsetY={1}
+          />
+        )}
       </Group>
       {isSelected && !ENDPOINT_EDITABLE.has(shapeProps.type) && (
         <Transformer ref={trRef} boundBoxFunc={(o, n) => (n.width < 5 || n.height < 5 ? o : n)} />
@@ -283,6 +301,54 @@ export default function CanvasEditor2D({
   const [stageConfig, setStageConfig] = useState({ scale: 1, x: 0, y: 0 });
   const [snapToGrid, setSnapToGrid]   = useState(showGrid);
 
+  // ── Undo / Redo history ──────────────────────────────────────────────────────
+  // History lives here so it's self-contained; shapes prop is the source of truth.
+  const historyRef    = useRef([]);   // past snapshots (oldest → newest)
+  const futureRef     = useRef([]);   // redo stack
+  const isUndoingRef  = useRef(false);
+
+  // Wrap the parent's setShapes to capture history on every committed change.
+  // `skip` = true means an intermediate drag frame — don't snapshot those.
+  const setShapesWithHistory = useCallback((updater, skip = false) => {
+    if (skip) { setShapes(updater); return; }
+    setShapes(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (!isUndoingRef.current) {
+        historyRef.current = [...historyRef.current, prev].slice(-50); // cap at 50
+        futureRef.current  = [];
+      }
+      return next;
+    });
+  }, [setShapes]);
+
+  const undo = useCallback(() => {
+    if (!historyRef.current.length) return;
+    const prev = historyRef.current[historyRef.current.length - 1];
+    historyRef.current = historyRef.current.slice(0, -1);
+    isUndoingRef.current = true;
+    setShapes(cur => { futureRef.current = [cur, ...futureRef.current].slice(0, 50); return prev; });
+    isUndoingRef.current = false;
+    setSelectedId(null);
+    setSelectedIds(new Set());
+  }, [setShapes, setSelectedId]);
+
+  const redo = useCallback(() => {
+    if (!futureRef.current.length) return;
+    const next = futureRef.current[0];
+    futureRef.current = futureRef.current.slice(1);
+    isUndoingRef.current = true;
+    setShapes(cur => { historyRef.current = [...historyRef.current, cur].slice(0, 50); return next; });
+    isUndoingRef.current = false;
+    setSelectedId(null);
+    setSelectedIds(new Set());
+  }, [setShapes, setSelectedId]);
+
+  // ── Multi-select state ───────────────────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  // Rubber-band selection rect (stage coords)
+  const [rubberBand, setRubberBand]   = useState(null); // { x,y,w,h,startX,startY }
+  const multiTrRef = useRef();
+
   // Connector / overlay state
   const [hoveredShapeId, setHoveredShapeId]       = useState(null);
   const [hoveredConnId, setHoveredConnId]         = useState(null);
@@ -296,6 +362,21 @@ export default function CanvasEditor2D({
   // Captures the last dragged position during onDragMove so onDragEnd always reads the correct coords.
   const lastDragPosRef = useRef({ x: 0, y: 0 });
   const snapIndicatorRef = useRef(null);
+
+  // ── Inline text editing ──────────────────────────────────────────────────────
+  const [editingLabel, setEditingLabel] = useState(null); // { id, x, y, w, h, value }
+  const labelInputRef = useRef(null);
+
+  // Focus the floating input whenever it appears
+  useEffect(() => {
+    if (editingLabel && labelInputRef.current) labelInputRef.current.focus();
+  }, [editingLabel?.id]);
+
+  const commitLabel = () => {
+    if (!editingLabel) return;
+    setShapesWithHistory(prev => prev.map(s => s.id === editingLabel.id ? { ...s, label: editingLabel.value } : s));
+    setEditingLabel(null);
+  };
 
   // Drawing tools
   const [drawMode, setDrawMode]       = useState('select');
@@ -352,93 +433,115 @@ export default function CanvasEditor2D({
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   const updateShape = (id, props, skip = false) =>
-    setShapes(prev => prev.map(s => s.id === id ? { ...s, ...props } : s), skip);
+    setShapesWithHistory(prev => prev.map(s => s.id === id ? { ...s, ...props } : s), skip);
 
   const deleteShape = id => {
-    setShapes(prev => prev.filter(s => s.id !== id));
+    setShapesWithHistory(prev => prev.filter(s => s.id !== id));
     if (selectedId === id) setSelectedId(null);
   };
 
-  const bringForward = id => setShapes(prev => {
+  const deleteSelected = () => {
+    if (selectedIds.size > 0) {
+      setShapesWithHistory(prev => prev.filter(s => !selectedIds.has(s.id)));
+      setSelectedIds(new Set());
+      setSelectedId(null);
+    } else if (selectedId) {
+      deleteShape(selectedId);
+    }
+  };
+
+  const bringForward = id => setShapesWithHistory(prev => {
     const i = prev.findIndex(s => s.id === id);
     if (i < 0 || i === prev.length - 1) return prev;
     const a = [...prev]; [a[i], a[i+1]] = [a[i+1], a[i]]; return a;
   });
-  const sendBackward = id => setShapes(prev => {
+  const sendBackward = id => setShapesWithHistory(prev => {
     const i = prev.findIndex(s => s.id === id);
     if (i <= 0) return prev;
     const a = [...prev]; [a[i-1], a[i]] = [a[i], a[i-1]]; return a;
   });
 
-  // ── Keyboard Shortcuts (Copy, Paste, Delete) ───────────────────────────────
+  // ── Keyboard Shortcuts ───────────────────────────────────────────────────────
   const clipboardRef = useRef(null);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
       const activeEl = document.activeElement;
-      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
-        return;
-      }
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) return;
 
       const isMod = e.ctrlKey || e.metaKey;
 
-      // Copy
+      // Undo / Redo
+      if (isMod && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+      if (isMod && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return; }
+
+      // Select All
+      if (isMod && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        setSelectedIds(new Set(shapes.map(s => s.id)));
+        setSelectedId(null);
+        return;
+      }
+
+      // Copy — single or multi
       if (isMod && e.key.toLowerCase() === 'c') {
-        if (selectedId) {
-          const shapeToCopy = shapes.find(s => s.id === selectedId);
-          if (shapeToCopy) {
-            clipboardRef.current = shapeToCopy;
-            e.preventDefault();
-          }
-        }
+        const ids = selectedIds.size > 0 ? selectedIds : (selectedId ? new Set([selectedId]) : new Set());
+        const toCopy = shapes.filter(s => ids.has(s.id));
+        if (toCopy.length) { clipboardRef.current = toCopy; e.preventDefault(); }
       }
 
       // Paste
       if (isMod && e.key.toLowerCase() === 'v') {
-        if (clipboardRef.current) {
-          const base = clipboardRef.current;
-          const newId = `${base.type}-${Date.now()}`;
-          
-          let posProps = {};
-          if (base.x1 !== undefined && base.y1 !== undefined) {
-            posProps = {
-              x1: base.x1 + 30, y1: base.y1 + 30,
-              x2: base.x2 !== undefined ? base.x2 + 30 : base.x1 + 180,
-              y2: base.y2 !== undefined ? base.y2 + 30 : base.y1 + 30
-            };
-          } else {
-            const currentX = base.x !== undefined ? base.x : 0;
-            const currentY = base.y !== undefined ? base.y : 0;
-            posProps = { x: currentX + 30, y: currentY + 30 };
-          }
-          
-          const pastedShape = {
-            ...base,
-            ...posProps,
-            id: newId,
-          };
-          
-          setShapes(prev => [...prev, pastedShape]);
-          setSelectedId(newId);
-          clipboardRef.current = pastedShape; // cascade repeated pastes
+        if (clipboardRef.current?.length) {
+          const now = Date.now();
+          const pasted = clipboardRef.current.map((base, i) => {
+            const newId = `${base.type}-${now}-${i}`;
+            const posProps = base.x1 !== undefined
+              ? { x1: base.x1 + 30, y1: base.y1 + 30, x2: (base.x2 ?? base.x1 + 150) + 30, y2: (base.y2 ?? base.y1) + 30 }
+              : { x: (base.x ?? 0) + 30, y: (base.y ?? 0) + 30 };
+            return { ...base, ...posProps, id: newId };
+          });
+          setShapesWithHistory(prev => [...prev, ...pasted]);
+          setSelectedIds(new Set(pasted.map(p => p.id)));
+          setSelectedId(null);
+          clipboardRef.current = pasted; // cascade repeated pastes
           e.preventDefault();
         }
       }
 
-      // Delete
+      // Delete / Backspace
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedId) {
-          deleteShape(selectedId);
+        e.preventDefault();
+        deleteSelected();
+      }
+
+      // Arrow nudge (1px, or 10px with shift)
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+        const d = e.shiftKey ? 10 : 1;
+        const dx = e.key === 'ArrowLeft' ? -d : e.key === 'ArrowRight' ? d : 0;
+        const dy = e.key === 'ArrowUp'   ? -d : e.key === 'ArrowDown'  ? d : 0;
+        const idsToNudge = selectedIds.size > 0 ? selectedIds : (selectedId ? new Set([selectedId]) : new Set());
+        if (idsToNudge.size) {
           e.preventDefault();
+          setShapesWithHistory(prev => prev.map(s => {
+            if (!idsToNudge.has(s.id)) return s;
+            return s.x1 !== undefined
+              ? { ...s, x1: s.x1 + dx, y1: s.y1 + dy, x2: s.x2 + dx, y2: s.y2 + dy }
+              : { ...s, x: (s.x ?? 0) + dx, y: (s.y ?? 0) + dy };
+          }));
         }
+      }
+
+      // Escape — deselect
+      if (e.key === 'Escape') {
+        setSelectedId(null);
+        setSelectedIds(new Set());
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [selectedId, shapes, setShapes, deleteShape]);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedId, selectedIds, shapes, undo, redo, deleteSelected, setShapesWithHistory]);
 
   const stampShape = (type, overrideProps = {}) => {
     const cx = -stageConfig.x / stageConfig.scale + dimensions.width  / 2 / stageConfig.scale;
@@ -448,8 +551,9 @@ export default function CanvasEditor2D({
     const posProps = CONNECTOR_TYPES.has(type)
       ? { x1: cx - 80, y1: cy, x2: cx + 80, y2: cy }
       : { x: cx, y: cy };
-    setShapes(prev => [...prev, { ...base, ...overrideProps, id, type, ...posProps }]);
+    setShapesWithHistory(prev => [...prev, { ...base, ...overrideProps, id, type, ...posProps }]);
     setSelectedId(id);
+    setSelectedIds(new Set());
     setDrawMode('select');
     setIsShapesMenuOpen(false);
   };
@@ -469,7 +573,7 @@ export default function CanvasEditor2D({
         const endY = connPreview?.snap?.y ?? connPreview?.y ?? pos.y;
         const endBinding = connPreview?.snap ? { shapeId: connPreview.snap.shapeId, pointIndex: connPreview.snap.pointIndex } : null;
         const id = `orthoConnector-${Date.now()}`;
-        setShapes(prev => [...prev, {
+        setShapesWithHistory(prev => [...prev, {
           id, type: 'orthoConnector',
           x1: drawingConn.x1, y1: drawingConn.y1, x2: endX, y2: endY,
           startBinding: drawingConn.startBinding, endBinding,
@@ -485,7 +589,13 @@ export default function CanvasEditor2D({
     }
 
     if (drawMode === 'select' || drawMode === 'eraser') {
-      if (e.target === e.target.getStage() && drawMode === 'select') setSelectedId(null);
+      if (e.target === e.target.getStage() && drawMode === 'select') {
+        setSelectedId(null);
+        setSelectedIds(new Set());
+        // Start rubber-band
+        const pos = stageToLocal(e);
+        setRubberBand({ startX: pos.x, startY: pos.y, x: pos.x, y: pos.y, w: 0, h: 0 });
+      }
       return;
     }
 
@@ -504,11 +614,21 @@ export default function CanvasEditor2D({
     } else if (drawMode === 'ellipse') {
       shape = { ...shape, type: 'drawEllipse', radiusX: 0, radiusY: 0, stroke: drawColor, strokeWidth: sw };
     }
-    setShapes(prev => [...prev, shape]);
+    setShapesWithHistory(prev => [...prev, shape]);
   };
 
   const handleStageMouseMove = e => {
     const pos = stageToLocal(e);
+
+    // Update rubber-band rect
+    if (rubberBand) {
+      const x = Math.min(pos.x, rubberBand.startX);
+      const y = Math.min(pos.y, rubberBand.startY);
+      const w = Math.abs(pos.x - rubberBand.startX);
+      const h = Math.abs(pos.y - rubberBand.startY);
+      setRubberBand(rb => ({ ...rb, x, y, w, h }));
+      return;
+    }
 
     if (drawMode === 'connector') {
       const snap = findNearestConnectionPoint(pos, shapes);
@@ -527,7 +647,7 @@ export default function CanvasEditor2D({
     }
 
     if (!isDrawing || drawMode === 'select') return;
-    setShapes(prev => {
+    setShapesWithHistory(prev => {
       const shapes = [...prev];
       const last   = { ...shapes[shapes.length - 1] };
       if (drawMode === 'pen' || drawMode === 'highlighter') {
@@ -545,12 +665,29 @@ export default function CanvasEditor2D({
   };
 
   const handleStageMouseUp = () => {
-    if (isDrawing) { setIsDrawing(false); setShapes(s => [...s]); }
+    // Finalise rubber-band selection
+    if (rubberBand && (rubberBand.w > 4 || rubberBand.h > 4)) {
+      const { x, y, w, h } = rubberBand;
+      const hitIds = new Set(
+        shapes.filter(s => {
+          const sx = s.x1 !== undefined ? Math.min(s.x1, s.x2) : (s.x ?? 0);
+          const sy = s.y1 !== undefined ? Math.min(s.y1, s.y2) : (s.y ?? 0);
+          const sw = s.x1 !== undefined ? Math.abs(s.x2 - s.x1) : (s.width || s.size || s.radius * 2 || 60);
+          const sh = s.x1 !== undefined ? Math.abs(s.y2 - s.y1) : (s.height || s.size || s.radius * 2 || 60);
+          return sx < x + w && sx + sw > x && sy < y + h && sy + sh > y;
+        }).map(s => s.id)
+      );
+      if (hitIds.size > 0) {
+        setSelectedIds(hitIds);
+        setSelectedId(null);
+      }
+    }
+    setRubberBand(null);
+    if (isDrawing) { setIsDrawing(false); setShapesWithHistory(s => [...s]); }
   };
 
   const handleKeyDown = e => {
-    if (e.key === 'Escape') { setDrawingConn(null); setConnPreview(null); if (drawMode === 'connector') setDrawMode('select'); }
-    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) deleteShape(selectedId);
+    if (e.key === 'Escape') { setDrawingConn(null); setConnPreview(null); setRubberBand(null); if (drawMode === 'connector') setDrawMode('select'); }
   };
 
   // ── Theme ────────────────────────────────────────────────────────────────────
@@ -661,7 +798,7 @@ export default function CanvasEditor2D({
       } else {
         updates.x = (conn.x ?? 0) + dx; updates.y = (conn.y ?? 0) + dy;
       }
-      updateShape(conn.id, updates);
+      setShapesWithHistory(prev => prev.map(s => s.id === conn.id ? { ...s, ...updates } : s));
     };
 
     return (
@@ -991,10 +1128,30 @@ export default function CanvasEditor2D({
         </div>
       )}
 
+      {/* ── Multi-select info bar ── */}
+      {selectedIds.size > 0 && (
+        <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 10, background: 'rgba(15,23,42,0.92)', border: '1px solid #334155', borderRadius: '10px', padding: '7px 14px', display: 'flex', gap: '12px', alignItems: 'center', color: '#e2e8f0', fontSize: '12px', userSelect: 'none' }}>
+          <span style={{ color: '#94a3b8' }}>{selectedIds.size} shapes selected</span>
+          <div style={{ width: '1px', height: '18px', background: '#334155' }} />
+          <button onClick={() => { setShapesWithHistory(prev => prev.filter(s => !selectedIds.has(s.id))); setSelectedIds(new Set()); }} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}>Delete All</button>
+          <button onClick={() => setSelectedIds(new Set())} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '11px' }}>Deselect</button>
+        </div>
+      )}
+
       {/* ── Drawing Toolbar ── */}
       <div style={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 10, background: '#1e293b', padding: '8px', borderRadius: '30px', display: 'flex', gap: '8px', alignItems: 'center', boxShadow: '0 10px 25px -5px rgba(0,0,0,.5)', border: '1px solid #334155' }}>
+        {/* Undo / Redo */}
+        <button onClick={undo} title="Undo (Ctrl+Z)" disabled={!historyRef.current?.length}
+          style={{ width: 36, height: 36, borderRadius: 18, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'transparent', color: '#94a3b8', opacity: historyRef.current?.length ? 1 : 0.35 }}>
+          <Undo2 size={16} />
+        </button>
+        <button onClick={redo} title="Redo (Ctrl+Y)" disabled={!futureRef.current?.length}
+          style={{ width: 36, height: 36, borderRadius: 18, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'transparent', color: '#94a3b8', opacity: futureRef.current?.length ? 1 : 0.35 }}>
+          <Redo2 size={16} />
+        </button>
+        <div style={{ width: 1, height: 24, background: '#334155' }} />
         {[
-          { id: 'select',    icon: <MousePointer2 size={16} />, title: 'Select & Move' },
+          { id: 'select',    icon: <MousePointer2 size={16} />, title: 'Select & Move (hold Shift to multi-select)' },
           { id: 'connector', icon: <Workflow size={16} />,       title: 'Connector (orthogonal)' },
           { id: 'pen',       icon: <Pen size={16} />,           title: 'Pen' },
           { id: 'highlighter',icon: <Highlighter size={16} />,  title: 'Highlighter' },
@@ -1061,6 +1218,27 @@ export default function CanvasEditor2D({
         ))}
       </div>
 
+      {/* ── Floating label editor ── */}
+      {editingLabel && (
+        <div style={{ position: 'absolute', zIndex: 50, left: editingLabel.x, top: editingLabel.y, width: Math.max(editingLabel.w, 120), pointerEvents: 'auto' }}>
+          <input
+            ref={labelInputRef}
+            value={editingLabel.value}
+            onChange={e => setEditingLabel(prev => ({ ...prev, value: e.target.value }))}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); commitLabel(); } }}
+            onBlur={commitLabel}
+            style={{
+              width: '100%', padding: '4px 8px', fontSize: 13, fontWeight: 700,
+              background: 'rgba(15,23,42,0.95)', border: '2px solid #3b82f6', borderRadius: 6,
+              color: '#fff', outline: 'none', boxSizing: 'border-box',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+            }}
+            placeholder="Type label…"
+          />
+          <div style={{ fontSize: 10, color: '#64748b', marginTop: 3, paddingLeft: 2 }}>Enter to confirm · Esc to cancel</div>
+        </div>
+      )}
+
       {/* ── Konva Stage ── */}
       <Stage
         width={dimensions.width} height={dimensions.height}
@@ -1068,7 +1246,7 @@ export default function CanvasEditor2D({
         onMouseMove={handleStageMouseMove} onTouchMove={handleStageMouseMove}
         onMouseUp={handleStageMouseUp}     onTouchEnd={handleStageMouseUp}
         onWheel={handleWheel}
-        draggable={drawMode === 'select'}
+        draggable={drawMode !== 'select'}
         onDragEnd={e => { if (e.target === stageRef.current) setStageConfig(p => ({ ...p, x: e.target.x(), y: e.target.y() })); }}
         scaleX={stageConfig.scale} scaleY={stageConfig.scale}
         x={stageConfig.x} y={stageConfig.y}
@@ -1082,8 +1260,32 @@ export default function CanvasEditor2D({
             <ShapeElement
               key={shape.id}
               shapeProps={shape}
-              isSelected={shape.id === selectedId}
-              onSelect={() => setSelectedId(shape.id)}
+              isSelected={shape.id === selectedId || selectedIds.has(shape.id)}
+              onDblClick={e => {
+                if (drawMode !== 'select') return;
+                const stage = stageRef.current;
+                if (!stage) return;
+                const absPos = stage.getAbsoluteTransform().point({ x: shape.x ?? 0, y: shape.y ?? 0 });
+                const sx = stageConfig.scale;
+                const w = (shape.width ?? 100) * sx;
+                const h = (shape.height ?? 60) * sx;
+                setEditingLabel({ id: shape.id, x: absPos.x, y: absPos.y, w, h, value: shape.label || '' });
+                setSelectedId(shape.id);
+              }}
+              onSelect={e => {
+                if (e?.evt?.shiftKey) {
+                  // Shift+click: toggle in multi-select
+                  setSelectedIds(prev => {
+                    const next = new Set(prev);
+                    if (next.has(shape.id)) next.delete(shape.id); else next.add(shape.id);
+                    return next;
+                  });
+                  setSelectedId(null);
+                } else {
+                  setSelectedId(shape.id);
+                  setSelectedIds(new Set());
+                }
+              }}
               onDelete={() => deleteShape(shape.id)}
               onChange={(p, skip) => updateShape(shape.id, p, skip)}
               snapToGrid={snapToGrid}
@@ -1091,7 +1293,10 @@ export default function CanvasEditor2D({
               drawMode={drawMode}
               onHoverChange={(drawMode === 'select' || drawMode === 'connector') ? setHoveredShapeId : undefined}
               onDragGuide={gs => setGuides(gs)}
-              onDragEnd={() => setGuides([])}
+              onDragEnd={() => {
+                setGuides([]);
+                // If this shape is in a multi-selection, move all others by same delta
+              }}
             />
           ))}
 
@@ -1109,6 +1314,16 @@ export default function CanvasEditor2D({
 
           {/* ── Alignment guides ── */}
           {renderGuides()}
+
+          {/* ── Rubber-band selection rect ── */}
+          {rubberBand && rubberBand.w > 2 && rubberBand.h > 2 && (
+            <Rect
+              x={rubberBand.x} y={rubberBand.y}
+              width={rubberBand.w} height={rubberBand.h}
+              fill="rgba(59,130,246,0.08)" stroke="#3b82f6" strokeWidth={1}
+              dash={[4,3]} listening={false}
+            />
+          )}
 
           {/* ── Endpoint handles ── */}
           {makeEndpointHandles()}

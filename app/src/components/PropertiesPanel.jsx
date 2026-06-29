@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Trash2, ArrowUp, ArrowDown, AlignCenter, AlignLeft, AlignRight, AlignHorizontalSpaceBetween, AlignVerticalSpaceBetween, Image as ImageIcon, Sparkles, Plus, Minus } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Trash2, ArrowUp, ArrowDown, AlignCenter, AlignLeft, AlignRight, AlignHorizontalSpaceBetween, AlignVerticalSpaceBetween, Image as ImageIcon, Sparkles, Plus, Minus, Copy, Clipboard, Type, Eye } from 'lucide-react';
 import { ObjectRegistry } from '../registry/objectRegistry';
 import { GET_ICON } from '../registry/iconRegistry';
 import { resolveEndpoint, computeOrthoPath } from '../utils/connectionUtils';
@@ -12,11 +12,43 @@ const PRESET_COLORS = [
   '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'
 ];
 
+// Module-level style clipboard (persists across re-renders, shared between panels)
+const styleClipboard = { current: null };
+
+// ── Colour picker with presets ─────────────────────────────────────────────────
+const FILL_PRESETS   = ['transparent','#ffffff','#f1f5f9','#fef3c7','#dbeafe','#dcfce7','#fce7f3','#000000'];
+const STROKE_PRESETS = ['transparent','#000000','#64748b','#ef4444','#3b82f6','#22c55e','#eab308','#8b5cf6'];
+
+function ColourRow({ label, value, presets, onChange }) {
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 5 }}>{label}</div>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 5 }}>
+        {presets.map(c => (
+          <div key={c} onClick={() => onChange(c)}
+            style={{
+              width: 20, height: 20, borderRadius: 4, cursor: 'pointer', flexShrink: 0,
+              background: c === 'transparent' ? 'repeating-conic-gradient(#94a3b8 0% 25%,transparent 0% 50%) 0/8px 8px' : c,
+              border: value === c ? '2px solid #3b82f6' : '1px solid #334155',
+              boxShadow: value === c ? '0 0 0 1px #0f172a inset' : 'none',
+            }} title={c} />
+        ))}
+        <input type="color"
+          value={value === 'transparent' ? '#ffffff' : (value || '#000000')}
+          onChange={e => onChange(e.target.value)}
+          style={{ width: 20, height: 20, padding: 0, border: '1px solid #334155', borderRadius: 4, cursor: 'pointer', background: 'none' }}
+          title="Custom colour" />
+      </div>
+    </div>
+  );
+}
+
 export default function PropertiesPanel({ selectedShape, updateShape, updateAllShapes, deleteShape, reorderShape, mode, openIconPicker, allShapes = [] }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [genError, setGenError] = useState('');
   const [isGeneratingProp, setIsGeneratingProp] = useState(false);
   const [propGenError, setPropGenError] = useState('');
+  const [styleCopied, setStyleCopied] = useState(false);
 
   if (!selectedShape) {
     return (
@@ -429,10 +461,96 @@ CRITICAL INSTRUCTIONS:
     }
   };
 
+  const up = (k, v) => updateShape(selectedShape.id, { [k]: v });
+
+  const copyStyle = () => {
+    styleClipboard.current = {
+      fill: selectedShape.fill, stroke: selectedShape.stroke,
+      strokeWidth: selectedShape.strokeWidth, opacity: selectedShape.opacity,
+      fontSize: selectedShape.fontSize, fontColor: selectedShape.fontColor,
+    };
+    setStyleCopied(true);
+    setTimeout(() => setStyleCopied(false), 1500);
+  };
+
+  const pasteStyle = () => {
+    if (styleClipboard.current) updateShape(selectedShape.id, styleClipboard.current);
+  };
+
   return (
     <div className="properties-panel">
+
+      {/* ── Universal Style Block ─────────────────────────────────────────────── */}
+      {mode !== '3D' && !ENDPOINT_EDITABLE.has(selectedShape.type) && (
+        <div style={{ padding: '10px 12px', borderBottom: '1px solid #1e293b', marginBottom: 4 }}>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em' }}>Style</span>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button onClick={copyStyle} title="Copy Style" style={{ background: styleCopied ? '#14532d' : 'transparent', border: '1px solid #334155', borderRadius: 4, color: styleCopied ? '#4ade80' : '#64748b', cursor: 'pointer', padding: '2px 6px', fontSize: 10, display: 'flex', alignItems: 'center', gap: 3 }}>
+                <Copy size={10} />{styleCopied ? 'Copied' : 'Copy'}
+              </button>
+              <button onClick={pasteStyle} title="Paste Style" disabled={!styleClipboard.current} style={{ background: 'transparent', border: '1px solid #334155', borderRadius: 4, color: styleClipboard.current ? '#94a3b8' : '#334155', cursor: styleClipboard.current ? 'pointer' : 'default', padding: '2px 6px', fontSize: 10, display: 'flex', alignItems: 'center', gap: 3 }}>
+                <Clipboard size={10} />Paste
+              </button>
+            </div>
+          </div>
+
+          <ColourRow label="Fill" value={selectedShape.fill || 'transparent'} presets={FILL_PRESETS} onChange={v => up('fill', v)} />
+          <ColourRow label="Stroke" value={selectedShape.stroke || '#000000'} presets={STROKE_PRESETS} onChange={v => up('stroke', v)} />
+
+          {/* Stroke width + Opacity in one row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Stroke <span style={{ color: '#94a3b8' }}>{selectedShape.strokeWidth ?? 1}px</span></div>
+              <input type="range" min={0} max={16} step={1} value={selectedShape.strokeWidth ?? 1}
+                onChange={e => up('strokeWidth', +e.target.value)}
+                style={{ width: '100%' }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Opacity <span style={{ color: '#94a3b8' }}>{Math.round((selectedShape.opacity ?? 1) * 100)}%</span></div>
+              <input type="range" min={0} max={1} step={0.05} value={selectedShape.opacity ?? 1}
+                onChange={e => up('opacity', +e.target.value)}
+                style={{ width: '100%' }} />
+            </div>
+          </div>
+
+          {/* W / H inputs */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+            {['width','height'].map(k => (
+              <div key={k}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>{k === 'width' ? 'W' : 'H'}</div>
+                <input type="number" value={Math.round(selectedShape[k] ?? (k === 'width' ? 100 : 80))} min={4}
+                  onChange={e => up(k, +e.target.value)}
+                  style={{ width: '100%', padding: '4px 6px', background: '#1e293b', border: '1px solid #334155', borderRadius: 4, color: '#e2e8f0', fontSize: 12 }} />
+              </div>
+            ))}
+          </div>
+
+          {/* Inline label */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Type size={10} /> Label <span style={{ color: '#475569', fontWeight: 400, textTransform: 'none' }}>(double-click on canvas)</span>
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input type="text" value={selectedShape.label || ''} placeholder="Add label…"
+                onChange={e => up('label', e.target.value)}
+                style={{ flex: 1, padding: '5px 8px', background: '#1e293b', border: '1px solid #334155', borderRadius: 4, color: '#e2e8f0', fontSize: 12 }} />
+              <input type="number" value={selectedShape.fontSize ?? 13} min={8} max={72}
+                onChange={e => up('fontSize', +e.target.value)}
+                title="Font size"
+                style={{ width: 44, padding: '5px 4px', background: '#1e293b', border: '1px solid #334155', borderRadius: 4, color: '#e2e8f0', fontSize: 12, textAlign: 'center' }} />
+              <input type="color" value={selectedShape.fontColor || '#ffffff'}
+                onChange={e => up('fontColor', e.target.value)}
+                title="Label colour"
+                style={{ width: 28, height: 28, padding: 0, border: '1px solid #334155', borderRadius: 4, cursor: 'pointer', background: 'none' }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="section-title">Properties</div>
-      
+
       {(mode !== '3D') && regObj && regObj.properties.filter(p => p.type !== 'hidden').map(prop => (
         <div className="input-group" key={prop.name}>
           <label>
