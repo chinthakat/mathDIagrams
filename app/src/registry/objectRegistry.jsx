@@ -62,6 +62,13 @@ import IsometricCube from '../components/MathObjects/IsometricCube';
 import Cylinder from '../components/MathObjects/Cylinder';
 import BlockArrow from '../components/MathObjects/BlockArrow';
 import Callout from '../components/MathObjects/Callout';
+import CurvedArrow from '../components/MathObjects/CurvedArrow';
+import UTurnArrow from '../components/MathObjects/UTurnArrow';
+import CircularArrow from '../components/MathObjects/CircularArrow';
+import FourWayArrow from '../components/MathObjects/FourWayArrow';
+import BentArrow from '../components/MathObjects/BentArrow';
+import DoubleBlockArrow from '../components/MathObjects/DoubleBlockArrow';
+import DiagonalArrow from '../components/MathObjects/DiagonalArrow';
 import Diamond from '../components/MathObjects/Diamond';
 import Parallelogram from '../components/MathObjects/Parallelogram';
 import Trapezoid from '../components/MathObjects/Trapezoid';
@@ -1307,6 +1314,139 @@ export const ObjectRegistry = {
       { name: 'pointerWidth', label: 'Arrow Width', type: 'range', min: 1, max: 30 },
       { name: 'pointerLength', label: 'Arrow Length', type: 'range', min: 1, max: 30 }
     ]
+  },
+
+  curvedBlockArrow: {
+    id: 'curvedBlockArrow',
+    category: 'Arrows',
+    name: 'Curved Block Arrow',
+    icon: <Navigation size={18} />,
+    defaultProps: { width: 120, height: 80, sweepAngle: 120, thickness: 0.35, fill: '#3b82f6', stroke: '#1e40af', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps: p }) => <CurvedArrow width={p.width} height={p.height} sweepAngle={p.sweepAngle} thickness={p.thickness} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
+    properties: [
+      { name: 'width',       label: 'Width',        type: 'range', min: 40, max: 400, step: 4 },
+      { name: 'height',      label: 'Height',       type: 'range', min: 30, max: 400, step: 4 },
+      { name: 'sweepAngle',  label: 'Sweep Angle',  type: 'range', min: 30, max: 300, step: 5 },
+      { name: 'thickness',   label: 'Thickness',    type: 'range', min: 0.1, max: 0.7, step: 0.05 },
+      { name: 'fill',        label: 'Fill',         type: 'color' },
+      { name: 'stroke',      label: 'Stroke',       type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'label',       label: 'Label',        type: 'text' },
+    ],
+  },
+
+  uTurnArrow: {
+    id: 'uTurnArrow',
+    category: 'Arrows',
+    name: 'U-Turn Arrow',
+    icon: <ArrowLeftRight size={18} />,
+    defaultProps: { width: 110, height: 90, thickness: 0.30, fill: '#8b5cf6', stroke: '#5b21b6', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps: p }) => <UTurnArrow width={p.width} height={p.height} thickness={p.thickness} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
+    properties: [
+      { name: 'width',       label: 'Width',        type: 'range', min: 40, max: 400, step: 4 },
+      { name: 'height',      label: 'Height',       type: 'range', min: 40, max: 400, step: 4 },
+      { name: 'thickness',   label: 'Arm Thickness',type: 'range', min: 0.1, max: 0.6, step: 0.05 },
+      { name: 'fill',        label: 'Fill',         type: 'color' },
+      { name: 'stroke',      label: 'Stroke',       type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'label',       label: 'Label',        type: 'text' },
+    ],
+  },
+
+  circularArrow: {
+    id: 'circularArrow',
+    category: 'Arrows',
+    name: 'Circular / Rotation Arrow',
+    icon: <Navigation size={18} />,
+    defaultProps: { width: 90, height: 90, sweepAngle: 270, thickness: 0.30, fill: '#10b981', stroke: '#065f46', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps: p }) => <CircularArrow width={p.width} height={p.height} sweepAngle={p.sweepAngle} thickness={p.thickness} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
+    properties: [
+      { name: 'width',       label: 'Size',         type: 'range', min: 30, max: 400, step: 4 },
+      { name: 'sweepAngle',  label: 'Arc Sweep',    type: 'range', min: 60, max: 340, step: 5 },
+      { name: 'thickness',   label: 'Thickness',    type: 'range', min: 0.1, max: 0.6, step: 0.05 },
+      { name: 'fill',        label: 'Fill',         type: 'color' },
+      { name: 'stroke',      label: 'Stroke',       type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'label',       label: 'Label',        type: 'text' },
+    ],
+  },
+
+  fourWayArrow: {
+    id: 'fourWayArrow',
+    category: 'Arrows',
+    name: '4-Way Move Arrow',
+    icon: <MoveHorizontal size={18} />,
+    defaultProps: { width: 90, height: 90, armRatio: 0.28, headRatio: 0.38, fill: '#64748b', stroke: '#1e293b', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps: p }) => <FourWayArrow width={p.width} height={p.height} armRatio={p.armRatio} headRatio={p.headRatio} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
+    properties: [
+      { name: 'width',       label: 'Size',         type: 'range', min: 30, max: 400, step: 4 },
+      { name: 'armRatio',    label: 'Arm Width',    type: 'range', min: 0.1, max: 0.4, step: 0.02 },
+      { name: 'headRatio',   label: 'Head Size',    type: 'range', min: 0.15, max: 0.55, step: 0.02 },
+      { name: 'fill',        label: 'Fill',         type: 'color' },
+      { name: 'stroke',      label: 'Stroke',       type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'label',       label: 'Label',        type: 'text' },
+    ],
+  },
+
+  bentArrow: {
+    id: 'bentArrow',
+    category: 'Arrows',
+    name: 'Bent / L-Shape Arrow',
+    icon: <CornerDownRight size={18} />,
+    defaultProps: { width: 100, height: 100, shaftRatio: 0.30, headRatio: 0.38, direction: 'up-right', fill: '#f97316', stroke: '#c2410c', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps: p }) => <BentArrow width={p.width} height={p.height} shaftRatio={p.shaftRatio} headRatio={p.headRatio} direction={p.direction} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
+    properties: [
+      { name: 'width',       label: 'Width',        type: 'range', min: 30, max: 400, step: 4 },
+      { name: 'height',      label: 'Height',       type: 'range', min: 30, max: 400, step: 4 },
+      { name: 'direction',   label: 'Direction',    type: 'select', options: ['up-right', 'up-left', 'down-right', 'down-left'] },
+      { name: 'shaftRatio',  label: 'Shaft Width',  type: 'range', min: 0.1, max: 0.6, step: 0.05 },
+      { name: 'headRatio',   label: 'Head Size',    type: 'range', min: 0.1, max: 0.7, step: 0.05 },
+      { name: 'fill',        label: 'Fill',         type: 'color' },
+      { name: 'stroke',      label: 'Stroke',       type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'label',       label: 'Label',        type: 'text' },
+    ],
+  },
+
+  doubleBlockArrow: {
+    id: 'doubleBlockArrow',
+    category: 'Arrows',
+    name: 'Double-Headed Block Arrow',
+    icon: <ArrowLeftRight size={18} />,
+    defaultProps: { width: 140, height: 60, shaftRatio: 0.40, headRatio: 0.28, direction: 'horizontal', fill: '#6366f1', stroke: '#3730a3', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps: p }) => <DoubleBlockArrow width={p.width} height={p.height} shaftRatio={p.shaftRatio} headRatio={p.headRatio} direction={p.direction} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
+    properties: [
+      { name: 'width',       label: 'Width',        type: 'range', min: 40, max: 400, step: 4 },
+      { name: 'height',      label: 'Height',       type: 'range', min: 20, max: 300, step: 4 },
+      { name: 'direction',   label: 'Direction',    type: 'select', options: ['horizontal', 'vertical'] },
+      { name: 'shaftRatio',  label: 'Shaft Width',  type: 'range', min: 0.1, max: 0.8, step: 0.05 },
+      { name: 'headRatio',   label: 'Head Length',  type: 'range', min: 0.05, max: 0.45, step: 0.02 },
+      { name: 'fill',        label: 'Fill',         type: 'color' },
+      { name: 'stroke',      label: 'Stroke',       type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'label',       label: 'Label',        type: 'text' },
+    ],
+  },
+
+  diagonalArrow: {
+    id: 'diagonalArrow',
+    category: 'Arrows',
+    name: 'Diagonal Arrow',
+    icon: <ArrowRight size={18} />,
+    defaultProps: { width: 120, height: 120, shaftRatio: 0.25, headRatio: 0.30, doubleHeaded: true, angle: 45, fill: '#ec4899', stroke: '#9d174d', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps: p }) => <DiagonalArrow width={p.width} height={p.height} shaftRatio={p.shaftRatio} headRatio={p.headRatio} doubleHeaded={p.doubleHeaded} angle={p.angle} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
+    properties: [
+      { name: 'width',        label: 'Size',         type: 'range', min: 30, max: 400, step: 4 },
+      { name: 'angle',        label: 'Angle',        type: 'range', min: 0, max: 359, step: 15 },
+      { name: 'doubleHeaded', label: 'Double Headed',type: 'select', options: [true, false] },
+      { name: 'shaftRatio',   label: 'Shaft Width',  type: 'range', min: 0.1, max: 0.7, step: 0.05 },
+      { name: 'headRatio',    label: 'Head Length',  type: 'range', min: 0.1, max: 0.5, step: 0.02 },
+      { name: 'fill',         label: 'Fill',         type: 'color' },
+      { name: 'stroke',       label: 'Stroke',       type: 'color' },
+      { name: 'strokeWidth',  label: 'Stroke Width', type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'label',        label: 'Label',        type: 'text' },
+    ],
   },
 
   // CATEGORY L: Logic
