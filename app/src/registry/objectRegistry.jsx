@@ -58,7 +58,11 @@ import WeighingScale from '../components/MathObjects/WeighingScale';
 import AnalogClock from '../components/MathObjects/AnalogClock';
 import DigitalClock from '../components/MathObjects/DigitalClock';
 import DepartureBoard from '../components/MathObjects/DepartureBoard';
-import { PieChart, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon, Bug, Waypoints, CornerDownRight, Spline, Code, Clock, Monitor, AlignLeft } from 'lucide-react';
+import IsometricCube from '../components/MathObjects/IsometricCube';
+import Cylinder from '../components/MathObjects/Cylinder';
+import BlockArrow from '../components/MathObjects/BlockArrow';
+import Callout from '../components/MathObjects/Callout';
+import { PieChart, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon, Bug, Waypoints, CornerDownRight, Spline, Code, Clock, Monitor, AlignLeft, Box, Database, ChevronRight } from 'lucide-react';
 
 
 const getNumeric = (val, fallback) => {
@@ -1927,6 +1931,123 @@ export const ObjectRegistry = {
       { name: 'titleColor',  label: 'Title Color',        type: 'color' },
       { name: 'label',       label: 'Caption',            type: 'text' },
     ]
+  },
+
+  isometricCube: {
+    id: 'isometricCube',
+    category: '3D & Diagram',
+    name: 'Isometric Cube',
+    icon: <Box size={18} />,
+    defaultProps: { width: 80, height: 50, depth: 50, topFill: '#60a5fa', leftFill: '#1d4ed8', rightFill: '#3b82f6', stroke: '#1e3a8a', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps }) => {
+      const { x = 0, y = 0, width, height, depth, topFill, leftFill, rightFill, stroke, strokeWidth } = shapeProps;
+      return (
+        <IsometricCube
+          width={width} height={height} depth={depth}
+          topFill={topFill} leftFill={leftFill} rightFill={rightFill}
+          stroke={stroke} strokeWidth={strokeWidth}
+        />
+      );
+    },
+    properties: [
+      { name: 'width',       label: 'Width',       type: 'range', min: 20, max: 300, step: 4 },
+      { name: 'height',      label: 'Height',      type: 'range', min: 10, max: 200, step: 4 },
+      { name: 'depth',       label: 'Depth',       type: 'range', min: 10, max: 200, step: 4 },
+      { name: 'topFill',     label: 'Top Face',    type: 'color' },
+      { name: 'leftFill',    label: 'Left Face',   type: 'color' },
+      { name: 'rightFill',   label: 'Right Face',  type: 'color' },
+      { name: 'stroke',      label: 'Stroke',      type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width',type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'label',       label: 'Label',       type: 'text' },
+    ],
+  },
+
+  cylinder: {
+    id: 'cylinder',
+    category: '3D & Diagram',
+    name: 'Cylinder',
+    icon: <Database size={18} />,
+    defaultProps: { width: 80, height: 120, fill: '#3b82f6', topFill: '#60a5fa', stroke: '#1e40af', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps }) => {
+      const { width, height, fill, topFill, stroke, strokeWidth } = shapeProps;
+      return (
+        <Cylinder
+          width={width} height={height}
+          fill={fill} topFill={topFill}
+          stroke={stroke} strokeWidth={strokeWidth}
+        />
+      );
+    },
+    properties: [
+      { name: 'width',       label: 'Width',       type: 'range', min: 20, max: 300, step: 4 },
+      { name: 'height',      label: 'Height',      type: 'range', min: 20, max: 400, step: 4 },
+      { name: 'fill',        label: 'Body Fill',   type: 'color' },
+      { name: 'topFill',     label: 'Top Fill',    type: 'color' },
+      { name: 'stroke',      label: 'Stroke',      type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width',type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'label',       label: 'Label',       type: 'text' },
+    ],
+  },
+
+  blockArrow: {
+    id: 'blockArrow',
+    category: '3D & Diagram',
+    name: 'Block Arrow',
+    icon: <ChevronRight size={18} />,
+    defaultProps: { width: 120, height: 60, direction: 'right', shaftRatio: 0.45, headRatio: 0.40, fill: '#3b82f6', stroke: '#1e40af', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps }) => {
+      const { width, height, direction, shaftRatio, headRatio, fill, stroke, strokeWidth } = shapeProps;
+      return (
+        <BlockArrow
+          width={width} height={height}
+          direction={direction} shaftRatio={shaftRatio} headRatio={headRatio}
+          fill={fill} stroke={stroke} strokeWidth={strokeWidth}
+        />
+      );
+    },
+    properties: [
+      { name: 'width',       label: 'Width',        type: 'range', min: 20, max: 400, step: 4 },
+      { name: 'height',      label: 'Height',       type: 'range', min: 10, max: 300, step: 4 },
+      { name: 'direction',   label: 'Direction',    type: 'select', options: ['right', 'left', 'up', 'down'] },
+      { name: 'shaftRatio',  label: 'Shaft Thickness', type: 'range', min: 0.1, max: 0.9, step: 0.05 },
+      { name: 'headRatio',   label: 'Head Length',  type: 'range', min: 0.1, max: 0.9, step: 0.05 },
+      { name: 'fill',        label: 'Fill',         type: 'color' },
+      { name: 'stroke',      label: 'Stroke',       type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'label',       label: 'Label',        type: 'text' },
+    ],
+  },
+
+  callout: {
+    id: 'callout',
+    category: '3D & Diagram',
+    name: 'Callout / Speech Bubble',
+    icon: <MessageSquare size={18} />,
+    defaultProps: { width: 140, height: 80, cornerRadius: 12, tailDir: 'bottom-left', tailSize: 22, fill: '#ffffff', stroke: '#334155', strokeWidth: 1.5, label: '', fontSize: 14, fontColor: '#1e293b' },
+    Component: ({ shapeProps }) => {
+      const { width, height, cornerRadius, tailDir, tailSize, fill, stroke, strokeWidth, label, fontSize, fontColor } = shapeProps;
+      return (
+        <Callout
+          width={width} height={height}
+          cornerRadius={cornerRadius} tailDir={tailDir} tailSize={tailSize}
+          fill={fill} stroke={stroke} strokeWidth={strokeWidth}
+          label={label} fontSize={fontSize} fontColor={fontColor}
+        />
+      );
+    },
+    properties: [
+      { name: 'width',        label: 'Width',        type: 'range', min: 40, max: 400, step: 4 },
+      { name: 'height',       label: 'Height',       type: 'range', min: 30, max: 300, step: 4 },
+      { name: 'cornerRadius', label: 'Corner Radius',type: 'range', min: 0,  max: 40,  step: 2 },
+      { name: 'tailDir',      label: 'Tail Direction', type: 'select', options: ['bottom-left', 'bottom-right', 'top-left', 'top-right'] },
+      { name: 'tailSize',     label: 'Tail Size',    type: 'range', min: 6, max: 50, step: 2 },
+      { name: 'fill',         label: 'Fill',         type: 'color' },
+      { name: 'stroke',       label: 'Stroke',       type: 'color' },
+      { name: 'strokeWidth',  label: 'Stroke Width', type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'label',        label: 'Label Text',   type: 'text' },
+      { name: 'fontSize',     label: 'Font Size',    type: 'range', min: 8, max: 48, step: 1 },
+      { name: 'fontColor',    label: 'Font Color',   type: 'color' },
+    ],
   },
 };
 
