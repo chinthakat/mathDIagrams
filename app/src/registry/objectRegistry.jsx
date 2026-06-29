@@ -62,7 +62,19 @@ import IsometricCube from '../components/MathObjects/IsometricCube';
 import Cylinder from '../components/MathObjects/Cylinder';
 import BlockArrow from '../components/MathObjects/BlockArrow';
 import Callout from '../components/MathObjects/Callout';
-import { PieChart, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon, Bug, Waypoints, CornerDownRight, Spline, Code, Clock, Monitor, AlignLeft, Box, Database, ChevronRight } from 'lucide-react';
+import Diamond from '../components/MathObjects/Diamond';
+import Parallelogram from '../components/MathObjects/Parallelogram';
+import Trapezoid from '../components/MathObjects/Trapezoid';
+import StarShape from '../components/MathObjects/StarShape';
+import HeartShape from '../components/MathObjects/Heart';
+import Crescent from '../components/MathObjects/Crescent';
+import LightningBolt from '../components/MathObjects/LightningBolt';
+import CrossShape from '../components/MathObjects/CrossShape';
+import CloudShape from '../components/MathObjects/CloudShape';
+import Teardrop from '../components/MathObjects/Teardrop';
+import TagLabel from '../components/MathObjects/TagLabel';
+import NoSign from '../components/MathObjects/NoSign';
+import { PieChart, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon, Bug, Waypoints, CornerDownRight, Spline, Code, Clock, Monitor, AlignLeft, Box, Database, ChevronRight, Diamond as DiamondIcon, Star, Zap, Plus, Tag, Ban } from 'lucide-react';
 
 
 const getNumeric = (val, fallback) => {
@@ -2015,6 +2027,217 @@ export const ObjectRegistry = {
       { name: 'stroke',      label: 'Stroke',       type: 'color' },
       { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 6, step: 0.5 },
       { name: 'label',       label: 'Label',        type: 'text' },
+    ],
+  },
+
+  diamond: {
+    id: 'diamond',
+    category: 'Basic Shapes',
+    name: 'Diamond',
+    icon: <DiamondIcon size={18} />,
+    defaultProps: { width: 100, height: 70, fill: '#3b82f6', stroke: '#1e40af', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps }) => <Diamond width={shapeProps.width} height={shapeProps.height} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    properties: [
+      { name: 'width', label: 'Width', type: 'range', min: 20, max: 400, step: 4 },
+      { name: 'height', label: 'Height', type: 'range', min: 20, max: 400, step: 4 },
+      { name: 'fill', label: 'Fill', type: 'color' },
+      { name: 'stroke', label: 'Stroke', type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 8, step: 0.5 },
+      { name: 'label', label: 'Label', type: 'text' },
+    ],
+  },
+
+  parallelogram: {
+    id: 'parallelogram',
+    category: 'Basic Shapes',
+    name: 'Parallelogram',
+    icon: <LayoutGrid size={18} />,
+    defaultProps: { width: 120, height: 60, skew: 0.25, fill: '#8b5cf6', stroke: '#5b21b6', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps }) => <Parallelogram width={shapeProps.width} height={shapeProps.height} skew={shapeProps.skew} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    properties: [
+      { name: 'width', label: 'Width', type: 'range', min: 20, max: 400, step: 4 },
+      { name: 'height', label: 'Height', type: 'range', min: 20, max: 300, step: 4 },
+      { name: 'skew', label: 'Skew', type: 'range', min: -0.45, max: 0.45, step: 0.05 },
+      { name: 'fill', label: 'Fill', type: 'color' },
+      { name: 'stroke', label: 'Stroke', type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 8, step: 0.5 },
+      { name: 'label', label: 'Label', type: 'text' },
+    ],
+  },
+
+  trapezoid: {
+    id: 'trapezoid',
+    category: 'Basic Shapes',
+    name: 'Trapezoid',
+    icon: <SquareSplitHorizontal size={18} />,
+    defaultProps: { width: 120, height: 60, topRatio: 0.55, fill: '#10b981', stroke: '#065f46', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps }) => <Trapezoid width={shapeProps.width} height={shapeProps.height} topRatio={shapeProps.topRatio} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    properties: [
+      { name: 'width', label: 'Width', type: 'range', min: 20, max: 400, step: 4 },
+      { name: 'height', label: 'Height', type: 'range', min: 20, max: 300, step: 4 },
+      { name: 'topRatio', label: 'Top Width', type: 'range', min: 0.05, max: 0.98, step: 0.05 },
+      { name: 'fill', label: 'Fill', type: 'color' },
+      { name: 'stroke', label: 'Stroke', type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 8, step: 0.5 },
+      { name: 'label', label: 'Label', type: 'text' },
+    ],
+  },
+
+  starShape: {
+    id: 'starShape',
+    category: 'Basic Shapes',
+    name: 'Star',
+    icon: <Star size={18} />,
+    defaultProps: { width: 80, height: 80, numPoints: 5, innerRatio: 0.45, fill: '#f59e0b', stroke: '#b45309', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps }) => <StarShape width={shapeProps.width} height={shapeProps.height} numPoints={shapeProps.numPoints} innerRatio={shapeProps.innerRatio} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    properties: [
+      { name: 'width', label: 'Size', type: 'range', min: 20, max: 300, step: 4 },
+      { name: 'numPoints', label: 'Points', type: 'range', min: 3, max: 12, step: 1 },
+      { name: 'innerRatio', label: 'Inner Radius', type: 'range', min: 0.1, max: 0.95, step: 0.05 },
+      { name: 'fill', label: 'Fill', type: 'color' },
+      { name: 'stroke', label: 'Stroke', type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 8, step: 0.5 },
+      { name: 'label', label: 'Label', type: 'text' },
+    ],
+  },
+
+  heart: {
+    id: 'heart',
+    category: 'Basic Shapes',
+    name: 'Heart',
+    icon: <Heart size={18} />,
+    defaultProps: { width: 90, height: 80, fill: '#ef4444', stroke: '#b91c1c', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps }) => <HeartShape width={shapeProps.width} height={shapeProps.height} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    properties: [
+      { name: 'width', label: 'Width', type: 'range', min: 20, max: 400, step: 4 },
+      { name: 'height', label: 'Height', type: 'range', min: 20, max: 400, step: 4 },
+      { name: 'fill', label: 'Fill', type: 'color' },
+      { name: 'stroke', label: 'Stroke', type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 8, step: 0.5 },
+      { name: 'label', label: 'Label', type: 'text' },
+    ],
+  },
+
+  crescent: {
+    id: 'crescent',
+    category: 'Basic Shapes',
+    name: 'Crescent Moon',
+    icon: <Star size={18} />,
+    defaultProps: { width: 70, height: 80, offsetRatio: 0.35, fill: '#fbbf24', stroke: '#92400e', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps }) => <Crescent width={shapeProps.width} height={shapeProps.height} offsetRatio={shapeProps.offsetRatio} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    properties: [
+      { name: 'width', label: 'Width', type: 'range', min: 20, max: 300, step: 4 },
+      { name: 'height', label: 'Height', type: 'range', min: 20, max: 300, step: 4 },
+      { name: 'offsetRatio', label: 'Crescent Width', type: 'range', min: 0.1, max: 0.8, step: 0.05 },
+      { name: 'fill', label: 'Fill', type: 'color' },
+      { name: 'stroke', label: 'Stroke', type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 8, step: 0.5 },
+      { name: 'label', label: 'Label', type: 'text' },
+    ],
+  },
+
+  lightningBolt: {
+    id: 'lightningBolt',
+    category: 'Basic Shapes',
+    name: 'Lightning Bolt',
+    icon: <Zap size={18} />,
+    defaultProps: { width: 60, height: 100, fill: '#fbbf24', stroke: '#92400e', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps }) => <LightningBolt width={shapeProps.width} height={shapeProps.height} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    properties: [
+      { name: 'width', label: 'Width', type: 'range', min: 20, max: 300, step: 4 },
+      { name: 'height', label: 'Height', type: 'range', min: 20, max: 400, step: 4 },
+      { name: 'fill', label: 'Fill', type: 'color' },
+      { name: 'stroke', label: 'Stroke', type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 8, step: 0.5 },
+      { name: 'label', label: 'Label', type: 'text' },
+    ],
+  },
+
+  crossShape: {
+    id: 'crossShape',
+    category: 'Basic Shapes',
+    name: 'Cross / Plus',
+    icon: <Plus size={18} />,
+    defaultProps: { width: 80, height: 80, armRatio: 0.38, fill: '#ef4444', stroke: '#b91c1c', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps }) => <CrossShape width={shapeProps.width} height={shapeProps.height} armRatio={shapeProps.armRatio} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    properties: [
+      { name: 'width', label: 'Width', type: 'range', min: 20, max: 400, step: 4 },
+      { name: 'height', label: 'Height', type: 'range', min: 20, max: 400, step: 4 },
+      { name: 'armRatio', label: 'Arm Thickness', type: 'range', min: 0.1, max: 0.48, step: 0.02 },
+      { name: 'fill', label: 'Fill', type: 'color' },
+      { name: 'stroke', label: 'Stroke', type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 8, step: 0.5 },
+      { name: 'label', label: 'Label', type: 'text' },
+    ],
+  },
+
+  cloudShape: {
+    id: 'cloudShape',
+    category: 'Basic Shapes',
+    name: 'Cloud',
+    icon: <Cloud size={18} />,
+    defaultProps: { width: 120, height: 80, fill: '#e2e8f0', stroke: '#94a3b8', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps }) => <CloudShape width={shapeProps.width} height={shapeProps.height} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    properties: [
+      { name: 'width', label: 'Width', type: 'range', min: 40, max: 400, step: 4 },
+      { name: 'height', label: 'Height', type: 'range', min: 30, max: 300, step: 4 },
+      { name: 'fill', label: 'Fill', type: 'color' },
+      { name: 'stroke', label: 'Stroke', type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 8, step: 0.5 },
+      { name: 'label', label: 'Label', type: 'text' },
+    ],
+  },
+
+  teardrop: {
+    id: 'teardrop',
+    category: 'Basic Shapes',
+    name: 'Teardrop',
+    icon: <Droplets size={18} />,
+    defaultProps: { width: 60, height: 90, fill: '#3b82f6', stroke: '#1e40af', strokeWidth: 1.5, label: '' },
+    Component: ({ shapeProps }) => <Teardrop width={shapeProps.width} height={shapeProps.height} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    properties: [
+      { name: 'width', label: 'Width', type: 'range', min: 10, max: 300, step: 4 },
+      { name: 'height', label: 'Height', type: 'range', min: 20, max: 400, step: 4 },
+      { name: 'fill', label: 'Fill', type: 'color' },
+      { name: 'stroke', label: 'Stroke', type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 8, step: 0.5 },
+      { name: 'label', label: 'Label', type: 'text' },
+    ],
+  },
+
+  tagLabel: {
+    id: 'tagLabel',
+    category: 'Text & Annotation',
+    name: 'Tag / Label',
+    icon: <Tag size={18} />,
+    defaultProps: { width: 110, height: 50, cornerRadius: 6, fill: '#fef3c7', stroke: '#d97706', strokeWidth: 1.5, label: 'Label', fontSize: 13, fontColor: '#92400e' },
+    Component: ({ shapeProps }) => <TagLabel width={shapeProps.width} height={shapeProps.height} cornerRadius={shapeProps.cornerRadius} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} label={shapeProps.label} fontSize={shapeProps.fontSize} fontColor={shapeProps.fontColor} />,
+    properties: [
+      { name: 'width', label: 'Width', type: 'range', min: 40, max: 400, step: 4 },
+      { name: 'height', label: 'Height', type: 'range', min: 20, max: 200, step: 4 },
+      { name: 'cornerRadius', label: 'Corner Radius', type: 'range', min: 0, max: 30, step: 2 },
+      { name: 'fill', label: 'Fill', type: 'color' },
+      { name: 'stroke', label: 'Stroke', type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 0, max: 8, step: 0.5 },
+      { name: 'label', label: 'Label Text', type: 'text' },
+      { name: 'fontSize', label: 'Font Size', type: 'range', min: 8, max: 48, step: 1 },
+      { name: 'fontColor', label: 'Font Color', type: 'color' },
+    ],
+  },
+
+  noSign: {
+    id: 'noSign',
+    category: 'Basic Shapes',
+    name: 'No / Prohibited',
+    icon: <Ban size={18} />,
+    defaultProps: { width: 80, height: 80, fill: '#fee2e2', stroke: '#ef4444', strokeWidth: 3, label: '' },
+    Component: ({ shapeProps }) => <NoSign width={shapeProps.width} height={shapeProps.height} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    properties: [
+      { name: 'width', label: 'Size', type: 'range', min: 20, max: 400, step: 4 },
+      { name: 'fill', label: 'Fill', type: 'color' },
+      { name: 'stroke', label: 'Stroke', type: 'color' },
+      { name: 'strokeWidth', label: 'Stroke Width', type: 'range', min: 1, max: 12, step: 0.5 },
+      { name: 'label', label: 'Label', type: 'text' },
     ],
   },
 
