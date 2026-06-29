@@ -38,9 +38,9 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
   const [loadedQuizData, setLoadedQuizData] = useState(null);
 
   // MCQ question state
-  const [currentQuestion, setCurrentQuestion] = useState(null);
   const [isRegeneratingQuestion, setIsRegeneratingQuestion] = useState(false);
-  
+
+
   // Tab Management State
   const [documents, setDocuments] = useState(() => {
     const saved = localStorage.getItem('mathDiagramsDocs');
@@ -105,6 +105,19 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
   const renameDoc = (id, newName) => {
     setDocuments(documents.map(d => d.id === id ? { ...d, name: newName } : d));
   };
+
+  const handleQuestionGenerated = useCallback((questionData) => {
+    setDocuments(prevDocs => prevDocs.map(doc => {
+      if (doc.id === activeDocId) {
+        return {
+          ...doc,
+          question: questionData,
+          questionDismissed: false
+        };
+      }
+      return doc;
+    }));
+  }, [activeDocId]);
 
   // Helper to update active document shapes
   const setActiveShapes = useCallback((newShapes, is3D = false, skipHistory = false) => {
@@ -347,8 +360,8 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
   const handleSaveToLibrary = async () => {
     try {
       const payload = is2D 
-        ? { shapes: activeDoc.shapes2D }
-        : { shapes: activeDoc.shapes3D };
+        ? { shapes: activeDoc.shapes2D, question: activeDoc.question || null }
+        : { shapes: activeDoc.shapes3D, question: activeDoc.question || null };
         
       let category = '2D_GEOMETRY';
       if (mode === 'Map') category = '2D_MAP';
@@ -394,14 +407,19 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
   useEffect(() => {
     if (globalLoadedData) {
       if (globalLoadedData.category === '2D_GEOMETRY' || globalLoadedData.category === 'EQUATIONS') {
-        setActiveShapes(globalLoadedData.payload.shapes, false);
+        setDocuments(prevDocs => prevDocs.map(d => d.id === activeDocId ? {
+          ...d,
+          shapes2D: globalLoadedData.payload.shapes || [],
+          question: globalLoadedData.payload.question || null,
+          questionDismissed: false
+        } : d));
       } else if (globalLoadedData.category === '3D_ELEVATIONS' || globalLoadedData.category === '3D_NET_QUIZ') {
         setLoadedQuizData(globalLoadedData);
         setIs3DQuestionGeneratorOpen(true);
       }
       setGlobalLoadedData(null);
     }
-  }, [globalLoadedData, setActiveShapes, setGlobalLoadedData]);
+  }, [globalLoadedData, activeDocId, setGlobalLoadedData]);
 
   return (
     <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', background: '#0f172a', color: '#f8fafc', overflow: 'hidden' }}>
@@ -450,6 +468,33 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
               style={{ padding: '6px 12px', fontSize: '12px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', border: 'none', display: 'flex', alignItems: 'center', gap: '6px', color: 'white', fontWeight: '600' }}
             >
               <Scan size={14} /> Clone from Image
+            </button>
+          )}
+          {activeDoc.question && (
+            <button
+              className="btn"
+              onClick={() => {
+                setDocuments(prevDocs => prevDocs.map(d => d.id === activeDocId ? {
+                  ...d,
+                  questionDismissed: !d.questionDismissed
+                } : d));
+              }}
+              style={{
+                padding: '6px 12px',
+                fontSize: '12px',
+                background: activeDoc.questionDismissed ? 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)' : '#1e293b',
+                border: activeDoc.questionDismissed ? 'none' : '1px solid #475569',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: activeDoc.questionDismissed ? 'white' : '#cbd5e1',
+                fontWeight: '600',
+                borderRadius: '6px',
+                cursor: 'pointer'
+              }}
+            >
+              <Sparkles size={14} />
+              {activeDoc.questionDismissed ? 'View Question' : 'Hide Question'}
             </button>
           )}
           <div style={{ width: '1px', background: '#334155', margin: '0 4px' }} />
@@ -503,12 +548,19 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
               />
             )}
           </div>
-          <QuestionPanel
-            question={currentQuestion}
-            onDismiss={() => setCurrentQuestion(null)}
-            isRegenerating={isRegeneratingQuestion}
-            onRegenerate={() => {}}
-          />
+          {activeDoc.question && !activeDoc.questionDismissed && (
+            <QuestionPanel
+              question={activeDoc.question}
+              onDismiss={() => {
+                setDocuments(prevDocs => prevDocs.map(d => d.id === activeDocId ? {
+                  ...d,
+                  questionDismissed: true
+                } : d));
+              }}
+              isRegenerating={isRegeneratingQuestion}
+              onRegenerate={() => {}}
+            />
+          )}
       </div>
 
       <PropertiesPanel 
@@ -536,13 +588,13 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
         isOpen={isAIGeneratorOpen}
         onClose={() => setIsAIGeneratorOpen(false)}
         onGenerate={handleAIGenerate}
-        onQuestionGenerated={setCurrentQuestion}
+        onQuestionGenerated={handleQuestionGenerated}
       />
       <SampleImageModal
         isOpen={isSampleImageOpen}
         onClose={() => setIsSampleImageOpen(false)}
         onGenerate={handleAIGenerate}
-        onQuestionGenerated={setCurrentQuestion}
+        onQuestionGenerated={handleQuestionGenerated}
       />
       <DiagramWizardModal
         isOpen={isWizardOpen}
@@ -554,7 +606,7 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
           }));
           setActiveShapes([...shapes2D, ...newShapes]);
         }}
-        onQuestionGenerated={setCurrentQuestion}
+        onQuestionGenerated={handleQuestionGenerated}
       />
       {is3DQuestionGeneratorOpen && (
         <ThreeDQuestionGenerator 

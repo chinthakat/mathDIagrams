@@ -73,8 +73,9 @@ function ProgressEntry({ entry }) {
     validating:       <Loader size={11} className="spin" style={{ color: '#fbbf24', flexShrink: 0 }} />,
     validated:        entry.validation?.isCorrect ? <CheckCircle size={11} color="#34d399" style={{ flexShrink: 0 }} /> : <XCircle size={11} color="#f87171" style={{ flexShrink: 0 }} />,
     retry:            <RotateCcw size={11} color="#f59e0b" style={{ flexShrink: 0 }} />,
-    error:            <XCircle size={11} color="#f87171" style={{ flexShrink: 0 }} />,
-    attempt_error:    <XCircle size={11} color="#f87171" style={{ flexShrink: 0 }} />,
+    error:             <XCircle size={11} color="#f87171" style={{ flexShrink: 0 }} />,
+    attempt_error:     <XCircle size={11} color="#f87171" style={{ flexShrink: 0 }} />,
+    missing_components:<XCircle size={11} color="#f59e0b" style={{ flexShrink: 0 }} />,
   }[entry.stage] || <ChevronRight size={11} color="#475569" style={{ flexShrink: 0 }} />;
 
   const text = {
@@ -91,7 +92,8 @@ function ProgressEntry({ entry }) {
       : `Attempt ${entry.attempt} — ✗ ${entry.validation?.feedback?.slice(0, 60) || 'FAILED'}`,
     retry:             `Attempt ${entry.attempt} — retrying…`,
     error:             `⚠ ${entry.message || 'Error'}`,
-    attempt_error:     `⚠ Attempt ${entry.attempt}: ${entry.message || 'error'}`,
+    attempt_error:      `⚠ Attempt ${entry.attempt}: ${entry.message || 'error'}`,
+    missing_components: `⚠ Missing components: ${(entry.missingComponents || []).map(m => m.type).join(', ')}`,
   }[entry.stage] || entry.stage;
 
   return (
@@ -147,6 +149,7 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
   // ── Pipeline state ─────────────────────────────────────────────────────────
   const [running, setRunning]     = useState(false);
   const [progressLog, setProgressLog] = useState([]);
+  const [missingComponents, setMissingComponents] = useState([]);
 
   // ── Save state ─────────────────────────────────────────────────────────────
   const [saving, setSaving]       = useState(false);
@@ -201,6 +204,7 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
 
     setRunning(true);
     setProgressLog([]);
+    setMissingComponents([]);
     setSaved(false);
 
     // Build combined feedback: user text + selected fields context
@@ -230,6 +234,7 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
           maxRetries: 3,
         });
         if (outcome.shapes?.length) setShapes(outcome.shapes);
+        if (outcome.missingComponents?.length) setMissingComponents(outcome.missingComponents);
       }
 
       // Text field fixes via Claude/Gemini (simple prompt)
@@ -502,6 +507,22 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
                 Select what to fix, add feedback,<br />then click "Run AI".
               </div>
             ) : progressLog.map((e, i) => <ProgressEntry key={i} entry={e} />)}
+            {missingComponents.length > 0 && (
+              <div style={{ marginTop: '10px', background: 'rgba(245,158,11,0.1)', border: '1px solid #f59e0b', borderRadius: '6px', padding: '8px 10px', fontSize: '11px', color: '#fcd34d' }}>
+                <strong style={{ display: 'block', marginBottom: '4px' }}>⚠ Missing Components</strong>
+                <span style={{ color: '#94a3b8', fontSize: '10px', display: 'block', marginBottom: '4px' }}>
+                  These types were requested but don't exist in the component library:
+                </span>
+                {missingComponents.map((m, i) => {
+                  const type = typeof m === 'string' ? m : m.type;
+                  const comment = typeof m === 'object' && m.comment ? ` — ${m.comment}` : '';
+                  return <div key={i} style={{ fontFamily: 'monospace', fontSize: '11px', color: '#f59e0b' }}>• {type}<span style={{ color: '#94a3b8', fontFamily: 'inherit' }}>{comment}</span></div>;
+                })}
+                <span style={{ color: '#64748b', fontSize: '10px', display: 'block', marginTop: '4px' }}>
+                  Add these to the object registry to use them.
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>

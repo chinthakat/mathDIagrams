@@ -14,6 +14,7 @@ export const GEMINI_IMAGE_MODELS = [
 ];
 
 export const GEMINI_VISION_MODELS = [
+  { id: 'gemini-3.5-flash',         label: 'Gemini 3.5 Flash' },
   { id: 'gemini-3-flash-preview',   label: 'Gemini 3 Flash' },
   { id: 'gemini-2.0-flash',         label: 'Gemini 2.0 Flash' },
   { id: 'gemini-1.5-flash',         label: 'Gemini 1.5 Flash' },
@@ -154,3 +155,126 @@ Respond with ONLY valid JSON — no markdown, no preamble:
 
   return JSON.parse(text);
 }
+
+// ── Generic REST caller for Gemini ──────────────────────────────────────────
+
+async function fetchImageBase64(url) {
+  try {
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const mimeType = blob.type || 'image/jpeg';
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve({ base64: reader.result.split(',')[1], mimeType });
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+export async function callGemini({ systemInstruction, contents, model = 'gemini-2.0-flash', apiKey, responseMimeType = 'application/json' }) {
+  const url = `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`;
+  const body = {
+    contents,
+    generationConfig: {
+      temperature: 0.2,
+    }
+  };
+
+  if (responseMimeType) {
+    body.generationConfig.responseMimeType = responseMimeType;
+  }
+
+  if (systemInstruction) {
+    body.systemInstruction = {
+      parts: [{ text: systemInstruction }]
+    };
+  }
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Gemini API error: ${resp.status}`);
+  }
+
+  const data = await resp.json();
+  let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  
+  if (responseMimeType === 'application/json') {
+    // Strip markdown fences if present
+    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (fenced) text = fenced[1];
+    const objStart = text.indexOf('{');
+    const arrStart = text.indexOf('[');
+    const start = objStart === -1 ? arrStart : arrStart === -1 ? objStart : Math.min(objStart, arrStart);
+    if (start !== -1) text = text.slice(start);
+  }
+  
+  return text.trim();
+}
+
+/**
+ * Analyze existing diagram with Gemini vision.
+ */
+export async function analyzeQuestionImageWithGemini({ imageUrl, questionText, systemPrompt, apiKey, model = 'gemini-2.0-flash' }) {
+  const parts = [];
+  
+  if (imageUrl.startsWith('data:')) {
+    const b64 = imageUrl.split(',')[1];
+    const mt = imageUrl.match(/data:(image\/\w+)/)?.[1] || 'image/png';
+    parts.push({ inlineData: { mimeType: mt, data: b64 } });
+  } else {
+    const fetched = await fetchImageBase64(imageUrl);
+    if (fetched) {
+      parts.push({ inlineData: { mimeType: fetched.mimeType, data: fetched.base64 } });
+    } else {
+      parts.push({ text: `Original Image URL: ${imageUrl} (could not fetch as base64)` });
+    }
+  }
+
+  parts.push({ text: `Question context: ${questionText || 'No question text provided.'}\n\nAnalyse this diagram and return the JSON classification.` });
+
+  const messages = [{
+    role: 'user',
+    parts
+  }];
+
+  const resText = await callGemini({
+    systemInstruction: systemPrompt,
+    contents: messages,
+    model,
+    apiKey,
+    responseMimeType: 'application/json'
+  });
+
+  return JSON.parse(resText);
+}
+
+/**
+ * Generate MathsDiagram shapes via Gemini.
+ */
+export async function generateRepairShapesWithGemini({ prompt, systemPrompt, apiKey, model = 'gemini-2.0-flash' }) {
+  const messages = [{
+    role: 'user',
+    parts: [{ text: prompt }]
+  }];
+
+  const resText = await callGemini({
+    systemInstruction: systemPrompt,
+    contents: messages,
+    model,
+    apiKey,
+    responseMimeType: 'application/json'
+  });
+
+  return JSON.parse(resText);
+}
+

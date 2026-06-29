@@ -16,7 +16,7 @@ const GRID_SIZE = 20;
 // Types rendered with endpoint handles instead of a Transformer box
 const ENDPOINT_EDITABLE = new Set([
   'connectorArrow', 'orthoConnector', 'dottedLineArrow', 'elbowArrow', 'bezierArrow',
-  'dashedConnector', 'doubleHeadedConnector', 'thickArrow', 'annotationArrow',
+  'dashedConnector', 'doubleHeadedConnector', 'thickArrow', 'annotationArrow', 'customPolygon',
 ]);
 // All connector types — rendered natively (no ShapeElement Group)
 const CONNECTOR_TYPES = new Set([
@@ -164,12 +164,70 @@ const ShapeElement = ({
     onTransformEnd,
   };
 
+  const renderPolygonHandles = () => {
+    if (!isSelected || shapeProps.type !== 'customPolygon' || drawMode !== 'select') return null;
+    const pts = Array.isArray(shapeProps.points) ? shapeProps.points : [];
+    const handles = [];
+    const numPoints = Math.floor(pts.length / 2);
+    for (let i = 0; i < numPoints; i++) {
+      const vx = pts[i * 2];
+      const vy = pts[i * 2 + 1];
+      handles.push(
+        <Circle
+          key={`vertex-${shapeProps.id}-${i}`}
+          x={vx}
+          y={vy}
+          radius={6}
+          fill="#ffffff"
+          stroke="#3b82f6"
+          strokeWidth={2}
+          draggable
+          onDragStart={e => {
+            e.cancelBubble = true; // Stop dragging the main group
+          }}
+          onDragMove={e => {
+            e.cancelBubble = true; // Stop dragging the main group
+            let px = e.target.x();
+            let py = e.target.y();
+            if (snapToGrid) {
+              px = Math.round(px / GRID_SIZE) * GRID_SIZE;
+              py = Math.round(py / GRID_SIZE) * GRID_SIZE;
+              e.target.x(px);
+              e.target.y(py);
+            }
+            // Update points list live
+            const nextPts = [...pts];
+            nextPts[i * 2] = px;
+            nextPts[i * 2 + 1] = py;
+            onChange({ ...shapeProps, points: nextPts }, true); // skip log/history intermediate updates
+          }}
+          onDragEnd={e => {
+            e.cancelBubble = true; // Stop dragging the main group
+            let px = e.target.x();
+            let py = e.target.y();
+            if (snapToGrid) {
+              px = Math.round(px / GRID_SIZE) * GRID_SIZE;
+              py = Math.round(py / GRID_SIZE) * GRID_SIZE;
+            }
+            const nextPts = [...pts];
+            nextPts[i * 2] = px;
+            nextPts[i * 2 + 1] = py;
+            onChange({ ...shapeProps, points: nextPts }); // commit final change
+            onDragEndCb?.();
+          }}
+        />
+      );
+    }
+    return handles;
+  };
+
   const ComponentToRender = ObjectRegistry[shapeProps.type]?.Component;
 
   return (
     <React.Fragment>
       <Group {...commonProps}>
         {ComponentToRender && <ComponentToRender props={shapeProps} />}
+        {renderPolygonHandles()}
       </Group>
       {isSelected && !ENDPOINT_EDITABLE.has(shapeProps.type) && (
         <Transformer ref={trRef} boundBoxFunc={(o, n) => (n.width < 5 || n.height < 5 ? o : n)} />
@@ -218,6 +276,7 @@ export default function CanvasEditor2D({
   stageRef, showGrid = true, theme = 'dark',
   mapTheme: externalMapTheme, setMapTheme: externalSetMapTheme,
   hideLocalControls = false,
+  cropMode = false, cropBox, setCropBox,
 }) {
   const containerRef = useRef(null);
   const [dimensions, setDimensions]   = useState({ width: 800, height: 600 });
@@ -261,6 +320,18 @@ export default function CanvasEditor2D({
     return () => ro.disconnect();
   }, []);
 
+  // Crop mode references
+  const cropRectRef = useRef();
+  const cropTransformerRef = useRef();
+
+  useEffect(() => {
+    if (cropMode && cropTransformerRef.current && cropRectRef.current) {
+      cropTransformerRef.current.nodes([cropRectRef.current]);
+      cropTransformerRef.current.getLayer().batchDraw();
+    }
+  }, [cropMode]);
+
+
   // ── Stage helpers ────────────────────────────────────────────────────────────
   const handleWheel = e => {
     e.evt.preventDefault();
@@ -298,6 +369,76 @@ export default function CanvasEditor2D({
     if (i <= 0) return prev;
     const a = [...prev]; [a[i-1], a[i]] = [a[i], a[i-1]]; return a;
   });
+
+  // ── Keyboard Shortcuts (Copy, Paste, Delete) ───────────────────────────────
+  const clipboardRef = useRef(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
+        return;
+      }
+
+      const isMod = e.ctrlKey || e.metaKey;
+
+      // Copy
+      if (isMod && e.key.toLowerCase() === 'c') {
+        if (selectedId) {
+          const shapeToCopy = shapes.find(s => s.id === selectedId);
+          if (shapeToCopy) {
+            clipboardRef.current = shapeToCopy;
+            e.preventDefault();
+          }
+        }
+      }
+
+      // Paste
+      if (isMod && e.key.toLowerCase() === 'v') {
+        if (clipboardRef.current) {
+          const base = clipboardRef.current;
+          const newId = `${base.type}-${Date.now()}`;
+          
+          let posProps = {};
+          if (base.x1 !== undefined && base.y1 !== undefined) {
+            posProps = {
+              x1: base.x1 + 30, y1: base.y1 + 30,
+              x2: base.x2 !== undefined ? base.x2 + 30 : base.x1 + 180,
+              y2: base.y2 !== undefined ? base.y2 + 30 : base.y1 + 30
+            };
+          } else {
+            const currentX = base.x !== undefined ? base.x : 0;
+            const currentY = base.y !== undefined ? base.y : 0;
+            posProps = { x: currentX + 30, y: currentY + 30 };
+          }
+          
+          const pastedShape = {
+            ...base,
+            ...posProps,
+            id: newId,
+          };
+          
+          setShapes(prev => [...prev, pastedShape]);
+          setSelectedId(newId);
+          clipboardRef.current = pastedShape; // cascade repeated pastes
+          e.preventDefault();
+        }
+      }
+
+      // Delete
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedId) {
+          deleteShape(selectedId);
+          e.preventDefault();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedId, shapes, setShapes, deleteShape]);
 
   const stampShape = (type, overrideProps = {}) => {
     const cx = -stageConfig.x / stageConfig.scale + dimensions.width  / 2 / stageConfig.scale;
@@ -975,6 +1116,45 @@ export default function CanvasEditor2D({
           {/* ── Pivot handles for selected orthoConnector ── */}
           {makePivotHandles()}
         </Layer>
+        {cropMode && (
+          <Layer>
+            <Rect
+              ref={cropRectRef}
+              x={cropBox?.x ?? 50}
+              y={cropBox?.y ?? 50}
+              width={cropBox?.width ?? 700}
+              height={cropBox?.height ?? 500}
+              stroke="#3b82f6"
+              strokeWidth={2.5}
+              dash={[6, 4]}
+              draggable
+              onDragEnd={e => {
+                setCropBox(prev => ({ ...prev, x: e.target.x(), y: e.target.y() }));
+              }}
+              onTransformEnd={e => {
+                const node = e.target;
+                setCropBox({
+                  x: node.x(),
+                  y: node.y(),
+                  width: node.width() * node.scaleX(),
+                  height: node.height() * node.scaleY(),
+                });
+                node.scaleX(1);
+                node.scaleY(1);
+              }}
+            />
+            <Transformer
+              ref={cropTransformerRef}
+              rotateEnabled={false}
+              borderDash={[3, 3]}
+              keepRatio={false}
+              boundBoxFunc={(oldBox, newBox) => {
+                if (newBox.width < 40 || newBox.height < 40) return oldBox;
+                return newBox;
+              }}
+            />
+          </Layer>
+        )}
       </Stage>
     </div>
   );

@@ -53,7 +53,13 @@ import RasterImage from '../components/MathObjects/RasterImage';
 import DottedLineArrow from '../components/MathObjects/DottedLineArrow';
 import ElbowArrow from '../components/MathObjects/ElbowArrow';
 import BezierArrow from '../components/MathObjects/BezierArrow';
-import { PieChart, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon, Bug, Waypoints, CornerDownRight, Spline, Code } from 'lucide-react';
+import Robot from '../components/MathObjects/Robot';
+import WeighingScale from '../components/MathObjects/WeighingScale';
+import AnalogClock from '../components/MathObjects/AnalogClock';
+import DigitalClock from '../components/MathObjects/DigitalClock';
+import DepartureBoard from '../components/MathObjects/DepartureBoard';
+import { PieChart, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon, Bug, Waypoints, CornerDownRight, Spline, Code, Clock, Monitor, AlignLeft } from 'lucide-react';
+
 
 const getNumeric = (val, fallback) => {
   if (val === null || val === undefined) return fallback;
@@ -81,6 +87,58 @@ const FONT_PRESETS = [
 
 // Registry of all 2D mathematical objects
 export const ObjectRegistry = {
+  robot: {
+    id: 'robot',
+    category: 'Geometry',
+    name: 'Robot',
+    icon: <Bug size={18} />,
+    defaultProps: { width: 80, height: 120, label: 'A', fill: '#ffffff', stroke: '#000000', strokeWidth: 2, rotation: 0 },
+    Component: ({ props }) => (
+      <Robot
+        width={props.width}
+        height={props.height}
+        label={props.label}
+        fill={props.fill}
+        stroke={props.stroke}
+        strokeWidth={props.strokeWidth}
+      />
+    ),
+    properties: [
+      { name: 'width', label: 'Width', type: 'number' },
+      { name: 'height', label: 'Height', type: 'number' },
+      { name: 'label', label: 'Label (A/B)', type: 'text' },
+      { name: 'fill', label: 'Fill Color', type: 'color' },
+      { name: 'stroke', label: 'Border Color', type: 'color' },
+      { name: 'strokeWidth', label: 'Border Width', type: 'range', min: 1, max: 8 },
+    ]
+  },
+
+  weighingScale: {
+    id: 'weighingScale',
+    category: 'Geometry',
+    name: 'Weighing Scale',
+    icon: <Scaling size={18} />,
+    defaultProps: { width: 160, height: 80, weightText: '85 kg', fill: '#ffffff', stroke: '#000000', strokeWidth: 2, rotation: 0 },
+    Component: ({ props }) => (
+      <WeighingScale
+        width={props.width}
+        height={props.height}
+        weightText={props.weightText}
+        fill={props.fill}
+        stroke={props.stroke}
+        strokeWidth={props.strokeWidth}
+      />
+    ),
+    properties: [
+      { name: 'width', label: 'Width', type: 'number' },
+      { name: 'height', label: 'Height', type: 'number' },
+      { name: 'weightText', label: 'Weight Text', type: 'text' },
+      { name: 'fill', label: 'Fill Color', type: 'color' },
+      { name: 'stroke', label: 'Border Color', type: 'color' },
+      { name: 'strokeWidth', label: 'Border Width', type: 'range', min: 1, max: 8 },
+    ]
+  },
+
   roadJunction: {
     id: 'roadJunction',
     category: 'Roads & Paths',
@@ -1782,6 +1840,92 @@ export const ObjectRegistry = {
       { name: 'dash', label: 'Dashed', type: 'checkbox' },
       { name: 'dashSize', label: 'Dash Size', type: 'range', min: 2, max: 20 },
       { name: 'gapSize', label: 'Gap Size', type: 'range', min: 2, max: 20 },
+    ]
+  },
+
+  analogClock: {
+    id: 'analogClock',
+    category: 'Clocks & Time',
+    name: 'Analogue Clock',
+    icon: <Clock size={18} />,
+    defaultProps: {
+      radius: 70, hours: 10, minutes: 10, seconds: 0,
+      showSeconds: false, showNumbers: true, showTicks: true,
+      faceColor: '#ffffff', rimColor: '#1e293b', handColor: '#1e293b',
+      secondColor: '#ef4444', label: '', rimWidth: 4, style: 'classic',
+    },
+    Component: ({ props }) => <AnalogClock props={props} />,
+    properties: [
+      { name: 'hours',    label: 'Hours (0–11)',   type: 'range', min: 0, max: 11, step: 1 },
+      { name: 'minutes',  label: 'Minutes (0–59)', type: 'range', min: 0, max: 59, step: 1 },
+      { name: 'seconds',  label: 'Seconds (0–59)', type: 'range', min: 0, max: 59, step: 1 },
+      { name: 'radius',   label: 'Radius',         type: 'range', min: 30, max: 150, step: 5 },
+      { name: 'rimWidth', label: 'Rim Thickness',  type: 'range', min: 2, max: 14, step: 1 },
+      { name: 'style',    label: 'Face Style',     type: 'select', options: [
+        { value: 'classic', label: 'Classic' },
+        { value: 'minimal', label: 'Minimal' },
+        { value: 'roman',   label: 'Roman Numerals' },
+      ]},
+      { name: 'showNumbers', label: 'Show Numbers',     type: 'checkbox' },
+      { name: 'showTicks',   label: 'Show Tick Marks',  type: 'checkbox' },
+      { name: 'showSeconds', label: 'Show Second Hand', type: 'checkbox' },
+      { name: 'faceColor',   label: 'Face Color',       type: 'color' },
+      { name: 'rimColor',    label: 'Rim & Hand Color', type: 'color' },
+      { name: 'secondColor', label: 'Second Hand Color',type: 'color' },
+      { name: 'label',       label: 'Label',            type: 'text' },
+    ]
+  },
+
+  digitalClock: {
+    id: 'digitalClock',
+    category: 'Clocks & Time',
+    name: 'Digital Clock',
+    icon: <Monitor size={18} />,
+    defaultProps: {
+      timeText: '10:10 AM', width: 160, height: 80,
+      style: 'lcd', bgColor: '', textColor: '', borderColor: '#1e293b',
+      label: '', borderWidth: 3,
+    },
+    Component: ({ props }) => <DigitalClock props={props} />,
+    properties: [
+      { name: 'timeText',    label: 'Time Display',   type: 'text' },
+      { name: 'width',       label: 'Width',          type: 'range', min: 80, max: 320, step: 8 },
+      { name: 'height',      label: 'Height',         type: 'range', min: 40, max: 160, step: 4 },
+      { name: 'style',       label: 'Clock Style',    type: 'select', options: [
+        { value: 'lcd',     label: 'LCD (Green)' },
+        { value: 'led',     label: 'LED (Red glow)' },
+        { value: 'alarm',   label: 'Alarm Clock (Blue)' },
+        { value: 'station', label: 'Station Board (Amber)' },
+      ]},
+      { name: 'bgColor',     label: 'Background Color', type: 'color' },
+      { name: 'textColor',   label: 'Text Color',        type: 'color' },
+      { name: 'borderColor', label: 'Border Color',      type: 'color' },
+      { name: 'fontSize',    label: 'Font Size Override',type: 'number' },
+      { name: 'label',       label: 'Caption',           type: 'text' },
+    ]
+  },
+
+  departureBoard: {
+    id: 'departureBoard',
+    category: 'Clocks & Time',
+    name: 'Departure / Arrival Board',
+    icon: <AlignLeft size={18} />,
+    defaultProps: {
+      title: 'DEPARTURES', times: '08:15,08:45,09:15,?',
+      width: 240, height: 180,
+      bgColor: '#0f0f0f', textColor: '#ffa500', titleColor: '#ffa500',
+      label: '',
+    },
+    Component: ({ props }) => <DepartureBoard props={props} />,
+    properties: [
+      { name: 'title',       label: 'Board Title',        type: 'text' },
+      { name: 'times',       label: 'Times (comma-separated)', type: 'text' },
+      { name: 'width',       label: 'Width',              type: 'range', min: 120, max: 400, step: 8 },
+      { name: 'height',      label: 'Height',             type: 'range', min: 80,  max: 320, step: 8 },
+      { name: 'bgColor',     label: 'Background',         type: 'color' },
+      { name: 'textColor',   label: 'Time Text Color',    type: 'color' },
+      { name: 'titleColor',  label: 'Title Color',        type: 'color' },
+      { name: 'label',       label: 'Caption',            type: 'text' },
     ]
   },
 };

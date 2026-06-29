@@ -4,7 +4,7 @@ import { ObjectRegistry } from '../registry/objectRegistry';
 import { GET_ICON } from '../registry/iconRegistry';
 import { resolveEndpoint, computeOrthoPath } from '../utils/connectionUtils';
 
-const ENDPOINT_EDITABLE = new Set(['connectorArrow', 'orthoConnector', 'dottedLineArrow', 'elbowArrow', 'bezierArrow']);
+const ENDPOINT_EDITABLE = new Set(['connectorArrow', 'orthoConnector', 'dottedLineArrow', 'elbowArrow', 'bezierArrow', 'dashedConnector', 'doubleHeadedConnector', 'thickArrow', 'annotationArrow']);
 
 const PRESET_COLORS = [
   'transparent', '#ffffff', '#000000', '#94a3b8', 
@@ -89,6 +89,34 @@ export default function PropertiesPanel({ selectedShape, updateShape, updateAllS
     return (
       <div className="properties-panel">
         <div className="section-title">Connector</div>
+
+        {/* Connector Type Toggle */}
+        <div className="input-group">
+          <label><span>Connector Type</span></label>
+          <select
+            value={
+              shape.type === 'bezierArrow' ? 'curved' :
+              (shape.type === 'orthoConnector' || shape.type === 'elbowArrow') ? 'l-shape' :
+              'straight'
+            }
+            onChange={(e) => {
+              const val = e.target.value;
+              let nextType = 'connectorArrow';
+              if (val === 'curved') {
+                nextType = 'bezierArrow';
+              } else if (val === 'l-shape') {
+                nextType = 'orthoConnector';
+              }
+              // Preserve other keys when swapping type
+              updateShape(shape.id, { type: nextType });
+            }}
+            style={inputStyle}
+          >
+            <option value="straight">Straight</option>
+            <option value="curved">Curved (Bezier)</option>
+            <option value="l-shape">Elbow (L-Shape)</option>
+          </select>
+        </div>
 
         {/* Stroke color */}
         <div className="input-group">

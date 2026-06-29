@@ -1,5 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { Group, Image as KonvaImage, Rect, Text } from 'react-konva';
+import { CLIPART_ITEMS } from '../../assets/clipartLibrary';
+
+function resolveClipartSrc(src) {
+  if (!src) return '';
+  if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) {
+    return src;
+  }
+  const clean = src.trim().toLowerCase();
+  
+  // 1. Try to find exact match by ID
+  let match = CLIPART_ITEMS.find(item => item.id.toLowerCase() === clean);
+  if (match) return match.url;
+
+  // 2. Try to find exact match by label
+  match = CLIPART_ITEMS.find(item => item.label.toLowerCase() === clean);
+  if (match) return match.url;
+
+  // 3. Try to find partial match on label
+  match = CLIPART_ITEMS.find(item => item.label.toLowerCase().includes(clean) || clean.includes(item.label.toLowerCase()));
+  if (match) return match.url;
+
+  // 4. Try to find match by emoji
+  match = CLIPART_ITEMS.find(item => item.emoji === src.trim());
+  if (match) return match.url;
+
+  return src;
+}
 
 /**
  * RasterImage — renders any raster src (PNG/JPEG/SVG data-URL or https URL)
@@ -12,24 +39,25 @@ export default function RasterImage({ src, width = 300, height = 200, opacity = 
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (!src) { setImage(null); return; }
+    const resolvedSrc = resolveClipartSrc(src);
+    if (!resolvedSrc) { setImage(null); return; }
     setError(false);
     const img = new window.Image();
     // Only set crossOrigin for non-data URLs (data: URIs don't need it)
-    if (!src.startsWith('data:')) img.crossOrigin = 'anonymous';
+    if (!resolvedSrc.startsWith('data:')) img.crossOrigin = 'anonymous';
     img.onload = () => setImage(img);
     img.onerror = () => {
       // Retry without crossOrigin (some servers don't send CORS headers)
-      if (!src.startsWith('data:') && img.crossOrigin) {
+      if (!resolvedSrc.startsWith('data:') && img.crossOrigin) {
         const img2 = new window.Image();
         img2.onload = () => setImage(img2);
         img2.onerror = () => setError(true);
-        img2.src = src;
+        img2.src = resolvedSrc;
       } else {
         setError(true);
       }
     };
-    img.src = src;
+    img.src = resolvedSrc;
   }, [src]);
 
   const w = width;

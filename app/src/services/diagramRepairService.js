@@ -272,7 +272,7 @@ async function extractImageValues({ imageUrl, apiKey, geminiApiKey, pipelineProv
 // ── Step 2: Generate MathsDiagram shapes ─────────────────────────────────────
 
 const GENERATE_SYSTEM = `You are a mathematics diagram generator for primary and middle school (Years 2–8).
-Recreate a specific diagram using ONLY the available shape types below.
+Recreate a specific diagram using ONLY the registered component types listed below.
 
 ${SHAPE_CATALOGUE}
 
@@ -283,15 +283,50 @@ Canvas is 800×500 logical pixels. Centre is x=400, y=250.
 Keep all shapes within x: 20–780, y: 20–480 so nothing is clipped.
 Use concrete positions and sizes. Include text labels where needed.
 
-IMPORTANT — VALUES FIDELITY (CRITICAL):
-- When a QUESTION CONTEXT is provided below with exact numbers, times, values, or labels — you MUST use those EXACT values in the diagram. Do NOT invent or change any numerical values, times, or labels.
-- If the question says "08:15, 08:45, 09:15, ?" those exact times must appear in the diagram.
-- If the question says "side = 8 cm" then the diagram must show "8 cm" not "10 cm".
-- Changing values will make the question's answer WRONG — this is unacceptable.
+COMPONENT SELECTION RULES (follow strictly):
+- Use "departureBoard" for any train/bus departure/arrival timetable showing multiple times.
+- Use "digitalClock" for any rectangular LED/LCD clock showing a single time (timeText prop).
+- Use "analogClock" for any round clock face with hands (hours, minutes props).
+- Use "barGraph" for bar charts. Use "dataTable" for tables of data.
+- Use "fractionCircle", "fractionRectangle", or "fractionBar" for fraction diagrams.
+- Use "numberline" for number lines. Use "cartesianPlane" for coordinate grids.
+- Use "rectangle", "circle", "triangle", "text" etc. for basic geometry.
+- NEVER use "rasterImage" for diagram structural elements (clocks, boards, graphs, shapes).
+  Only use "rasterImage" for illustrative icons (animals, vehicles, food, people) when
+  no specific component type covers it — set src to the lowercase clipart ID.
+- If the diagram requires a component type not in this list, output it anyway with a comment
+  field: { "type": "MISSING_TYPE_NAME", "comment": "brief description of what this should be" }
+  The system will detect it and notify the developer to add it to the library.
 
-Important Rules:
-- If the diagram contains animals, vehicles, food, or common objects (e.g. fish, butterflies, cars, apples), you MUST use a rasterImage shape with the src set to the lowercase clipart ID (e.g. { "type": "rasterImage", "src": "fishBlue", "width": 80, "height": 80 }) rather than drawing it using customPolygon/vectors. This is critical for visual quality.
-- Do NOT include any explanation, markdown, or text outside the JSON array.`;
+IMPORTANT — VALUES FIDELITY (CRITICAL):
+- Use EXACT times, numbers, labels from the question context — never invent or round them.
+- Changing values makes the question's answer WRONG.
+
+Do NOT include any explanation, markdown, or text outside the JSON array.`;
+
+// ── Post-generation: detect types not in the component registry ───────────────
+
+const KNOWN_TYPES = new Set([
+  'rasterImage','rectangle','circle','triangle','polygon','customPolygon','line',
+  'rightTriangle','isoscelesTriangle','equilateralTriangle','fractionCircle',
+  'fractionRectangle','fractionBar','numberline','cartesianPlane','barGraph',
+  'vennDiagram','annulus','bearings','spinner','factorTree','angleMarker','point',
+  'rightAngleMarker','lengthMarker','ruler','text','road','roadJunction','bridge',
+  'tree','river','lake','sea','mountain','footpath','playground','airport','port',
+  'mapMarker','mapSprite','gridMap','scaleBar','compassRose','sunDirection','flag',
+  'dataTable','coordAxes','spiderIcon','dottedLineArrow','elbowArrow','bezierArrow',
+  'robot','weighingScale','analogClock','digitalClock','departureBoard',
+]);
+
+function validateShapeTypes(shapes) {
+  const missing = [];
+  const valid = shapes.filter(s => {
+    if (KNOWN_TYPES.has(s.type)) return true;
+    missing.push({ type: s.type, comment: s.comment || '' });
+    return false;
+  });
+  return { valid, missing };
+}
 
 export async function generateRepairShapes({ analysis, feedbackHistory, userInstructions, apiKey, attempt, pipelineProvider = 'claude', geminiApiKey = '', model = 'gemini-3.5-flash', questionValues = null }) {
   let prompt = `Diagram type: ${analysis.diagramType}\nDescription: ${analysis.diagramDescription}\n\nInstructions:\n${analysis.generationInstructions}`;
@@ -315,26 +350,31 @@ export async function generateRepairShapes({ analysis, feedbackHistory, userInst
     prompt += `\nRedraw from scratch. Fix ALL issues listed above. Each shape must be fully within the canvas bounds (x: 20–780, y: 20–480).`;
   }
 
+  let rawShapes;
   if (pipelineProvider === 'gemini') {
-    return generateRepairShapesWithGemini({
+    rawShapes = await generateRepairShapesWithGemini({
       prompt,
       systemPrompt: GENERATE_SYSTEM,
       apiKey: geminiApiKey,
       model,
     });
+  } else {
+    const text = await callClaude({
+      stage: 'generate', attempt,
+      model: 'claude-sonnet-4-6',
+      system: GENERATE_SYSTEM,
+      messages: [{ role: 'user', content: prompt }],
+      apiKey, maxTokens: 4096,
+    });
+    rawShapes = JSON.parse(text);
   }
 
-  const text = await callClaude({
-    stage: 'generate', attempt,
-    model: 'claude-sonnet-4-6',
-    system: GENERATE_SYSTEM,
-    messages: [{ role: 'user', content: prompt }],
-    apiKey, maxTokens: 4096,
-  });
+  if (!Array.isArray(rawShapes)) throw new Error('Generator returned non-array JSON');
 
-  const parsed = JSON.parse(text);
-  if (!Array.isArray(parsed)) throw new Error('Generator returned non-array JSON');
-  return parsed;
+  const { valid, missing } = validateShapeTypes(rawShapes);
+  // Attach missing list to the array so callers can surface it to the UI
+  valid.__missingComponents = missing;
+  return valid;
 }
 
 
@@ -617,9 +657,10 @@ export async function repairDiagramWithRetry({
 
   let feedbackHistory = [];
   let lastShapes = null;
-  let lastImage = null;   // base64 data URI — used in gemini gen mode
+  let lastImage = null;
   let lastValidation = null;
-  let prevImageBase64 = null; // reference image for iterative Gemini regeneration
+  let prevImageBase64 = null;
+  let allMissingComponents = []; // accumulate across attempts
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     await logEvent({ stage: 'attempt_start', attempt, maxAttempts: maxRetries, message: `Starting attempt ${attempt}` });
@@ -669,9 +710,14 @@ export async function repairDiagramWithRetry({
           model: geminiVisionModel || 'gemini-3.5-flash',
           questionValues,
         });
+        const missingComponents = shapes.__missingComponents || [];
+        if (missingComponents.length) allMissingComponents.push(...missingComponents);
         lastShapes = shapes;
-        await logEvent({ stage: 'generated', attempt, message: `${shapes.length} shapes generated`, data: { shapeTypes: shapes.map(s => s.type) } });
-        onProgress({ stage: 'generated', attempt, maxAttempts: maxRetries, shapes, analysis });
+        await logEvent({ stage: 'generated', attempt, message: `${shapes.length} shapes generated`, data: { shapeTypes: shapes.map(s => s.type), missingComponents } });
+        if (missingComponents.length > 0) {
+          onProgress({ stage: 'missing_components', attempt, maxAttempts: maxRetries, missingComponents, pipelineProvider });
+        }
+        onProgress({ stage: 'generated', attempt, maxAttempts: maxRetries, shapes, analysis, missingComponents, pipelineProvider, geminiVisionModel });
 
 
         onProgress({ stage: 'rendering', attempt, maxAttempts: maxRetries, shapes });
@@ -702,7 +748,7 @@ export async function repairDiagramWithRetry({
 
       if (validation.isCorrect) {
         await logEvent({ stage: 'success', attempt, message: 'Pipeline succeeded' });
-        return { shapes: lastShapes, image: lastImage, analysis, attempts: attempt, success: true, validation, generationMode };
+        return { shapes: lastShapes, image: lastImage, analysis, attempts: attempt, success: true, validation, generationMode, missingComponents: allMissingComponents };
       }
 
       feedbackHistory.push(validation.feedback);
@@ -717,5 +763,5 @@ export async function repairDiagramWithRetry({
   }
 
   await logEvent({ stage: 'exhausted', message: `All ${maxRetries} attempts failed`, data: lastValidation });
-  return { shapes: lastShapes, image: lastImage, analysis, attempts: maxRetries, success: false, validation: lastValidation, generationMode };
+  return { shapes: lastShapes, image: lastImage, analysis, attempts: maxRetries, success: false, validation: lastValidation, generationMode, missingComponents: allMissingComponents };
 }

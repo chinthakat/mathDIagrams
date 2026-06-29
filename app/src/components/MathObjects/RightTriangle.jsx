@@ -2,15 +2,20 @@ import React from 'react';
 import { Group, Line } from 'react-konva';
 import RightAngleMarker from './RightAngleMarker';
 
-export default function RightTriangle({ base, height, fill, stroke, strokeWidth }) {
+export default function RightTriangle({ base = 100, height = 100, fill, stroke, strokeWidth }) {
+  const numBase = Number(base);
+  const cleanBase = Number.isNaN(numBase) ? 100 : numBase;
+  const numHeight = Number(height);
+  const cleanHeight = Number.isNaN(numHeight) ? 100 : numHeight;
+
   // A right triangle drawn from the origin (0,0) at the right angle
   return (
     <Group>
       <Line
         points={[
           0, 0, 
-          base, 0, 
-          0, -height
+          cleanBase, 0, 
+          0, -cleanHeight
         ]}
         fill={fill}
         stroke={stroke}
