@@ -382,6 +382,26 @@ export default function CanvasEditor2D({
 
   // ── Multi-select state ───────────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState(new Set());
+
+  // Sanitise shapes on load: ensure every shape has a unique, non-null string id
+  useEffect(() => {
+    if (!shapes || !shapes.length) return;
+    let hasChanges = false;
+    const seen = new Set();
+    const sanitised = shapes.map((shape, i) => {
+      let id = shape.id;
+      if (!id || typeof id !== 'string' || id.trim() === '' || seen.has(id)) {
+        id = `${shape.type || 'shape'}-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 5)}`;
+        hasChanges = true;
+      }
+      seen.add(id);
+      return { ...shape, id };
+    });
+    if (hasChanges) {
+      setShapes(sanitised);
+    }
+  }, [shapes, setShapes]);
+
   // Rubber-band selection rect (stage coords)
   const [rubberBand, setRubberBand]   = useState(null); // { x,y,w,h,startX,startY }
   const multiTrRef = useRef();
