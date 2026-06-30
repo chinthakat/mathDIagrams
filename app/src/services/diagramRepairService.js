@@ -137,7 +137,19 @@ Compare the original image against the available shape components and cliparts. 
 STRICT LOGICAL RULES FOR ANALYSIS:
 1. ONLY describe what you physically see in the diagram. Do not assume or guess based on the question context. If the image has a stick figure and a doorway, describe a stick figure and a doorway. Do NOT invent flowcharts, arrows, or boxes that are not physically present in the image.
 2. If there are characters, people, stick figures, animals, or objects (like a portal vortex), look up their names in the AVAILABLE RASTERIMAGE CLIPARTS list. You MUST write down their clipart IDs (e.g. "person" for a stick figure, "portal" for a space portal, "door" for an arch/doorway) and instruct the generator to draw them using "rasterImage".
-3. Check the shape registry: if the diagram contains scales, clocks, or departure boards, instruct the generator to use their dedicated component types (e.g., 'weighingScale', 'analogClock') instead of building them out of rectangles and text.`;
+3. Check the shape registry: if the diagram contains scales, clocks, or departure boards, instruct the generator to use their dedicated component types (e.g., 'weighingScale', 'analogClock') instead of building them out of rectangles and text.
+4. GRAPH TYPE IDENTIFICATION — match the image to the EXACT component type:
+   - Vertical bars with DISCRETE category labels (e.g. Gold/Silver, Mon/Tue) → "barGraph"
+   - Vertical bars touching each other with INTERVAL labels (e.g. 0–5, 5–10) → "histogram"
+   - Lines connecting data points over a category or time axis → "lineGraph"
+   - Circular sector/pie diagram → "pieChart" (add innerRadius if it's a donut/ring)
+   - Dots stacked above a number line → "dotPlot"
+   - Two-column stem | leaves display → "stemLeafPlot"
+   - Rows of repeated icons (stars/smiley faces etc.) representing counts → "pictograph"
+   - Grid of cells with values → "dataTable"
+   NEVER describe a bar chart as generic rectangles — always match to the correct graph type.
+   For barGraph: extract exact bar labels and numeric values from the image. Include the chart title, x-axis label, and y-axis label in generationInstructions.`;
+
 
 export async function analyzeQuestionImage({ imageUrl, questionText, apiKey, pipelineProvider = 'claude', geminiApiKey = '', model = 'gemini-3.5-flash' }) {
   const systemPrompt = makeAnalyzeSystemPrompt();
@@ -302,7 +314,18 @@ COMPONENT SELECTION RULES (follow strictly):
 - Use "departureBoard" for any train/bus departure/arrival timetable showing multiple times.
 - Use "digitalClock" for any rectangular LED/LCD clock showing a single time (timeText prop).
 - Use "analogClock" for any round clock face with hands (hours, minutes props).
-- Use "barGraph" for bar charts. Use "dataTable" for tables of data.
+- GRAPH & DATA COMPONENT SELECTION (strict — read all options before choosing):
+  • "barGraph"      → vertical bar/column chart with DISCRETE categories (Gold/Silver/Bronze, Mon/Tue/Wed). Always supply bars[].label for category names and bars[].value for heights. Include title, xAxisLabel, yAxisLabel.
+  • "histogram"     → continuous frequency chart where bars TOUCH (no gaps). Use for grouped data like "0–5", "5–10". Label bars[].label with interval strings.
+  • "lineGraph"     → line/trend chart connected by lines. Use series[].points with {x,y} pairs. Supply xLabels[] for category x-axis (e.g. ["Jan","Feb",…]).
+  • "pieChart"      → pie or donut/ring chart. Use slices[].value (raw numbers, auto-converted to %). Set innerRadius>0 for donut.
+  • "dotPlot"       → frequency dot plot: supply values[] array (repeated values stack dots). Use for small integer datasets.
+  • "stemLeafPlot"  → stem-and-leaf display: supply stems[] as [{stem, leaves:[]}]. Always include keyText.
+  • "pictograph"    → icon-based chart: supply rows[] with {label, count}, iconSrc (clipart id e.g. "star"), iconValue (units per icon).
+  • "dataTable"     → plain data table (rows, cols). Use when the original image shows a TABLE of values, not a chart.
+  • "vennDiagram"   → two overlapping circles with labelled regions.
+  NEVER manually draw a chart using rectangles/lines when a dedicated graph component is available.
+- Use "departureBoard" for any train/bus departure/arrival timetable showing multiple times.
 - Use "fractionCircle", "fractionRectangle", or "fractionBar" for fraction diagrams.
 - Use "numberline" for number lines. Use "cartesianPlane" for coordinate grids.
 - Use "rectangle", "circle", "triangle", "text" etc. for basic geometry.
@@ -324,7 +347,8 @@ Do NOT include any explanation, markdown, or text outside the JSON array.`;
 const KNOWN_TYPES = new Set([
   'rasterImage','rectangle','circle','triangle','polygon','customPolygon','line',
   'rightTriangle','isoscelesTriangle','equilateralTriangle','fractionCircle',
-  'fractionRectangle','fractionBar','numberline','cartesianPlane','barGraph',
+  'fractionRectangle','fractionBar','numberline','cartesianPlane',
+  'barGraph','lineGraph','pieChart','histogram','dotPlot','stemLeafPlot','pictograph',
   'vennDiagram','annulus','bearings','spinner','factorTree','angleMarker','point',
   'rightAngleMarker','lengthMarker','ruler','text','road','roadJunction','bridge',
   'tree','river','lake','sea','mountain','footpath','playground','airport','port',

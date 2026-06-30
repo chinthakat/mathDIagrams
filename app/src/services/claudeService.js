@@ -43,7 +43,41 @@ Available shape types (use these exact strings for the "type" field):
 - fractionBar: { width, height, partitions, shaded, fill, stroke, strokeWidth }
 - numberline: { width, min, max, step, isOpen, jumpCount, jumpSize, labelMode, stroke, strokeWidth }
 - cartesianPlane: { width, height, domain, range, step, showGrid, showLabels, stroke, strokeWidth, plots: [{expr, color}] }
-- barGraph: { width, height, bars: [{label, value, color}], showGrid, strokeWidth }
+- barGraph: { width, height, bars: [{id, label, value, color}], title, xAxisLabel, yAxisLabel, yAxisMax, yAxisStep, showGrid, showValues, stroke, strokeWidth, barGap }
+    • bars[].label — category text shown below each bar (e.g. "Gold", "Silver", "Bronze")
+    • bars[].value — numeric bar height
+    • title — chart heading shown above the plot
+    • yAxisMax — explicit Y-axis maximum; auto-rounded if omitted
+    • showGrid — draw horizontal guide lines (default true)
+    • showValues — print value above each bar (default true)
+    • Use for: any vertical bar chart / column chart showing discrete categories
+- lineGraph: { width, height, title, xAxisLabel, yAxisLabel, series: [{id, label, color, points:[{x,y}]}], xLabels: [string], yMin, yMax, showGrid, showPoints, showLegend, stroke, strokeWidth }
+    • series[].points — array of {x, y} coordinate objects (x = index 0,1,2…)
+    • xLabels — optional string labels for x-axis ticks (e.g. ["Mon","Tue","Wed"])
+    • showLegend — coloured legend panel (default true)
+    • Use for: line/trend graphs, time-series charts, multi-series comparisons
+- pieChart: { width, height, radius, innerRadius, title, slices: [{id, label, value, color}], showLabels, showLegend, stroke, strokeWidth }
+    • slices[].value — raw value (auto-converted to percent)
+    • innerRadius — set > 0 for donut/ring chart (default 0 = solid pie)
+    • showLabels — percentage labels on slices (default true)
+    • Use for: pie charts, donut charts, sector/proportion diagrams
+- histogram: { width, height, title, xAxisLabel, yAxisLabel, bars: [{id, label, value, color}], fillColor, showGrid, showValues, stroke, strokeWidth }
+    • Bars touch each other (no gap between them) — use for continuous frequency data
+    • bars[].label — interval label (e.g. "0–5", "5–10")
+    • Use for: frequency histograms, grouped continuous data
+- dotPlot: { width, height, title, values: [number], min, max, step, dotRadius, dotColor, stroke, strokeWidth }
+    • values — raw data array including repeated values (e.g. [1,2,2,3,3,3,4])
+    • step — number line tick interval (default 1)
+    • Use for: dot plots, frequency dot diagrams above a number line
+- stemLeafPlot: { width, height, title, keyText, stems: [{stem, leaves:[number]}], stroke, fontSize }
+    • stems — array of { stem: number|string, leaves: number[] } (e.g. {stem:2, leaves:[3,5,8]})
+    • keyText — key line e.g. "1|2 means 12" (shown at bottom)
+    • Use for: stem-and-leaf displays, back-to-back stem plots
+- pictograph: { width, height, title, iconSrc, iconValue, iconSize, maxIcons, rows: [{id, label, count}], keyText, stroke }
+    • iconSrc — clipart id from the library (e.g. "star", "apple", "person", "car")
+    • iconValue — units each icon represents (e.g. 2 → each icon = 2 votes)
+    • rows[].count — total units for that row (icons auto-calculated as count/iconValue)
+    • Use for: pictograms, pictographs, icon charts
 - vennDiagram: { radius, overlapPercent, labelA, labelB, fillA, fillB, fillOverlap }
 - annulus: { innerRadius, outerRadius, fill, stroke, strokeWidth, showLabels }
 - bearings: { bearing, radius, stroke, strokeWidth, label }

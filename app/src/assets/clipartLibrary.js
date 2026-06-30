@@ -433,3 +433,14 @@ export const CLIPART_CATEGORIES = [
   'Household', 'Stationery', 'Shopping', 'Sports', 'Geographic',
   'Fantasy', 'Objects'
 ];
+
+/**
+ * Resolve a clipart ID (e.g. "star", "apple", "person") to its CDN URL.
+ * Falls back to the star emoji if not found.
+ */
+export const resolveClipArtSrc = (id) => {
+  if (!id) return null;
+  const lower = String(id).toLowerCase();
+  const item = CLIPART_ITEMS.find(c => c.id.toLowerCase() === lower || c.label.toLowerCase() === lower);
+  return item ? item.url : null;
+};

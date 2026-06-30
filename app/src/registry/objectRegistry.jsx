@@ -58,6 +58,12 @@ import WeighingScale from '../components/MathObjects/WeighingScale';
 import AnalogClock from '../components/MathObjects/AnalogClock';
 import DigitalClock from '../components/MathObjects/DigitalClock';
 import DepartureBoard from '../components/MathObjects/DepartureBoard';
+import LineGraph from '../components/MathObjects/LineGraph';
+import PieChartComp from '../components/MathObjects/PieChart';
+import StemAndLeafPlot from '../components/MathObjects/StemAndLeafPlot';
+import DotPlot from '../components/MathObjects/DotPlot';
+import Histogram from '../components/MathObjects/Histogram';
+import Pictograph from '../components/MathObjects/Pictograph';
 import IsometricCube from '../components/MathObjects/IsometricCube';
 import Cylinder from '../components/MathObjects/Cylinder';
 import BlockArrow from '../components/MathObjects/BlockArrow';
@@ -81,7 +87,7 @@ import CloudShape from '../components/MathObjects/CloudShape';
 import Teardrop from '../components/MathObjects/Teardrop';
 import TagLabel from '../components/MathObjects/TagLabel';
 import NoSign from '../components/MathObjects/NoSign';
-import { PieChart, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon, Bug, Waypoints, CornerDownRight, Spline, Code, Clock, Monitor, AlignLeft, Box, Database, ChevronRight, Diamond as DiamondIcon, Star, Zap, Plus, Tag, Ban } from 'lucide-react';
+import { PieChart as PieChartIcon, TrendingUp, Layers, Minus as MinusIcon, BarChart2, ImageIcon as PictIcon, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon, Bug, Waypoints, CornerDownRight, Spline, Code, Clock, Monitor, AlignLeft, Box, Database, ChevronRight, Diamond as DiamondIcon, Star, Zap, Plus, Tag, Ban } from 'lucide-react';
 
 
 const getNumeric = (val, fallback) => {
@@ -669,6 +675,209 @@ export const ObjectRegistry = {
       { name: 'height', label: 'Height', type: 'number' },
       { name: 'rows', label: 'Rows', type: 'range', min: 1, max: 20 },
       { name: 'cols', label: 'Columns', type: 'range', min: 1, max: 10 }
+    ]
+  },
+
+  lineGraph: {
+    id: 'lineGraph',
+    category: 'Graphs & Data',
+    name: 'Line Graph',
+    icon: <TrendingUp size={18} />,
+    defaultProps: {
+      width: 360, height: 260, title: 'Line Graph',
+      xAxisLabel: '', yAxisLabel: '',
+      series: [
+        { id: 's1', label: 'Series A', color: '#3b82f6', points: [{x:0,y:2},{x:1,y:5},{x:2,y:3},{x:3,y:7},{x:4,y:6}] },
+      ],
+      xLabels: ['Mon','Tue','Wed','Thu','Fri'],
+      showGrid: true, showPoints: true, showLegend: true,
+      stroke: '#334155', strokeWidth: 1.5, rotation: 0,
+    },
+    Component: ({ props }) => (
+      <LineGraph width={props.width} height={props.height} title={props.title}
+        xAxisLabel={props.xAxisLabel} yAxisLabel={props.yAxisLabel}
+        series={props.series} xLabels={props.xLabels}
+        showGrid={props.showGrid} showPoints={props.showPoints} showLegend={props.showLegend}
+        stroke={props.stroke} strokeWidth={props.strokeWidth} />
+    ),
+    properties: [
+      { name: 'title', label: 'Title', type: 'text' },
+      { name: 'xAxisLabel', label: 'X Axis Label', type: 'text' },
+      { name: 'yAxisLabel', label: 'Y Axis Label', type: 'text' },
+      { name: 'stroke', label: 'Axis Color', type: 'color' },
+      { name: 'width', label: 'Width', type: 'number' },
+      { name: 'height', label: 'Height', type: 'number' },
+      { name: 'showGrid', label: 'Show Grid', type: 'checkbox' },
+      { name: 'showPoints', label: 'Show Points', type: 'checkbox' },
+      { name: 'showLegend', label: 'Show Legend', type: 'checkbox' },
+    ]
+  },
+
+  pieChart: {
+    id: 'pieChart',
+    category: 'Graphs & Data',
+    name: 'Pie Chart',
+    icon: <PieChartIcon size={18} />,
+    defaultProps: {
+      width: 320, height: 240, radius: 90, innerRadius: 0,
+      title: 'Pie Chart', showLabels: true, showLegend: true,
+      slices: [
+        { id: 'sl1', label: 'Category A', value: 30, color: '#60a5fa' },
+        { id: 'sl2', label: 'Category B', value: 50, color: '#34d399' },
+        { id: 'sl3', label: 'Category C', value: 20, color: '#f97316' },
+      ],
+      stroke: '#fff', strokeWidth: 1.5, rotation: 0,
+    },
+    Component: ({ props }) => (
+      <PieChartComp width={props.width} height={props.height}
+        radius={props.radius} innerRadius={props.innerRadius}
+        title={props.title} slices={props.slices}
+        showLabels={props.showLabels} showLegend={props.showLegend}
+        stroke={props.stroke} strokeWidth={props.strokeWidth} />
+    ),
+    properties: [
+      { name: 'title', label: 'Title', type: 'text' },
+      { name: 'radius', label: 'Radius', type: 'range', min: 40, max: 150 },
+      { name: 'innerRadius', label: 'Inner Radius (donut)', type: 'range', min: 0, max: 120 },
+      { name: 'stroke', label: 'Slice Border Color', type: 'color' },
+      { name: 'width', label: 'Width', type: 'number' },
+      { name: 'height', label: 'Height', type: 'number' },
+      { name: 'showLabels', label: 'Show % Labels', type: 'checkbox' },
+      { name: 'showLegend', label: 'Show Legend', type: 'checkbox' },
+    ]
+  },
+
+  stemLeafPlot: {
+    id: 'stemLeafPlot',
+    category: 'Graphs & Data',
+    name: 'Stem & Leaf Plot',
+    icon: <Layers size={18} />,
+    defaultProps: {
+      width: 280, height: 220,
+      title: 'Stem & Leaf Plot',
+      keyText: '1|2 means 12',
+      stems: [
+        { stem: 1, leaves: [2, 4, 7] },
+        { stem: 2, leaves: [0, 3, 3, 9] },
+        { stem: 3, leaves: [1, 5, 8] },
+      ],
+      stroke: '#334155', fontSize: 13, rotation: 0,
+    },
+    Component: ({ props }) => (
+      <StemAndLeafPlot width={props.width} height={props.height}
+        title={props.title} keyText={props.keyText}
+        stems={props.stems} stroke={props.stroke} fontSize={props.fontSize} />
+    ),
+    properties: [
+      { name: 'title', label: 'Title', type: 'text' },
+      { name: 'keyText', label: 'Key', type: 'text' },
+      { name: 'stroke', label: 'Text Color', type: 'color' },
+      { name: 'width', label: 'Width', type: 'number' },
+      { name: 'height', label: 'Height', type: 'number' },
+      { name: 'fontSize', label: 'Font Size', type: 'range', min: 10, max: 18 },
+    ]
+  },
+
+  dotPlot: {
+    id: 'dotPlot',
+    category: 'Graphs & Data',
+    name: 'Dot Plot',
+    icon: <MinusIcon size={18} />,
+    defaultProps: {
+      width: 340, height: 220, title: 'Dot Plot',
+      values: [1,2,2,3,3,3,4,4,5],
+      min: 0, max: 6, step: 1,
+      dotRadius: 7, dotColor: '#3b82f6',
+      stroke: '#334155', strokeWidth: 1.5, rotation: 0,
+    },
+    Component: ({ props }) => (
+      <DotPlot width={props.width} height={props.height} title={props.title}
+        values={props.values} min={props.min} max={props.max} step={props.step}
+        dotRadius={props.dotRadius} dotColor={props.dotColor}
+        stroke={props.stroke} strokeWidth={props.strokeWidth} />
+    ),
+    properties: [
+      { name: 'title', label: 'Title', type: 'text' },
+      { name: 'dotRadius', label: 'Dot Radius', type: 'range', min: 4, max: 16 },
+      { name: 'dotColor', label: 'Dot Color', type: 'color' },
+      { name: 'stroke', label: 'Axis Color', type: 'color' },
+      { name: 'width', label: 'Width', type: 'number' },
+      { name: 'height', label: 'Height', type: 'number' },
+      { name: 'step', label: 'Tick Step', type: 'number' },
+    ]
+  },
+
+  histogram: {
+    id: 'histogram',
+    category: 'Graphs & Data',
+    name: 'Histogram',
+    icon: <BarChart2 size={18} />,
+    defaultProps: {
+      width: 340, height: 260, title: 'Histogram',
+      xAxisLabel: 'Interval', yAxisLabel: 'Frequency',
+      fillColor: '#60a5fa',
+      bars: [
+        { id: 'b1', label: '0–5',   value: 3, color: '#60a5fa' },
+        { id: 'b2', label: '5–10',  value: 7, color: '#60a5fa' },
+        { id: 'b3', label: '10–15', value: 5, color: '#60a5fa' },
+        { id: 'b4', label: '15–20', value: 2, color: '#60a5fa' },
+      ],
+      showGrid: true, showValues: true,
+      stroke: '#334155', strokeWidth: 1.5, rotation: 0,
+    },
+    Component: ({ props }) => (
+      <Histogram width={props.width} height={props.height} title={props.title}
+        xAxisLabel={props.xAxisLabel} yAxisLabel={props.yAxisLabel}
+        bars={props.bars} fillColor={props.fillColor}
+        showGrid={props.showGrid} showValues={props.showValues}
+        stroke={props.stroke} strokeWidth={props.strokeWidth} />
+    ),
+    properties: [
+      { name: 'title', label: 'Title', type: 'text' },
+      { name: 'xAxisLabel', label: 'X Axis Label', type: 'text' },
+      { name: 'yAxisLabel', label: 'Y Axis Label', type: 'text' },
+      { name: 'fillColor', label: 'Bar Color', type: 'color' },
+      { name: 'stroke', label: 'Axis Color', type: 'color' },
+      { name: 'width', label: 'Width', type: 'number' },
+      { name: 'height', label: 'Height', type: 'number' },
+      { name: 'showGrid', label: 'Show Grid', type: 'checkbox' },
+      { name: 'showValues', label: 'Show Values', type: 'checkbox' },
+    ]
+  },
+
+  pictograph: {
+    id: 'pictograph',
+    category: 'Graphs & Data',
+    name: 'Pictograph',
+    icon: <PictIcon size={18} />,
+    defaultProps: {
+      width: 380, height: 260, title: 'Pictograph',
+      iconSrc: 'star', iconValue: 2, iconSize: 26, maxIcons: 10,
+      keyText: '',
+      rows: [
+        { id: 'r1', label: 'Monday',    count: 4 },
+        { id: 'r2', label: 'Tuesday',   count: 6 },
+        { id: 'r3', label: 'Wednesday', count: 3 },
+        { id: 'r4', label: 'Thursday',  count: 5 },
+      ],
+      stroke: '#334155', rotation: 0,
+    },
+    Component: ({ props }) => (
+      <Pictograph width={props.width} height={props.height} title={props.title}
+        iconSrc={props.iconSrc} iconValue={props.iconValue} iconSize={props.iconSize}
+        maxIcons={props.maxIcons} keyText={props.keyText}
+        rows={props.rows} stroke={props.stroke} />
+    ),
+    properties: [
+      { name: 'title', label: 'Title', type: 'text' },
+      { name: 'iconSrc', label: 'Icon (clipart id)', type: 'text' },
+      { name: 'iconValue', label: 'Value per Icon', type: 'number' },
+      { name: 'iconSize', label: 'Icon Size', type: 'range', min: 16, max: 48 },
+      { name: 'maxIcons', label: 'Max per Row', type: 'range', min: 3, max: 20 },
+      { name: 'keyText', label: 'Key Text', type: 'text' },
+      { name: 'stroke', label: 'Text Color', type: 'color' },
+      { name: 'width', label: 'Width', type: 'number' },
+      { name: 'height', label: 'Height', type: 'number' },
     ]
   },
 

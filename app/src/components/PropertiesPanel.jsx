@@ -675,18 +675,25 @@ CRITICAL INSTRUCTIONS:
           <div className="section-title">Bar Data</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {(selectedShape.bars || []).map((bar, index) => (
-              <div key={bar.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-dark)', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)', width: '16px' }}>{index + 1}.</span>
-                <input 
-                  type="number" 
-                  value={bar.value} 
-                  onChange={(e) => handleBarChange(bar.id, 'value', e.target.value)} 
-                  style={{ width: '60px', padding: '4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px' }}
+              <div key={bar.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-dark)', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', width: '14px' }}>{index + 1}.</span>
+                <input
+                  type="text"
+                  value={bar.label || ''}
+                  onChange={(e) => handleBarChange(bar.id, 'label', e.target.value)}
+                  placeholder="Label"
+                  style={{ width: '72px', padding: '4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px', fontSize: '11px' }}
                 />
-                <input 
-                  type="color" 
-                  value={bar.color} 
-                  onChange={(e) => handleBarChange(bar.id, 'color', e.target.value)} 
+                <input
+                  type="number"
+                  value={bar.value}
+                  onChange={(e) => handleBarChange(bar.id, 'value', e.target.value)}
+                  style={{ width: '52px', padding: '4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px' }}
+                />
+                <input
+                  type="color"
+                  value={bar.color}
+                  onChange={(e) => handleBarChange(bar.id, 'color', e.target.value)}
                   style={{ flex: 1, height: '24px', padding: '0', cursor: 'pointer', border: 'none', background: 'transparent' }}
                 />
                 <button className="btn-icon" onClick={() => handleDeleteBar(bar.id)} style={{ color: '#ef4444' }} title="Delete Bar">
@@ -700,6 +707,261 @@ CRITICAL INSTRUCTIONS:
           </div>
         </div>
       )}
+
+      {/* ── Histogram bars editor (same structure as barGraph) ── */}
+      {selectedShape?.type === 'histogram' && (
+        <div style={{ marginTop: '24px' }}>
+          <div className="section-title">Histogram Intervals</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {(selectedShape.bars || []).map((bar, index) => (
+              <div key={bar.id || index} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-dark)', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', width: '14px' }}>{index + 1}.</span>
+                <input
+                  type="text"
+                  value={bar.label || ''}
+                  onChange={(e) => {
+                    const bars = (selectedShape.bars || []).map(b => b.id === bar.id ? { ...b, label: e.target.value } : b);
+                    updateShape(selectedShape.id, { bars });
+                  }}
+                  placeholder="0–5"
+                  style={{ width: '72px', padding: '4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px', fontSize: '11px' }}
+                />
+                <input
+                  type="number"
+                  value={bar.value}
+                  onChange={(e) => {
+                    const bars = (selectedShape.bars || []).map(b => b.id === bar.id ? { ...b, value: Number(e.target.value) } : b);
+                    updateShape(selectedShape.id, { bars });
+                  }}
+                  style={{ width: '52px', padding: '4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px' }}
+                />
+                <button className="btn-icon" onClick={() => {
+                  const bars = (selectedShape.bars || []).filter(b => b.id !== bar.id);
+                  updateShape(selectedShape.id, { bars });
+                }} style={{ color: '#ef4444' }} title="Delete Interval">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+            <button className="btn btn-secondary" onClick={() => {
+              const bars = [...(selectedShape.bars || []), { id: `b${Date.now()}`, label: '', value: 1, color: selectedShape.fillColor || '#60a5fa' }];
+              updateShape(selectedShape.id, { bars });
+            }} style={{ width: '100%', padding: '8px', marginTop: '4px' }}>
+              + Add Interval
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Line Graph series editor ── */}
+      {selectedShape?.type === 'lineGraph' && (
+        <div style={{ marginTop: '24px' }}>
+          <div className="section-title">Series &amp; Points</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {(selectedShape.series || []).map((s, si) => (
+              <div key={s.id || si} style={{ background: 'var(--bg-dark)', borderRadius: '6px', padding: '10px', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <input
+                    type="text"
+                    value={s.label || ''}
+                    onChange={(e) => {
+                      const series = selectedShape.series.map((ss, i) => i === si ? { ...ss, label: e.target.value } : ss);
+                      updateShape(selectedShape.id, { series });
+                    }}
+                    placeholder="Series name"
+                    style={{ flex: 1, padding: '4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px', fontSize: '12px' }}
+                  />
+                  <input type="color" value={s.color || '#3b82f6'}
+                    onChange={(e) => {
+                      const series = selectedShape.series.map((ss, i) => i === si ? { ...ss, color: e.target.value } : ss);
+                      updateShape(selectedShape.id, { series });
+                    }}
+                    style={{ width: '28px', height: '28px', padding: '0', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                  />
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Points (x,y — one per line):</div>
+                <textarea
+                  value={(s.points || []).map(p => `${p.x},${p.y}`).join('\n')}
+                  onChange={(e) => {
+                    const pts = e.target.value.split('\n').map(line => {
+                      const [x, y] = line.split(',').map(Number);
+                      return (isNaN(x) || isNaN(y)) ? null : { x, y };
+                    }).filter(Boolean);
+                    const series = selectedShape.series.map((ss, i) => i === si ? { ...ss, points: pts } : ss);
+                    updateShape(selectedShape.id, { series });
+                  }}
+                  rows={Math.max(3, (s.points || []).length)}
+                  style={{ width: '100%', padding: '6px', background: 'var(--bg)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px', fontFamily: 'monospace', fontSize: '11px', resize: 'vertical', boxSizing: 'border-box' }}
+                  placeholder={"0,2\n1,5\n2,3"}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Pie Chart slices editor ── */}
+      {selectedShape?.type === 'pieChart' && (
+        <div style={{ marginTop: '24px' }}>
+          <div className="section-title">Slices</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {(selectedShape.slices || []).map((sl, i) => (
+              <div key={sl.id || i} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-dark)', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                <input
+                  type="text"
+                  value={sl.label || ''}
+                  onChange={(e) => {
+                    const slices = selectedShape.slices.map((s, j) => j === i ? { ...s, label: e.target.value } : s);
+                    updateShape(selectedShape.id, { slices });
+                  }}
+                  placeholder="Label"
+                  style={{ flex: 1, padding: '4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px', fontSize: '11px' }}
+                />
+                <input
+                  type="number"
+                  value={sl.value}
+                  onChange={(e) => {
+                    const slices = selectedShape.slices.map((s, j) => j === i ? { ...s, value: Number(e.target.value) } : s);
+                    updateShape(selectedShape.id, { slices });
+                  }}
+                  style={{ width: '52px', padding: '4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px' }}
+                />
+                <input type="color" value={sl.color || '#60a5fa'}
+                  onChange={(e) => {
+                    const slices = selectedShape.slices.map((s, j) => j === i ? { ...s, color: e.target.value } : s);
+                    updateShape(selectedShape.id, { slices });
+                  }}
+                  style={{ width: '28px', height: '28px', padding: '0', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                />
+                <button className="btn-icon" onClick={() => {
+                  const slices = selectedShape.slices.filter((_, j) => j !== i);
+                  updateShape(selectedShape.id, { slices });
+                }} style={{ color: '#ef4444' }}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+            <button className="btn btn-secondary" onClick={() => {
+              const colors = ['#60a5fa','#34d399','#f97316','#f59e0b','#a78bfa','#fb7185'];
+              const slices = [...(selectedShape.slices || []), { id: `sl${Date.now()}`, label: 'New', value: 10, color: colors[(selectedShape.slices || []).length % colors.length] }];
+              updateShape(selectedShape.id, { slices });
+            }} style={{ width: '100%', padding: '8px', marginTop: '4px' }}>
+              + Add Slice
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Stem & Leaf plot editor ── */}
+      {selectedShape?.type === 'stemLeafPlot' && (
+        <div style={{ marginTop: '24px' }}>
+          <div className="section-title">Stems &amp; Leaves</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {(selectedShape.stems || []).map((row, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-dark)', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                <input
+                  type="text"
+                  value={row.stem}
+                  onChange={(e) => {
+                    const stems = selectedShape.stems.map((r, j) => j === i ? { ...r, stem: e.target.value } : r);
+                    updateShape(selectedShape.id, { stems });
+                  }}
+                  style={{ width: '36px', padding: '4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px', textAlign: 'center', fontFamily: 'monospace' }}
+                />
+                <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>|</span>
+                <input
+                  type="text"
+                  value={(row.leaves || []).join(' ')}
+                  onChange={(e) => {
+                    const leaves = e.target.value.split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
+                    const stems = selectedShape.stems.map((r, j) => j === i ? { ...r, leaves } : r);
+                    updateShape(selectedShape.id, { stems });
+                  }}
+                  placeholder="2 4 7"
+                  style={{ flex: 1, padding: '4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px', fontFamily: 'monospace' }}
+                />
+                <button className="btn-icon" onClick={() => {
+                  const stems = selectedShape.stems.filter((_, j) => j !== i);
+                  updateShape(selectedShape.id, { stems });
+                }} style={{ color: '#ef4444' }}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+            <button className="btn btn-secondary" onClick={() => {
+              const stems = [...(selectedShape.stems || []), { stem: '', leaves: [] }];
+              updateShape(selectedShape.id, { stems });
+            }} style={{ width: '100%', padding: '8px', marginTop: '4px' }}>
+              + Add Stem Row
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Dot Plot values editor ── */}
+      {selectedShape?.type === 'dotPlot' && (
+        <div style={{ marginTop: '24px' }}>
+          <div className="section-title">Data Values</div>
+          <div className="input-group">
+            <label>Values (space or comma separated)</label>
+            <textarea
+              value={(selectedShape.values || []).join(', ')}
+              onChange={(e) => {
+                const values = e.target.value.split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
+                updateShape(selectedShape.id, { values });
+              }}
+              rows={3}
+              style={{ width: '100%', padding: '6px', background: 'var(--bg)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px', fontFamily: 'monospace', fontSize: '12px', resize: 'vertical', boxSizing: 'border-box' }}
+              placeholder="1, 2, 2, 3, 3, 3, 4"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── Pictograph rows editor ── */}
+      {selectedShape?.type === 'pictograph' && (
+        <div style={{ marginTop: '24px' }}>
+          <div className="section-title">Pictograph Rows</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {(selectedShape.rows || []).map((row, i) => (
+              <div key={row.id || i} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-dark)', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                <input
+                  type="text"
+                  value={row.label || ''}
+                  onChange={(e) => {
+                    const rows = selectedShape.rows.map((r, j) => j === i ? { ...r, label: e.target.value } : r);
+                    updateShape(selectedShape.id, { rows });
+                  }}
+                  placeholder="Label"
+                  style={{ flex: 1, padding: '4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px', fontSize: '11px' }}
+                />
+                <input
+                  type="number"
+                  value={row.count}
+                  onChange={(e) => {
+                    const rows = selectedShape.rows.map((r, j) => j === i ? { ...r, count: Number(e.target.value) } : r);
+                    updateShape(selectedShape.id, { rows });
+                  }}
+                  style={{ width: '52px', padding: '4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px' }}
+                />
+                <button className="btn-icon" onClick={() => {
+                  const rows = selectedShape.rows.filter((_, j) => j !== i);
+                  updateShape(selectedShape.id, { rows });
+                }} style={{ color: '#ef4444' }}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+            <button className="btn btn-secondary" onClick={() => {
+              const rows = [...(selectedShape.rows || []), { id: `r${Date.now()}`, label: '', count: 0 }];
+              updateShape(selectedShape.id, { rows });
+            }} style={{ width: '100%', padding: '8px', marginTop: '4px' }}>
+              + Add Row
+            </button>
+          </div>
+        </div>
+      )}
+
 
       {selectedShape?.type === 'cartesianPlane' && (
         <div style={{ marginTop: '24px' }}>
