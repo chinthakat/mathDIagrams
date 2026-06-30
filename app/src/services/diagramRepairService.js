@@ -322,9 +322,13 @@ COMPONENT SELECTION RULES (follow strictly):
   • "dotPlot"       → frequency dot plot: supply values[] array (repeated values stack dots). Use for small integer datasets.
   • "stemLeafPlot"  → stem-and-leaf display: supply stems[] as [{stem, leaves:[]}]. Always include keyText.
   • "pictograph"    → icon-based chart: supply rows[] with {label, count}, iconSrc (clipart id e.g. "star"), iconValue (units per icon).
-  • "dataTable"     → plain data table (rows, cols). Use when the original image shows a TABLE of values, not a chart.
+  • "tallyChart"    → table representing categories and tally mark counts (vertical lines crossed by diagonal lines for blocks of 5).
+  • "dataTable"     → plain data table (rows, cols) with customized cell string content (pass 2D string array "data" for cells). Use when the original image shows a TABLE of values, not a chart.
+  • "tenFrame"      → 1x5 or 2x5 grid filled with circular discs representing numbers. Use for ten-frame/five-frame addition or counting problems.
+  • "baseTenBlocks" → place value blocks showing thousands (3D blocks), hundreds (flats), tens (rods), and ones (units) side-by-side.
+  • "objectArray"   → grid arrays (multiplication arrays) or scattered groups of identical clipart items/circles representing count sets.
   • "vennDiagram"   → two overlapping circles with labelled regions.
-  NEVER manually draw a chart using rectangles/lines when a dedicated graph component is available.
+  NEVER manually draw a chart, table, or array using individual rectangles/lines/circles when a dedicated component is available.
 - Use "departureBoard" for any train/bus departure/arrival timetable showing multiple times.
 - Use "fractionCircle", "fractionRectangle", or "fractionBar" for fraction diagrams.
 - Use "numberline" for number lines. Use "cartesianPlane" for coordinate grids.
@@ -349,6 +353,7 @@ const KNOWN_TYPES = new Set([
   'rightTriangle','isoscelesTriangle','equilateralTriangle','fractionCircle',
   'fractionRectangle','fractionBar','numberline','cartesianPlane',
   'barGraph','lineGraph','pieChart','histogram','dotPlot','stemLeafPlot','pictograph',
+  'tallyChart','tenFrame','baseTenBlocks','objectArray',
   'vennDiagram','annulus','bearings','spinner','factorTree','angleMarker','point',
   'rightAngleMarker','lengthMarker','ruler','text','road','roadJunction','bridge',
   'tree','river','lake','sea','mountain','footpath','playground','airport','port',

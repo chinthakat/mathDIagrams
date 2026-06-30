@@ -33,8 +33,8 @@ export default function Sidebar({ mode, setMode, addShape, addClipart, handleExp
   const categories = {};
   
   // Filter categories based on mode
-  const allowedCategories2D = ['Basic Shapes', 'Geometry', 'Triangles', 'Arrows', 'Diagram Annotations', 'Math Engines', 'Logic & Problem Solving', 'Text & Annotation', 'Images & Icons', 'Measurement', 'Coordinate Geometry', '3D & Diagram'];
-  const allowedCategoriesEq = ['Fractions', 'Graphs & Data', 'Number Lines', 'Text & Annotation'];
+  const allowedCategories2D = ['Basic Shapes', 'Geometry', 'Triangles', 'Arrows', 'Diagram Annotations', 'Math Engines', 'Logic & Problem Solving', 'Text & Annotation', 'Images & Icons', 'Measurement', 'Coordinate Geometry', '3D & Diagram', 'Place Value & Counting'];
+  const allowedCategoriesEq = ['Fractions', 'Graphs & Data', 'Number Lines', 'Text & Annotation', 'Place Value & Counting'];
 
   Object.keys(rawCategories).forEach(cat => {
     if ((mode === '2D' || mode === 'Geometry') && allowedCategories2D.includes(cat)) {

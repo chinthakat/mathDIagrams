@@ -1,39 +1,79 @@
 import React from 'react';
-import { Group, Rect, Line, Text } from 'react-konva';
+import { Group, Rect, Text } from 'react-konva';
 
-export default function DataTable({ width, height, rows, cols, headerColor, stroke, strokeWidth }) {
-  const rowHeight = height / rows;
-  const colWidth = width / cols;
-  
+/**
+ * DataTable — customizable mathematical data table.
+ *
+ * Props:
+ *   width, height — outer bounding dimensions
+ *   rows, cols    — grid dimensions
+ *   data          — 2D string array: data[row][col]
+ *   headerColor   — background fill color for the top row
+ *   stroke        — cell boundary lines color
+ *   strokeWidth   — boundary lines thickness
+ *   fontSize      — size of text inside cell
+ *   textColor     — color of cell contents
+ *   fontFamily    — font family of text
+ */
+export default function DataTable({
+  width = 300,
+  height = 150,
+  rows = 4,
+  cols = 2,
+  data,
+  headerColor = '#cbd5e1',
+  stroke = '#334155',
+  strokeWidth = 1.5,
+  fontSize = 12,
+  textColor = '#1e293b',
+  fontFamily = 'Arial',
+}) {
+  const cellW = width / cols;
+  const cellH = height / rows;
+
+  // Fallback grid initialization
+  const safeData = data || Array.from({ length: rows }, (_, r) =>
+    Array.from({ length: cols }, (_, c) => r === 0 ? `Header ${c + 1}` : '')
+  );
+
   const cells = [];
-  
-  // Create background and grid lines
+
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const isHeader = r === 0;
-      
+      const val = safeData[r]?.[c] != null ? String(safeData[r][c]) : '';
+
+      const cx = c * cellW;
+      const cy = r * cellH;
+
       cells.push(
         <Group key={`cell-${r}-${c}`}>
-          <Rect 
-            x={c * colWidth} 
-            y={r * rowHeight} 
-            width={colWidth} 
-            height={rowHeight} 
-            fill={isHeader ? headerColor : 'transparent'} 
-            stroke={stroke} 
-            strokeWidth={strokeWidth} 
+          {/* Cell block */}
+          <Rect
+            x={cx}
+            y={cy}
+            width={cellW}
+            height={cellH}
+            fill={isHeader ? headerColor : '#ffffff'}
+            stroke={stroke}
+            strokeWidth={strokeWidth}
           />
-          {/* Default placeholder text just to show it's a table */}
-          {isHeader && (
-            <Text 
-              text={`Header ${c + 1}`} 
-              x={c * colWidth + 5} 
-              y={r * rowHeight + rowHeight / 2 - 6} 
-              width={colWidth - 10}
+          {/* Cell Text content */}
+          {val.trim() !== '' && (
+            <Text
+              text={val}
+              x={cx + 4}
+              y={cy + (cellH - fontSize) / 2 - 2}
+              width={cellW - 8}
+              height={cellH - 4}
               align="center"
-              fontSize={12} 
-              fill={stroke} 
-              fontStyle="bold"
+              fontSize={fontSize}
+              fill={textColor}
+              fontStyle={isHeader ? 'bold' : 'normal'}
+              fontFamily={fontFamily}
+              verticalAlign="middle"
+              ellipsis={true}
+              wrap="char"
             />
           )}
         </Group>
@@ -43,6 +83,8 @@ export default function DataTable({ width, height, rows, cols, headerColor, stro
 
   return (
     <Group>
+      {/* Invisible background wrapper */}
+      <Rect x={0} y={0} width={width} height={height} fill="transparent" />
       {cells}
     </Group>
   );

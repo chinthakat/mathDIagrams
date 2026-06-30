@@ -78,6 +78,23 @@ Available shape types (use these exact strings for the "type" field):
     • iconValue — units each icon represents (e.g. 2 → each icon = 2 votes)
     • rows[].count — total units for that row (icons auto-calculated as count/iconValue)
     • Use for: pictograms, pictographs, icon charts
+- tallyChart: { width, height, title, categories: [{id, label, count}], stroke, strokeWidth }
+    • categories — list of rows to display: label (category text) and count (integer tally value)
+    • Renders tally marks (groups of 5: 4 vertical + 1 diagonal crossing line) and a frequency total column.
+    • Use for: tally mark tables, frequency charts
+- tenFrame: { width, height, frameSize, count, counterColor, fillColor, stroke, strokeWidth }
+    • frameSize — 5 (five frame) or 10 (ten frame) cells.
+    • count — number of circular counter discs inside the frame (0 to frameSize).
+    • Use for: 10-frame or 5-frame counting/addition visual problems.
+- baseTenBlocks: { width, height, thousands, hundreds, tens, ones, fillColor, stroke, strokeWidth }
+    • thousands, hundreds, tens, ones — place value unit counts (e.g. ones=6, tens=4, hundreds=2, thousands=1)
+    • Renders 3D blocks (thousands), 10x10 flats (hundreds), vertical rods (tens), and small cubes (ones) grouped side-by-side.
+    • Use for: place value block representation diagrams.
+- objectArray: { width, height, count, rows, cols, layout, iconSrc, iconSize, spacing, fillColor }
+    • layout — 'grid' (ordered rows x cols) or 'scatter' (dispersed scattering within bounds).
+    • iconSrc — clipart ID from the library (e.g. 'apple', 'star', 'fishBlue') or empty for circles.
+    • count — total items to render (especially for scatter layout).
+    • Use for: multiplication arrays, counting groups, grids of objects.
 - vennDiagram: { radius, overlapPercent, labelA, labelB, fillA, fillB, fillOverlap }
 - annulus: { innerRadius, outerRadius, fill, stroke, strokeWidth, showLabels }
 - bearings: { bearing, radius, stroke, strokeWidth, label }
@@ -547,7 +564,9 @@ export const REGISTERED_COMPONENT_TYPES = [
   'rasterImage',
   'rectangle','circle','triangle','polygon','customPolygon','line','rightTriangle','isoscelesTriangle',
   'equilateralTriangle','fractionCircle','fractionRectangle','fractionBar','numberline',
-  'cartesianPlane','barGraph','vennDiagram','annulus','bearings','spinner','factorTree',
+  'cartesianPlane','barGraph','lineGraph','pieChart','histogram','dotPlot','stemLeafPlot','pictograph',
+  'tallyChart','tenFrame','baseTenBlocks','objectArray',
+  'vennDiagram','annulus','bearings','spinner','factorTree',
   'angleMarker','point','rightAngleMarker','lengthMarker','ruler','text',
   'road','roadJunction','bridge','tree','river','lake','sea','mountain','footpath',
   'playground','airport','port','mapMarker','mapSprite','gridMap','scaleBar',

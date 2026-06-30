@@ -64,6 +64,10 @@ import StemAndLeafPlot from '../components/MathObjects/StemAndLeafPlot';
 import DotPlot from '../components/MathObjects/DotPlot';
 import Histogram from '../components/MathObjects/Histogram';
 import Pictograph from '../components/MathObjects/Pictograph';
+import TallyChart from '../components/MathObjects/TallyChart';
+import TenFrame from '../components/MathObjects/TenFrame';
+import BaseTenBlocks from '../components/MathObjects/BaseTenBlocks';
+import ObjectArray from '../components/MathObjects/ObjectArray';
 import IsometricCube from '../components/MathObjects/IsometricCube';
 import Cylinder from '../components/MathObjects/Cylinder';
 import BlockArrow from '../components/MathObjects/BlockArrow';
@@ -87,7 +91,7 @@ import CloudShape from '../components/MathObjects/CloudShape';
 import Teardrop from '../components/MathObjects/Teardrop';
 import TagLabel from '../components/MathObjects/TagLabel';
 import NoSign from '../components/MathObjects/NoSign';
-import { PieChart as PieChartIcon, TrendingUp, Layers, Minus as MinusIcon, BarChart2, ImageIcon as PictIcon, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon, Bug, Waypoints, CornerDownRight, Spline, Code, Clock, Monitor, AlignLeft, Box, Database, ChevronRight, Diamond as DiamondIcon, Star, Zap, Plus, Tag, Ban } from 'lucide-react';
+import { PieChart as PieChartIcon, Grid3X3, Tally5, TrendingUp, Layers, Minus as MinusIcon, BarChart2, ImageIcon as PictIcon, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon, Bug, Waypoints, CornerDownRight, Spline, Code, Clock, Monitor, AlignLeft, Box, Database, ChevronRight, Diamond as DiamondIcon, Star, Zap, Plus, Tag, Ban } from 'lucide-react';
 
 
 const getNumeric = (val, fallback) => {
@@ -524,7 +528,7 @@ export const ObjectRegistry = {
     id: 'fractionCircle',
     category: 'Fractions',
     name: 'Fraction Circle',
-    icon: <PieChart size={18} />,
+    icon: <PieChartIcon size={18} />,
     defaultProps: { radius: 60, sectors: 4, shaded: 1, fill: '#3b82f6', stroke: '#334155', strokeWidth: 2, rotation: 0 },
     Component: ({ props }) => <FractionCircle radius={props.radius} sectors={props.sectors} shaded={props.shaded} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
     properties: [
@@ -665,8 +669,19 @@ export const ObjectRegistry = {
     category: 'Graphs & Data',
     name: 'Data Table',
     icon: <Table size={18} />,
-    defaultProps: { width: 300, height: 150, rows: 4, cols: 2, headerColor: '#cbd5e1', stroke: '#334155', strokeWidth: 2, rotation: 0 },
-    Component: ({ props }) => <DataTable width={props.width} height={props.height} rows={props.rows} cols={props.cols} headerColor={props.headerColor} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
+    defaultProps: {
+      width: 300, height: 150, rows: 3, cols: 2,
+      headerColor: '#cbd5e1', stroke: '#334155', strokeWidth: 1.5, rotation: 0,
+      data: [
+        ['Item', 'Count'],
+        ['Apples', '5'],
+        ['Oranges', '3']
+      ]
+    },
+    Component: ({ props }) => (
+      <DataTable width={props.width} height={props.height} rows={props.rows} cols={props.cols}
+        data={props.data} headerColor={props.headerColor} stroke={props.stroke} strokeWidth={props.strokeWidth} />
+    ),
     properties: [
       { name: 'headerColor', label: 'Header Color', type: 'color' },
       { name: 'stroke', label: 'Border Color', type: 'color' },
@@ -675,6 +690,33 @@ export const ObjectRegistry = {
       { name: 'height', label: 'Height', type: 'number' },
       { name: 'rows', label: 'Rows', type: 'range', min: 1, max: 20 },
       { name: 'cols', label: 'Columns', type: 'range', min: 1, max: 10 }
+    ]
+  },
+
+  tallyChart: {
+    id: 'tallyChart',
+    category: 'Graphs & Data',
+    name: 'Tally Chart',
+    icon: <Tally5 size={18} />,
+    defaultProps: {
+      width: 340, height: 200, title: 'Tally Chart',
+      categories: [
+        { id: 'c1', label: 'Red', count: 5 },
+        { id: 'c2', label: 'Blue', count: 7 },
+        { id: 'c3', label: 'Green', count: 3 },
+      ],
+      stroke: '#334155', strokeWidth: 1.5, rotation: 0,
+    },
+    Component: ({ props }) => (
+      <TallyChart width={props.width} height={props.height} title={props.title}
+        categories={props.categories} stroke={props.stroke} strokeWidth={props.strokeWidth} />
+    ),
+    properties: [
+      { name: 'title', label: 'Title', type: 'text' },
+      { name: 'stroke', label: 'Lines/Borders Color', type: 'color' },
+      { name: 'strokeWidth', label: 'Line Thickness', type: 'range', min: 1, max: 5 },
+      { name: 'width', label: 'Width', type: 'number' },
+      { name: 'height', label: 'Height', type: 'number' },
     ]
   },
 
@@ -876,6 +918,90 @@ export const ObjectRegistry = {
       { name: 'maxIcons', label: 'Max per Row', type: 'range', min: 3, max: 20 },
       { name: 'keyText', label: 'Key Text', type: 'text' },
       { name: 'stroke', label: 'Text Color', type: 'color' },
+      { name: 'width', label: 'Width', type: 'number' },
+      { name: 'height', label: 'Height', type: 'number' },
+    ]
+  },
+
+  tenFrame: {
+    id: 'tenFrame',
+    category: 'Place Value & Counting',
+    name: 'Ten Frame',
+    icon: <LayoutGrid size={18} />,
+    defaultProps: {
+      width: 240, height: 100, frameSize: 10, count: 7,
+      counterColor: '#ef4444', fillColor: '#ffffff',
+      stroke: '#334155', strokeWidth: 2, rotation: 0,
+    },
+    Component: ({ props }) => (
+      <TenFrame width={props.width} height={props.height} frameSize={props.frameSize}
+        count={props.count} counterColor={props.counterColor} fillColor={props.fillColor}
+        stroke={props.stroke} strokeWidth={props.strokeWidth} />
+    ),
+    properties: [
+      { name: 'frameSize', label: 'Frame Size (5 or 10)', type: 'range', min: 5, max: 10, step: 5 },
+      { name: 'count', label: 'Counters Count', type: 'range', min: 0, max: 10 },
+      { name: 'counterColor', label: 'Counter Color', type: 'color' },
+      { name: 'fillColor', label: 'Cell Background', type: 'color' },
+      { name: 'stroke', label: 'Border Color', type: 'color' },
+      { name: 'strokeWidth', label: 'Border Thickness', type: 'range', min: 1, max: 5 },
+      { name: 'width', label: 'Width', type: 'number' },
+      { name: 'height', label: 'Height', type: 'number' },
+    ]
+  },
+
+  baseTenBlocks: {
+    id: 'baseTenBlocks',
+    category: 'Place Value & Counting',
+    name: 'Base Ten Blocks',
+    icon: <Box size={18} />,
+    defaultProps: {
+      width: 400, height: 200,
+      thousands: 1, hundreds: 2, tens: 4, ones: 6,
+      fillColor: '#a78bfa', stroke: '#1e1b4b', strokeWidth: 1, rotation: 0,
+    },
+    Component: ({ props }) => (
+      <BaseTenBlocks width={props.width} height={props.height}
+        thousands={props.thousands} hundreds={props.hundreds} tens={props.tens} ones={props.ones}
+        fillColor={props.fillColor} stroke={props.stroke} strokeWidth={props.strokeWidth} />
+    ),
+    properties: [
+      { name: 'thousands', label: 'Thousands (Blocks)', type: 'range', min: 0, max: 5 },
+      { name: 'hundreds', label: 'Hundreds (Flats)', type: 'range', min: 0, max: 9 },
+      { name: 'tens', label: 'Tens (Rods)', type: 'range', min: 0, max: 9 },
+      { name: 'ones', label: 'Ones (Units)', type: 'range', min: 0, max: 9 },
+      { name: 'fillColor', label: 'Blocks Color', type: 'color' },
+      { name: 'stroke', label: 'Outline Color', type: 'color' },
+      { name: 'width', label: 'Width', type: 'number' },
+      { name: 'height', label: 'Height', type: 'number' },
+    ]
+  },
+
+  objectArray: {
+    id: 'objectArray',
+    category: 'Place Value & Counting',
+    name: 'Object Array Grid',
+    icon: <Grid3X3 size={18} />,
+    defaultProps: {
+      width: 300, height: 200, count: 12, rows: 3, cols: 4,
+      layout: 'grid', iconSrc: 'star', iconSize: 28, spacing: 10,
+      fillColor: '#3b82f6', rotation: 0,
+    },
+    Component: ({ props }) => (
+      <ObjectArray width={props.width} height={props.height} count={props.count}
+        rows={props.rows} cols={props.cols} layout={props.layout}
+        iconSrc={props.iconSrc} iconSize={props.iconSize} spacing={props.spacing}
+        fillColor={props.fillColor} />
+    ),
+    properties: [
+      { name: 'layout', label: 'Layout Style', type: 'select', options: ['grid', 'scatter'] },
+      { name: 'iconSrc', label: 'Icon Clipart ID', type: 'text' },
+      { name: 'count', label: 'Total Count', type: 'number' },
+      { name: 'rows', label: 'Grid Rows', type: 'range', min: 1, max: 12 },
+      { name: 'cols', label: 'Grid Columns', type: 'range', min: 1, max: 12 },
+      { name: 'iconSize', label: 'Item Size', type: 'range', min: 12, max: 64 },
+      { name: 'spacing', label: 'Item Spacing', type: 'range', min: 2, max: 32 },
+      { name: 'fillColor', label: 'Circle Color (if no icon)', type: 'color' },
       { name: 'width', label: 'Width', type: 'number' },
       { name: 'height', label: 'Height', type: 'number' },
     ]

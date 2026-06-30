@@ -962,6 +962,289 @@ CRITICAL INSTRUCTIONS:
         </div>
       )}
 
+      {selectedShape?.type === 'dataTable' && (
+        <div style={{ marginTop: '24px' }}>
+          <div className="section-title">Table Cells</div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${selectedShape.cols || 2}, minmax(60px, 1fr))`,
+            gap: '4px',
+            background: 'var(--bg-dark)',
+            padding: '8px',
+            borderRadius: '4px',
+            border: '1px solid var(--border-color)',
+            overflowX: 'auto'
+          }}>
+            {Array.from({ length: selectedShape.rows || 3 }).map((_, r) =>
+              Array.from({ length: selectedShape.cols || 2 }).map((_, c) => {
+                const safeData = selectedShape.data || [];
+                const val = safeData[r]?.[c] || '';
+                return (
+                  <input
+                    key={`cell-${r}-${c}`}
+                    type="text"
+                    value={val}
+                    onChange={(e) => {
+                      const newData = [...safeData.map(row => [...row])];
+                      while (newData.length <= r) {
+                        newData.push(Array(selectedShape.cols || 2).fill(''));
+                      }
+                      while (newData[r].length <= c) {
+                        newData[r].push('');
+                      }
+                      newData[r][c] = e.target.value;
+                      updateShape(selectedShape.id, { data: newData });
+                    }}
+                    style={{
+                      padding: '4px',
+                      background: r === 0 ? 'var(--bg)' : 'transparent',
+                      border: '1px solid var(--border-color)',
+                      color: 'white',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: r === 0 ? 'bold' : 'normal',
+                      textAlign: 'center',
+                      minWidth: '50px'
+                    }}
+                  />
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {selectedShape?.type === 'tallyChart' && (
+        <div style={{ marginTop: '24px' }}>
+          <div className="section-title">Tally Categories</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {(selectedShape.categories || []).map((cat, index) => (
+              <div key={cat.id || index} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-dark)', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', width: '14px' }}>{index + 1}.</span>
+                <input
+                  type="text"
+                  value={cat.label || ''}
+                  onChange={(e) => {
+                    const categories = selectedShape.categories.map(c => c.id === cat.id ? { ...c, label: e.target.value } : c);
+                    updateShape(selectedShape.id, { categories });
+                  }}
+                  placeholder="Category"
+                  style={{ flex: 1, padding: '4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px', fontSize: '11px', minWidth: '40px' }}
+                />
+                <input
+                  type="number"
+                  value={cat.count}
+                  onChange={(e) => {
+                    const categories = selectedShape.categories.map(c => c.id === cat.id ? { ...c, count: Number(e.target.value) } : c);
+                    updateShape(selectedShape.id, { categories });
+                  }}
+                  style={{ width: '48px', padding: '4px', background: 'transparent', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px' }}
+                />
+                <button className="btn-icon" onClick={() => {
+                  const categories = selectedShape.categories.filter(c => c.id !== cat.id);
+                  updateShape(selectedShape.id, { categories });
+                }} style={{ color: '#ef4444' }}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+            <button className="btn btn-secondary" onClick={() => {
+              const categories = [...(selectedShape.categories || []), { id: `c${Date.now()}`, label: 'New', count: 5 }];
+              updateShape(selectedShape.id, { categories });
+            }} style={{ width: '100%', padding: '8px', marginTop: '4px' }}>
+              + Add Category
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Ten Frame properties */}
+      {selectedShape?.type === 'tenFrame' && (
+        <div style={{ marginTop: '24px' }}>
+          <div className="section-title">Ten Frame Settings</div>
+          <div className="input-group" style={{ marginBottom: '12px' }}>
+            <label>Frame Size</label>
+            <select
+              value={selectedShape.frameSize || 10}
+              onChange={(e) => {
+                const fs = Number(e.target.value);
+                const count = Math.min(selectedShape.count || 0, fs);
+                updateShape(selectedShape.id, { frameSize: fs, count });
+              }}
+              style={{ width: '100%', padding: '6px', background: 'var(--bg)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px' }}
+            >
+              <option value={5}>5-Frame (1x5)</option>
+              <option value={10}>10-Frame (2x5)</option>
+            </select>
+          </div>
+          <div className="input-group" style={{ marginBottom: '12px' }}>
+            <label>Counters Count ({selectedShape.count || 0})</label>
+            <input
+              type="range"
+              min={0}
+              max={selectedShape.frameSize || 10}
+              value={selectedShape.count || 0}
+              onChange={(e) => updateShape(selectedShape.id, { count: Number(e.target.value) })}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div className="input-group" style={{ marginBottom: '12px' }}>
+            <label>Counter Color</label>
+            <input
+              type="color"
+              value={selectedShape.counterColor || '#ef4444'}
+              onChange={(e) => updateShape(selectedShape.id, { counterColor: e.target.value })}
+              style={{ width: '100%', height: '30px', border: 'none', background: 'transparent', cursor: 'pointer' }}
+            />
+          </div>
+          <div className="input-group" style={{ marginBottom: '12px' }}>
+            <label>Cell Background</label>
+            <input
+              type="color"
+              value={selectedShape.fillColor || '#ffffff'}
+              onChange={(e) => updateShape(selectedShape.id, { fillColor: e.target.value })}
+              style={{ width: '100%', height: '30px', border: 'none', background: 'transparent', cursor: 'pointer' }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Base Ten Blocks properties */}
+      {selectedShape?.type === 'baseTenBlocks' && (
+        <div style={{ marginTop: '24px' }}>
+          <div className="section-title">Place Value Counts</div>
+          <div className="input-group" style={{ marginBottom: '10px' }}>
+            <label>Thousands (Blocks): {selectedShape.thousands || 0}</label>
+            <input
+              type="range"
+              min={0}
+              max={5}
+              value={selectedShape.thousands || 0}
+              onChange={(e) => updateShape(selectedShape.id, { thousands: Number(e.target.value) })}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div className="input-group" style={{ marginBottom: '10px' }}>
+            <label>Hundreds (Flats): {selectedShape.hundreds || 0}</label>
+            <input
+              type="range"
+              min={0}
+              max={9}
+              value={selectedShape.hundreds || 0}
+              onChange={(e) => updateShape(selectedShape.id, { hundreds: Number(e.target.value) })}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div className="input-group" style={{ marginBottom: '10px' }}>
+            <label>Tens (Rods): {selectedShape.tens || 0}</label>
+            <input
+              type="range"
+              min={0}
+              max={9}
+              value={selectedShape.tens || 0}
+              onChange={(e) => updateShape(selectedShape.id, { tens: Number(e.target.value) })}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div className="input-group" style={{ marginBottom: '10px' }}>
+            <label>Ones (Units): {selectedShape.ones || 0}</label>
+            <input
+              type="range"
+              min={0}
+              max={9}
+              value={selectedShape.ones || 0}
+              onChange={(e) => updateShape(selectedShape.id, { ones: Number(e.target.value) })}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div className="input-group" style={{ marginBottom: '10px' }}>
+            <label>Blocks Color</label>
+            <input
+              type="color"
+              value={selectedShape.fillColor || '#a78bfa'}
+              onChange={(e) => updateShape(selectedShape.id, { fillColor: e.target.value })}
+              style={{ width: '100%', height: '30px', border: 'none', background: 'transparent', cursor: 'pointer' }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Object Array Grid properties */}
+      {selectedShape?.type === 'objectArray' && (
+        <div style={{ marginTop: '24px' }}>
+          <div className="section-title">Object Collection Settings</div>
+          <div className="input-group" style={{ marginBottom: '12px' }}>
+            <label>Layout Style</label>
+            <select
+              value={selectedShape.layout || 'grid'}
+              onChange={(e) => updateShape(selectedShape.id, { layout: e.target.value })}
+              style={{ width: '100%', padding: '6px', background: 'var(--bg)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px' }}
+            >
+              <option value="grid">Grid (Ordered Array)</option>
+              <option value="scatter">Scatter (Dispersed Count)</option>
+            </select>
+          </div>
+          <div className="input-group" style={{ marginBottom: '12px' }}>
+            <label>Icon Clipart ID</label>
+            <input
+              type="text"
+              value={selectedShape.iconSrc || ''}
+              onChange={(e) => updateShape(selectedShape.id, { iconSrc: e.target.value })}
+              placeholder="e.g. apple, star, fishBlue (empty for circles)"
+              style={{ width: '100%', padding: '6px', background: 'var(--bg)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px', fontSize: '11px', boxSizing: 'border-box' }}
+            />
+          </div>
+          <div className="input-group" style={{ marginBottom: '12px' }}>
+            <label>Total Items Count</label>
+            <input
+              type="number"
+              value={selectedShape.count || 0}
+              onChange={(e) => updateShape(selectedShape.id, { count: Number(e.target.value) })}
+              style={{ width: '100%', padding: '6px', background: 'var(--bg)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '4px', boxSizing: 'border-box' }}
+            />
+          </div>
+          {selectedShape.layout === 'grid' && (
+            <>
+              <div className="input-group" style={{ marginBottom: '12px' }}>
+                <label>Grid Rows ({selectedShape.rows || 3})</label>
+                <input
+                  type="range"
+                  min={1}
+                  max={12}
+                  value={selectedShape.rows || 3}
+                  onChange={(e) => updateShape(selectedShape.id, { rows: Number(e.target.value) })}
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <div className="input-group" style={{ marginBottom: '12px' }}>
+                <label>Grid Columns ({selectedShape.cols || 4})</label>
+                <input
+                  type="range"
+                  min={1}
+                  max={12}
+                  value={selectedShape.cols || 4}
+                  onChange={(e) => updateShape(selectedShape.id, { cols: Number(e.target.value) })}
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </>
+          )}
+          <div className="input-group" style={{ marginBottom: '12px' }}>
+            <label>Item Size</label>
+            <input
+              type="range"
+              min={12}
+              max={64}
+              value={selectedShape.iconSize || 28}
+              onChange={(e) => updateShape(selectedShape.id, { iconSize: Number(e.target.value) })}
+              style={{ width: '100%' }}
+            />
+          </div>
+        </div>
+      )}
+
+
+
 
       {selectedShape?.type === 'cartesianPlane' && (
         <div style={{ marginTop: '24px' }}>
