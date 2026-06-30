@@ -23,7 +23,7 @@ export default function UTurnArrow({
   if (gap < 2) {
     // Not enough room — render degenerate rect
     return <Path data={`M ${-w/2} ${-h/2} L ${w/2} ${-h/2} L ${w/2} ${h/2} L ${-w/2} ${h/2} Z`}
-      fill={fill} stroke={stroke} strokeWidth={strokeWidth} listening={false} />;
+      fill={fill} stroke={stroke} strokeWidth={strokeWidth}  />;
   }
 
   const R     = (gap + shaftW) / 2;   // outer semicircle radius (to shaft centre axis)
@@ -70,5 +70,5 @@ export default function UTurnArrow({
     'Z',
   ].join(' ');
 
-  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} listening={false} />;
+  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth}  />;
 }

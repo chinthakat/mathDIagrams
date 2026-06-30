@@ -283,14 +283,18 @@ export default function DiagramEngineModal({ question, onClose, onSaved }) {
   const addShape = (type) => {
     const reg = ObjectRegistry[type];
     const id = `shape_${Date.now()}`;
-    setShapes(prev => [...prev, { id, type, x: 400, y: 250, ...reg?.defaultProps }]);
+    const rx = 400 + (Math.floor(Math.random() * 7) - 3) * 20;
+    const ry = 300 + (Math.floor(Math.random() * 7) - 3) * 20;
+    setShapes(prev => [...prev, { id, type, x: rx, y: ry, ...reg?.defaultProps }]);
     setSelectedId(id);
     setRecentlyUsed(prev => [type, ...prev.filter(t => t !== type)].slice(0, 10));
   };
 
   const addClipart = item => {
     const id = `clipart_${Date.now()}`;
-    setShapes(prev => [...prev, { id, type: 'rasterImage', x: 360, y: 210, src: item.url, width: 80, height: 80, opacity: 1, rotation: 0 }]);
+    const rx = 400 + (Math.floor(Math.random() * 7) - 3) * 20;
+    const ry = 300 + (Math.floor(Math.random() * 7) - 3) * 20;
+    setShapes(prev => [...prev, { id, type: 'rasterImage', x: rx, y: ry, src: item.url, width: 80, height: 80, opacity: 1, rotation: 0 }]);
     setSelectedId(id);
   };
 

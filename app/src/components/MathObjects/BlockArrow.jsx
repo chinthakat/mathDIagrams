@@ -49,7 +49,7 @@ export default function BlockArrow({
       stroke={stroke}
       strokeWidth={strokeWidth}
       rotation={rot}
-      listening={false}
+      
     />
   );
 }

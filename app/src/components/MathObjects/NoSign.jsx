@@ -7,8 +7,8 @@ export default function NoSign({ width = 80, height = 80, fill = '#fee2e2', stro
   const diag = r * Math.cos(Math.PI / 4);
   return (
     <Group>
-      <Circle radius={r} fill={fill} stroke={stroke} strokeWidth={sw} listening={false} />
-      <Line points={[-diag, -diag, diag, diag]} stroke={stroke} strokeWidth={sw * 1.5} listening={false} />
+      <Circle radius={r} fill={fill} stroke={stroke} strokeWidth={sw}  />
+      <Line points={[-diag, -diag, diag, diag]} stroke={stroke} strokeWidth={sw * 1.5}  />
     </Group>
   );
 }

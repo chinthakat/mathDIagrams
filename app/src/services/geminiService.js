@@ -25,6 +25,57 @@ export function getGeminiApiKey() {
 }
 export function saveGeminiApiKey(k) { localStorage.setItem('gemini_api_key', k); }
 
+import { logModelCall } from './pipelineLogger.js';
+
+let cachedContentMap = {};
+
+/**
+ * Creates or retrieves an active explicit context cache for a given system instruction.
+ * @returns {Promise<string>} The cachedContent resource name (e.g. 'cachedContents/xyz123')
+ */
+export async function getOrCreateShapeCache(apiKey, systemInstruction, modelName = 'models/gemini-3.5-flash') {
+  // Use a hash of the instruction to support multiple distinct caches if needed
+  const cacheKey = modelName;
+  const current = cachedContentMap[cacheKey];
+  
+  if (current && Date.now() < current.expiry) {
+    return current.name;
+  }
+  
+  const url = `https://generativelanguage.googleapis.com/v1beta/cachedContents?key=${apiKey}`;
+  const body = {
+    model: modelName,
+    systemInstruction: {
+      parts: [{ text: systemInstruction }]
+    },
+    ttl: "3600s"
+  };
+  
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    
+    if (!resp.ok) {
+      console.warn('Failed to create cache, falling back to uncached', await resp.text());
+      return null;
+    }
+    
+    const data = await resp.json();
+    cachedContentMap[cacheKey] = {
+      name: data.name,
+      expiry: Date.now() + (55 * 60 * 1000) // 55 mins to be safe
+    };
+    return data.name;
+  } catch (e) {
+    console.warn('Error creating explicit cache:', e);
+    return null;
+  }
+}
+
+
 // ── Image generation ──────────────────────────────────────────────────────────
 
 /**
@@ -69,26 +120,52 @@ export async function generateGeminiImage({ prompt, referenceImageBase64 = null,
     generationConfig: { responseModalities: ['IMAGE'] },
   };
 
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
 
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Gemini image API error: ${resp.status}`);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Gemini image API error: ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    const parts2 = data.candidates?.[0]?.content?.parts || [];
+    const imagePart = parts2.find(p => p.inlineData?.data);
+    if (!imagePart) {
+      const textOut = parts2.find(p => p.text)?.text || 'No image returned';
+      throw new Error(`Gemini returned no image. Response: ${textOut.slice(0, 200)}`);
+    }
+
+    const finalImageUri = `data:image/png;base64,${imagePart.inlineData.data}`;
+    await logModelCall({
+      stage: 'generate_image',
+      attempt: 0,
+      model,
+      systemPrompt: preamble,
+      userMessages: [{ role: 'user', parts: [{ text: textPrompt }] }],
+      responseText: '[Base64 PNG Image Generated]',
+      parsedResult: { image: '[IMAGE DATA]' },
+      durationMs: Date.now() - t0,
+    });
+    return finalImageUri;
+  } catch (e) {
+    await logModelCall({
+      stage: 'generate_image',
+      attempt: 0,
+      model,
+      systemPrompt: preamble,
+      userMessages: [{ role: 'user', parts: [{ text: textPrompt }] }],
+      responseText: '',
+      parsedResult: null,
+      durationMs: Date.now() - t0,
+      error: e.message,
+    });
+    throw e;
   }
-
-  const data = await resp.json();
-  const parts2 = data.candidates?.[0]?.content?.parts || [];
-  const imagePart = parts2.find(p => p.inlineData?.data);
-  if (!imagePart) {
-    const textOut = parts2.find(p => p.text)?.text || 'No image returned';
-    throw new Error(`Gemini returned no image. Response: ${textOut.slice(0, 200)}`);
-  }
-
-  return `data:image/png;base64,${imagePart.inlineData.data}`;
 }
 
 // ── Vision validation ─────────────────────────────────────────────────────────
@@ -97,7 +174,8 @@ export async function generateGeminiImage({ prompt, referenceImageBase64 = null,
  * Validate a generated diagram image via Gemini vision.
  * @returns {{ isCorrect: boolean, feedback: string, score: number }}
  */
-export async function validateWithGemini({ imageBase64, analysis, feedbackHistory = [], model = GEMINI_VISION_MODELS[0].id, apiKey }) {
+export async function validateWithGemini({ imageBase64, analysis, feedbackHistory = [], model = GEMINI_VISION_MODELS[0].id, apiKey, attempt = 0 }) {
+  const t0 = Date.now();
   const checklist = (analysis.verificationChecklist || [])
     .map(item => item.replace(/[✓✗☑☒]/g, '').replace(/\b(true|false|correct|incorrect|not 3\/4|= 3\/4)\b/gi, '').trim())
     .filter(item => item.length > 10 && !item.startsWith('e.g.') && !item.startsWith('VISUAL') && !item.startsWith('Format') && !item.startsWith('Each item'))
@@ -133,27 +211,56 @@ Respond with ONLY valid JSON — no markdown, no preamble:
     generationConfig: { temperature: 0.1 },
   };
 
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  let text = '';
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
 
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Gemini vision API error: ${resp.status}`);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Gemini vision API error: ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    // Strip markdown fences if present
+    let cleaned = text;
+    const fenced = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (fenced) cleaned = fenced[1];
+    const objStart = cleaned.indexOf('{');
+    if (objStart > 0) cleaned = cleaned.slice(objStart);
+
+    const parsed = JSON.parse(cleaned);
+    await logModelCall({
+      stage: 'validate',
+      attempt,
+      model,
+      systemPrompt: 'Mathematics diagram QA validation rules',
+      userMessages: [{ role: 'user', parts: [{ text: prompt }, { text: '[Screenshot attached]' }] }],
+      responseText: text,
+      parsedResult: parsed,
+      durationMs: Date.now() - t0,
+    });
+
+    return parsed;
+  } catch (e) {
+    await logModelCall({
+      stage: 'validate',
+      attempt,
+      model,
+      systemPrompt: 'Mathematics diagram QA validation rules',
+      userMessages: [{ role: 'user', parts: [{ text: prompt }] }],
+      responseText: text,
+      parsedResult: null,
+      durationMs: Date.now() - t0,
+      error: e.message,
+    });
+    throw e;
   }
-
-  const data = await resp.json();
-  let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-  // Strip markdown fences if present
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  if (fenced) text = fenced[1];
-  const objStart = text.indexOf('{');
-  if (objStart > 0) text = text.slice(objStart);
-
-  return JSON.parse(text);
 }
 
 // ── Generic REST caller for Gemini ──────────────────────────────────────────
@@ -175,56 +282,90 @@ async function fetchImageBase64(url) {
   }
 }
 
-export async function callGemini({ systemInstruction, contents, model = 'gemini-2.0-flash', apiKey, responseMimeType = 'application/json' }) {
-  const url = `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`;
-  const body = {
-    contents,
-    generationConfig: {
-      temperature: 0.2,
-    }
-  };
-
-  if (responseMimeType) {
-    body.generationConfig.responseMimeType = responseMimeType;
-  }
-
-  if (systemInstruction) {
-    body.systemInstruction = {
-      parts: [{ text: systemInstruction }]
+export async function callGemini({ systemInstruction, contents, model = 'gemini-3.5-flash', apiKey, responseMimeType = 'application/json', cachedContentName = null, stage = 'gemini_call', attempt = 0 }) {
+  const t0 = Date.now();
+  let text = '';
+  try {
+    const url = `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`;
+    const body = {
+      contents,
+      generationConfig: {
+        temperature: 0.2,
+      }
     };
-  }
 
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+    if (responseMimeType) {
+      body.generationConfig.responseMimeType = responseMimeType;
+    }
 
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Gemini API error: ${resp.status}`);
-  }
+    if (cachedContentName) {
+      body.cachedContent = cachedContentName;
+      // System instruction is already in the cache; DO NOT send it again.
+    } else if (systemInstruction) {
+      body.systemInstruction = {
+        parts: [{ text: systemInstruction }]
+      };
+    }
 
-  const data = await resp.json();
-  let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  
-  if (responseMimeType === 'application/json') {
-    // Strip markdown fences if present
-    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (fenced) text = fenced[1];
-    const objStart = text.indexOf('{');
-    const arrStart = text.indexOf('[');
-    const start = objStart === -1 ? arrStart : arrStart === -1 ? objStart : Math.min(objStart, arrStart);
-    if (start !== -1) text = text.slice(start);
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Gemini API error: ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    let parsedResult = null;
+    if (responseMimeType === 'application/json') {
+      let cleaned = text;
+      // Strip markdown fences if present
+      const fenced = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (fenced) cleaned = fenced[1];
+      const objStart = cleaned.indexOf('{');
+      const arrStart = cleaned.indexOf('[');
+      const start = objStart === -1 ? arrStart : arrStart === -1 ? objStart : Math.min(objStart, arrStart);
+      if (start !== -1) cleaned = cleaned.slice(start);
+      try { parsedResult = JSON.parse(cleaned); } catch {}
+    }
+    
+    await logModelCall({
+      stage,
+      attempt,
+      model,
+      systemPrompt: cachedContentName ? `[CACHED INSTRUCTION] ${cachedContentName}\n\nOriginal Prompt:\n${systemInstruction}` : systemInstruction,
+      userMessages: contents,
+      responseText: text,
+      parsedResult,
+      durationMs: Date.now() - t0,
+    });
+    
+    return text.trim();
+  } catch (e) {
+    await logModelCall({
+      stage,
+      attempt,
+      model,
+      systemPrompt: cachedContentName ? `[CACHED INSTRUCTION] ${cachedContentName}\n\nOriginal Prompt:\n${systemInstruction}` : systemInstruction,
+      userMessages: contents,
+      responseText: text,
+      parsedResult: null,
+      durationMs: Date.now() - t0,
+      error: e.message,
+    });
+    throw e;
   }
-  
-  return text.trim();
 }
 
 /**
  * Analyze existing diagram with Gemini vision.
  */
-export async function analyzeQuestionImageWithGemini({ imageUrl, questionText, systemPrompt, apiKey, model = 'gemini-2.0-flash' }) {
+export async function analyzeQuestionImageWithGemini({ imageUrl, questionText, systemPrompt, apiKey, model = 'gemini-3.5-flash' }) {
   const parts = [];
   
   if (imageUrl.startsWith('data:')) {
@@ -252,7 +393,9 @@ export async function analyzeQuestionImageWithGemini({ imageUrl, questionText, s
     contents: messages,
     model,
     apiKey,
-    responseMimeType: 'application/json'
+    responseMimeType: 'application/json',
+    stage: 'analyze',
+    attempt: 0
   });
 
   return JSON.parse(resText);
@@ -261,7 +404,7 @@ export async function analyzeQuestionImageWithGemini({ imageUrl, questionText, s
 /**
  * Generate MathsDiagram shapes via Gemini.
  */
-export async function generateRepairShapesWithGemini({ prompt, systemPrompt, apiKey, model = 'gemini-2.0-flash' }) {
+export async function generateRepairShapesWithGemini({ prompt, systemPrompt, apiKey, model = 'gemini-3.5-flash', cachedContentName = null, attempt = 0 }) {
   const messages = [{
     role: 'user',
     parts: [{ text: prompt }]
@@ -272,7 +415,10 @@ export async function generateRepairShapesWithGemini({ prompt, systemPrompt, api
     contents: messages,
     model,
     apiKey,
-    responseMimeType: 'application/json'
+    responseMimeType: 'application/json',
+    cachedContentName,
+    stage: 'generate',
+    attempt
   });
 
   return JSON.parse(resText);

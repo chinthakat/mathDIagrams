@@ -15,5 +15,5 @@ export default function Heart({ width = 90, height = 80, fill = '#ef4444', strok
     `C ${hw * sx} ${-hh * 0.65 * sy} ${hw * 0.05 * sx} ${-hh * 0.55 * sy} 0 ${-hh * 0.1 * sy}`,
     'Z',
   ].join(' ');
-  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} listening={false} />;
+  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth}  />;
 }

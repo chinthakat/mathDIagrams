@@ -39,7 +39,7 @@ export default function DepartureBoard({ props = {} }) {
         width={width + 4} height={height + 4}
         cornerRadius={4}
         fill="#333333"
-        listening={false}
+        
       />
       {/* Main board */}
       <Rect
@@ -47,7 +47,7 @@ export default function DepartureBoard({ props = {} }) {
         width={width} height={height}
         cornerRadius={3}
         fill={bgColor}
-        listening={false}
+        
       />
       {/* Title bar */}
       <Rect
@@ -55,7 +55,7 @@ export default function DepartureBoard({ props = {} }) {
         width={width} height={titleH}
         cornerRadius={3}
         fill="rgba(255,255,255,0.06)"
-        listening={false}
+        
       />
       {/* Title text */}
       <Text
@@ -68,7 +68,7 @@ export default function DepartureBoard({ props = {} }) {
         fill={titleColor}
         align="center"
         letterSpacing={3}
-        listening={false}
+        
       />
       {/* Divider */}
       <Rect
@@ -76,7 +76,7 @@ export default function DepartureBoard({ props = {} }) {
         width={width - 16} height={1}
         fill={titleColor}
         opacity={0.3}
-        listening={false}
+        
       />
       {/* Time rows */}
       {times.map((t, i) => (
@@ -90,7 +90,7 @@ export default function DepartureBoard({ props = {} }) {
               height={rowH}
               fill="rgba(255,255,255,0.07)"
               cornerRadius={2}
-              listening={false}
+              
             />
           )}
           <Text
@@ -103,7 +103,7 @@ export default function DepartureBoard({ props = {} }) {
             fontStyle={t.trim() === '?' ? 'bold' : 'normal'}
             fill={t.trim() === '?' ? '#ffffff' : textColor}
             align="center"
-            listening={false}
+            
           />
         </Group>
       ))}
@@ -117,7 +117,7 @@ export default function DepartureBoard({ props = {} }) {
           fontFamily="Arial"
           fill="#1e293b"
           align="center"
-          listening={false}
+          
         />
       ) : null}
     </Group>

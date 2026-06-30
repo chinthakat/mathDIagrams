@@ -1,10 +1,12 @@
 import { CLIPART_ITEMS } from '../assets/clipartLibrary';
+import { callGemini, getOrCreateShapeCache, getGeminiApiKey } from './geminiService';
 
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
 
 // Model definitions
 export const AVAILABLE_MODELS = [
+  { id: 'gemini-3.5-flash',         label: 'Gemini 3.5 Flash',   provider: 'gemini',   supportsVision: true,  description: 'Fast, cheap, natively supports caching' },
   { id: 'claude-sonnet-4-6',       label: 'Claude Sonnet 4.6',  provider: 'claude',   supportsVision: true,  description: 'Best quality' },
   { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', provider: 'claude',   supportsVision: true,  description: 'Fast & cheap' },
   { id: 'deepseek-chat',            label: 'DeepSeek V3',        provider: 'deepseek', supportsVision: false, description: 'Very cheap (text only)' },
@@ -12,7 +14,7 @@ export const AVAILABLE_MODELS = [
 ];
 
 export function getModel() {
-  return localStorage.getItem('maths_model') || 'claude-sonnet-4-6';
+  return localStorage.getItem('maths_model') || 'gemini-3.5-flash';
 }
 export function saveModel(id) {
   localStorage.setItem('maths_model', id);
@@ -211,13 +213,37 @@ async function callDeepSeek(userMessage, apiKey) {
 }
 
 // Route to correct provider
-function callAI(userMessage, apiKey) {
+async function callAI(userMessage, apiKey) {
   const def = getModelDef();
   if (def.provider === 'deepseek') {
     const dsKey = apiKey || getDeepSeekApiKey();
     if (!dsKey) throw new Error('DeepSeek API key not set.');
     return callDeepSeek(userMessage, dsKey);
   }
+  
+  if (def.provider === 'gemini') {
+    const gKey = apiKey || getGeminiApiKey();
+    if (!gKey) throw new Error('Gemini API key not set.');
+    
+    // Explicitly document all available cliparts to maximize cache effectiveness
+    const clipartNames = CLIPART_ITEMS.map(c => `- ${c.id}: ${c.label} (Category: ${c.category})`).join('\n');
+    const fullSystemInstruction = SYSTEM_PROMPT + '\n\nAVAILABLE RASTERIMAGE CLIPARTS:\n' + clipartNames;
+    
+    // Use Context Caching to eliminate system prompt latency and cost
+    const cacheName = await getOrCreateShapeCache(gKey, fullSystemInstruction, `models/${def.id}`);
+    
+    const resText = await callGemini({
+      systemInstruction: fullSystemInstruction,
+      contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+      model: def.id,
+      apiKey: gKey,
+      cachedContentName: cacheName
+    });
+    
+    try { return normalise(JSON.parse(resText)); }
+    catch { throw new Error('Gemini returned invalid JSON. Please try again.'); }
+  }
+  
   return callClaude(userMessage, apiKey, def.id);
 }
 

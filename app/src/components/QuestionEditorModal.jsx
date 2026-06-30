@@ -11,7 +11,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   X, Sparkles, Loader, Save, CheckCircle, XCircle, RotateCcw,
   ChevronRight, Key, Image as ImageIcon, Wand2, FileText, List,
-  CheckSquare, AlignLeft,
+  CheckSquare, AlignLeft, ChevronLeft, Crop,
 } from 'lucide-react';
 import CanvasEditor2D from './CanvasEditor2D';
 import PropertiesPanel from './PropertiesPanel';
@@ -150,6 +150,14 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
   const [running, setRunning]     = useState(false);
   const [progressLog, setProgressLog] = useState([]);
   const [missingComponents, setMissingComponents] = useState([]);
+  const [originalExpanded, setOriginalExpanded] = useState(true);
+  const [result, setResult]       = useState(null);
+
+  // ── Crop & Grid state ──────────────────────────────────────────────────────
+  const [cropMode, setCropMode]   = useState(false);
+  const [cropBox, setCropBox]     = useState({ x: 50, y: 50, width: 700, height: 400 });
+  const [showGrid, setShowGrid]   = useState(true);
+  const [showNumberedGrid, setShowNumberedGrid] = useState(true);
 
   // ── Save state ─────────────────────────────────────────────────────────────
   const [saving, setSaving]       = useState(false);
@@ -233,6 +241,7 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
           renderAndCapture,
           maxRetries: 3,
         });
+        setResult(outcome);
         if (outcome.shapes?.length) setShapes(outcome.shapes);
         if (outcome.missingComponents?.length) setMissingComponents(outcome.missingComponents);
       }
@@ -261,6 +270,7 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
 
   // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
+    const wasCropMode = cropMode;
     setSaving(true);
     setSaveError(null);
     setSaved(false);
@@ -269,7 +279,38 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
 
       // Upload new diagram image if shapes exist
       if (shapes.length > 0 && stageRef.current) {
-        const dataUrl = exportCroppedDataUrl(stageRef.current, shapes, { pixelRatio: 2 });
+        let dataUrl;
+        if (wasCropMode) {
+          // Hide crop outline temporarily before capture
+          setCropMode(false);
+          await new Promise(r => setTimeout(r, 120)); // wait for Konva to repaint without crop rect
+
+          const stage = stageRef.current;
+          const scale  = stage.scaleX();          // zoom level (same for X and Y)
+          const stageX = stage.x();               // pan offset X
+          const stageY = stage.y();               // pan offset Y
+
+          // cropBox coords are in Konva *canvas* space (local units).
+          // Convert to screen pixels relative to the stage container, then back to
+          // Konva "absolute" units that toDataURL() expects.
+          const sx = cropBox.x * scale + stageX;
+          const sy = cropBox.y * scale + stageY;
+          const sw = cropBox.width  * scale;
+          const sh = cropBox.height * scale;
+
+          // Clamp to visible stage bounds (avoid negative widths)
+          const pixelRatio = 2;
+          dataUrl = stage.toDataURL({
+            x: Math.max(0, sx),
+            y: Math.max(0, sy),
+            width:  Math.max(20, sw),
+            height: Math.max(20, sh),
+            pixelRatio,
+          });
+        } else {
+          dataUrl = exportCroppedDataUrl(stageRef.current, shapes, { pixelRatio: 2 });
+        }
+
         updates.image = await uploadDiagramImage(dataUrl, 'question-editor/unified');
         updates.diagramShapes = shapes;
       }
@@ -283,8 +324,10 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
       const updated = await updateQuestion(question.id, updates);
       setSaved(true);
       onSaved?.(updated || { ...question, ...updates });
+      setCropMode(false);
     } catch (e) {
       setSaveError(e.message);
+      if (wasCropMode) setCropMode(true);
     } finally {
       setSaving(false);
     }
@@ -303,6 +346,10 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
             {question.text?.slice(0, 80) || '(no text)'}
           </span>
         </div>
+
+        {/* Portal target for the CanvasEditor2D toolbar */}
+        <div id="question-canvas-toolbar-portal" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}></div>
+
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}>
           <X size={18} />
         </button>
@@ -396,6 +443,15 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
             {/* Divider */}
             <div style={{ borderTop: '1px solid #1e293b', margin: '6px 0 12px' }} />
 
+            {/* Grid Settings */}
+            <div style={S.section}>
+              <div style={S.label}>Canvas Grid</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <CheckRow checked={showGrid} onChange={setShowGrid} label="Show Grid Lines" />
+                <CheckRow checked={showNumberedGrid} onChange={setShowNumberedGrid} label="Show Coordinates" />
+              </div>
+            </div>
+
             {/* AI repair section */}
             <div style={S.section}>
               <div style={{ ...S.label, color: '#a78bfa' }}><Sparkles size={11} /> AI Repair — What to Fix</div>
@@ -414,7 +470,7 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
                 onChange={e => setFeedback(e.target.value)}
                 rows={3}
                 style={S.textarea}
-                placeholder="e.g. Train 1 shows 10:15 AM, add times in 2-hour intervals, question mark for Train 3…"
+                placeholder="e.g. Move the robot to X: 400, Y: 200, align the text labels along X: 150…"
               />
             </div>
 
@@ -459,25 +515,85 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
           </div>
         </div>
 
-        {/* ── Centre — canvas ── */}
-        <div style={S.centre}>
-          {reconstructing && shapes.length === 0 && (
+        {/* ── Centre — original image + canvas ── */}
+        <div style={{ ...S.centre, flexDirection: 'row' }}>
+          
+          {/* ── Side-by-side Original Image Panel ── */}
+          {imageUrl && (
             <div style={{
-              position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: '10px', zIndex: 10, pointerEvents: 'none',
+              width: originalExpanded ? '33.33%' : '40px',
+              borderRight: `1px solid #334155`,
+              background: '#1e293b',
+              display: 'flex',
+              flexDirection: 'column',
+              transition: 'width 0.2s ease',
+              flexShrink: 0,
+              overflow: 'hidden'
             }}>
-              <Loader size={28} color="#7c3aed" className="spin" />
-              <span style={{ fontSize: '13px', color: '#94a3b8' }}>Reconstructing diagram from image…</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: originalExpanded ? 'space-between' : 'center', padding: '10px 8px', borderBottom: `1px solid #334155`, background: '#0f172a' }}>
+                {originalExpanded && <span style={{ fontSize: '11px', fontWeight: 700, color: '#e2e8f0', textTransform: 'uppercase', letterSpacing: '0.05em' }}><ImageIcon size={12} style={{marginRight: 6, verticalAlign:'-2px'}}/> Original Image</span>}
+                <button onClick={() => setOriginalExpanded(!originalExpanded)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 2 }} title={originalExpanded ? "Collapse" : "Expand Original"}>
+                  {originalExpanded ? <ChevronLeft size={16} /> : <ImageIcon size={16} />}
+                </button>
+              </div>
+              
+              {originalExpanded && (
+                <div style={{ flex: 1, padding: '12px', overflow: 'auto', display: 'flex', justifyContent: 'center' }}>
+                  <img src={imageUrl} alt="original" style={{ maxWidth: '100%', objectFit: 'contain', background: '#fff', borderRadius: '4px', border: `1px solid #334155`, alignSelf: 'flex-start' }} />
+                </div>
+              )}
+              {!originalExpanded && (
+                <div style={{ padding: '14px 0', display: 'flex', justifyContent: 'center' }}>
+                   <span style={{ fontSize: '10px', fontWeight: 700, writingMode: 'vertical-rl', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Original</span>
+                </div>
+              )}
             </div>
           )}
-          <CanvasEditor2D
-            shapes={shapes}
-            setShapes={(fn) => setShapes(typeof fn === 'function' ? fn(shapes) : fn)}
-            selectedId={selectedId}
-            setSelectedId={setSelectedId}
-            stageRef={stageRef}
-            showGrid={false}
-          />
+
+          {/* ── Canvas Editor ── */}
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+            {reconstructing && shapes.length === 0 && (
+              <div style={{
+                position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: '10px', zIndex: 10, pointerEvents: 'none',
+              }}>
+                <Loader size={28} color="#7c3aed" className="spin" />
+                <span style={{ fontSize: '13px', color: '#94a3b8' }}>Reconstructing diagram from image…</span>
+              </div>
+            )}
+            {cropMode && (
+              <div style={{
+                position: 'absolute', top: 12, left: 12, right: 12, zIndex: 50,
+                background: 'rgba(59,130,246,0.92)', border: '1px solid #3b82f6', borderRadius: '8px',
+                padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)'
+              }}>
+                <span style={{ fontSize: '12px', color: '#eff6ff' }}>
+                  <strong>Crop Mode Active:</strong> Drag and resize the blue dashed box to select the area of the diagram to save.
+                </span>
+                <button
+                  onClick={() => setCropMode(false)}
+                  style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#fff', fontSize: '11px', fontWeight: 600, padding: '4px 8px' }}
+                >
+                  Cancel Crop
+                </button>
+              </div>
+            )}
+            <CanvasEditor2D
+              shapes={shapes}
+              setShapes={(fn) => setShapes(typeof fn === 'function' ? fn(shapes) : fn)}
+              selectedId={selectedId}
+              setSelectedId={setSelectedId}
+              stageRef={stageRef}
+              showGrid={showGrid}
+              showNumberedGrid={showNumberedGrid}
+              cropMode={cropMode}
+              cropBox={cropBox}
+              setCropBox={setCropBox}
+              isExporting={saving}
+              toolbarPortalId="question-canvas-toolbar-portal"
+            />
+          </div>
         </div>
 
         {/* ── Right panel — properties + log ── */}
@@ -538,13 +654,29 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
           {running ? 'Running AI…' : 'Run AI'}
         </button>
 
+        {shapes.length > 0 && (
+          <button
+            style={{
+              ...S.btn,
+              background: cropMode ? '#1e3a8a' : '#1e293b',
+              color: '#fff',
+              border: '1px solid #334155',
+            }}
+            onClick={() => setCropMode(!cropMode)}
+            disabled={saving || running}
+          >
+            <Crop size={14} />
+            {cropMode ? 'Exit Crop Mode' : 'Crop Diagram'}
+          </button>
+        )}
+
         <button
           style={{ ...S.btn, background: saving ? '#065f46' : '#059669', color: '#fff', opacity: saving ? 0.7 : 1 }}
           onClick={handleSave}
           disabled={saving || running}
         >
           {saving ? <Loader size={14} className="spin" /> : <Save size={14} />}
-          {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save All'}
+          {saving ? 'Saving…' : cropMode ? 'Confirm Crop & Save' : saved ? '✓ Saved' : 'Save All'}
         </button>
 
         {saveError && <span style={{ fontSize: '12px', color: '#f87171' }}>{saveError}</span>}

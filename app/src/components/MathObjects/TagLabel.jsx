@@ -23,10 +23,10 @@ export default function TagLabel({ width = 110, height = 50, cornerRadius = 6, f
 
   return (
     <>
-      <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} listening={false} />
+      <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth}  />
       {label ? (
         <Text text={label} x={-hw + r + 2} y={-hh + 4} width={w - tailW - r - 4} height={h - 8}
-          align="center" verticalAlign="middle" fontSize={fontSize} fill={fontColor} listening={false} />
+          align="center" verticalAlign="middle" fontSize={fontSize} fill={fontColor}  />
       ) : null}
     </>
   );

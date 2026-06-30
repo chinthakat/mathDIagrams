@@ -48,7 +48,7 @@ import Annulus from '../components/MathObjects/Annulus';
 import BearingsMarker from '../components/MathObjects/BearingsMarker';
 import SpiderIcon from '../components/MathObjects/SpiderIcon';
 import JSXGraphBoard from '../components/MathObjects/JSXGraphBoard';
-import TikZRenderer from '../components/MathObjects/TikZRenderer';
+import TikZKonvaNode from '../components/MathObjects/TikZKonvaNode';
 import RasterImage from '../components/MathObjects/RasterImage';
 import DottedLineArrow from '../components/MathObjects/DottedLineArrow';
 import ElbowArrow from '../components/MathObjects/ElbowArrow';
@@ -1322,7 +1322,7 @@ export const ObjectRegistry = {
     name: 'Curved Block Arrow',
     icon: <Navigation size={18} />,
     defaultProps: { width: 120, height: 80, sweepAngle: 120, thickness: 0.35, fill: '#3b82f6', stroke: '#1e40af', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps: p }) => <CurvedArrow width={p.width} height={p.height} sweepAngle={p.sweepAngle} thickness={p.thickness} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
+    Component: ({ props: p }) => <CurvedArrow width={p.width} height={p.height} sweepAngle={p.sweepAngle} thickness={p.thickness} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
     properties: [
       { name: 'width',       label: 'Width',        type: 'range', min: 40, max: 400, step: 4 },
       { name: 'height',      label: 'Height',       type: 'range', min: 30, max: 400, step: 4 },
@@ -1341,7 +1341,7 @@ export const ObjectRegistry = {
     name: 'U-Turn Arrow',
     icon: <ArrowLeftRight size={18} />,
     defaultProps: { width: 110, height: 90, thickness: 0.30, fill: '#8b5cf6', stroke: '#5b21b6', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps: p }) => <UTurnArrow width={p.width} height={p.height} thickness={p.thickness} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
+    Component: ({ props: p }) => <UTurnArrow width={p.width} height={p.height} thickness={p.thickness} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
     properties: [
       { name: 'width',       label: 'Width',        type: 'range', min: 40, max: 400, step: 4 },
       { name: 'height',      label: 'Height',       type: 'range', min: 40, max: 400, step: 4 },
@@ -1359,7 +1359,7 @@ export const ObjectRegistry = {
     name: 'Circular / Rotation Arrow',
     icon: <Navigation size={18} />,
     defaultProps: { width: 90, height: 90, sweepAngle: 270, thickness: 0.30, fill: '#10b981', stroke: '#065f46', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps: p }) => <CircularArrow width={p.width} height={p.height} sweepAngle={p.sweepAngle} thickness={p.thickness} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
+    Component: ({ props: p }) => <CircularArrow width={p.width} height={p.height} sweepAngle={p.sweepAngle} thickness={p.thickness} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
     properties: [
       { name: 'width',       label: 'Size',         type: 'range', min: 30, max: 400, step: 4 },
       { name: 'sweepAngle',  label: 'Arc Sweep',    type: 'range', min: 60, max: 340, step: 5 },
@@ -1377,7 +1377,7 @@ export const ObjectRegistry = {
     name: '4-Way Move Arrow',
     icon: <MoveHorizontal size={18} />,
     defaultProps: { width: 90, height: 90, armRatio: 0.28, headRatio: 0.38, fill: '#64748b', stroke: '#1e293b', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps: p }) => <FourWayArrow width={p.width} height={p.height} armRatio={p.armRatio} headRatio={p.headRatio} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
+    Component: ({ props: p }) => <FourWayArrow width={p.width} height={p.height} armRatio={p.armRatio} headRatio={p.headRatio} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
     properties: [
       { name: 'width',       label: 'Size',         type: 'range', min: 30, max: 400, step: 4 },
       { name: 'armRatio',    label: 'Arm Width',    type: 'range', min: 0.1, max: 0.4, step: 0.02 },
@@ -1395,7 +1395,7 @@ export const ObjectRegistry = {
     name: 'Bent / L-Shape Arrow',
     icon: <CornerDownRight size={18} />,
     defaultProps: { width: 100, height: 100, shaftRatio: 0.30, headRatio: 0.38, direction: 'up-right', fill: '#f97316', stroke: '#c2410c', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps: p }) => <BentArrow width={p.width} height={p.height} shaftRatio={p.shaftRatio} headRatio={p.headRatio} direction={p.direction} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
+    Component: ({ props: p }) => <BentArrow width={p.width} height={p.height} shaftRatio={p.shaftRatio} headRatio={p.headRatio} direction={p.direction} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
     properties: [
       { name: 'width',       label: 'Width',        type: 'range', min: 30, max: 400, step: 4 },
       { name: 'height',      label: 'Height',       type: 'range', min: 30, max: 400, step: 4 },
@@ -1415,7 +1415,7 @@ export const ObjectRegistry = {
     name: 'Double-Headed Block Arrow',
     icon: <ArrowLeftRight size={18} />,
     defaultProps: { width: 140, height: 60, shaftRatio: 0.40, headRatio: 0.28, direction: 'horizontal', fill: '#6366f1', stroke: '#3730a3', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps: p }) => <DoubleBlockArrow width={p.width} height={p.height} shaftRatio={p.shaftRatio} headRatio={p.headRatio} direction={p.direction} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
+    Component: ({ props: p }) => <DoubleBlockArrow width={p.width} height={p.height} shaftRatio={p.shaftRatio} headRatio={p.headRatio} direction={p.direction} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
     properties: [
       { name: 'width',       label: 'Width',        type: 'range', min: 40, max: 400, step: 4 },
       { name: 'height',      label: 'Height',       type: 'range', min: 20, max: 300, step: 4 },
@@ -1435,7 +1435,7 @@ export const ObjectRegistry = {
     name: 'Diagonal Arrow',
     icon: <ArrowRight size={18} />,
     defaultProps: { width: 120, height: 120, shaftRatio: 0.25, headRatio: 0.30, doubleHeaded: true, angle: 45, fill: '#ec4899', stroke: '#9d174d', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps: p }) => <DiagonalArrow width={p.width} height={p.height} shaftRatio={p.shaftRatio} headRatio={p.headRatio} doubleHeaded={p.doubleHeaded} angle={p.angle} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
+    Component: ({ props: p }) => <DiagonalArrow width={p.width} height={p.height} shaftRatio={p.shaftRatio} headRatio={p.headRatio} doubleHeaded={p.doubleHeaded} angle={p.angle} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} />,
     properties: [
       { name: 'width',        label: 'Size',         type: 'range', min: 30, max: 400, step: 4 },
       { name: 'angle',        label: 'Angle',        type: 'range', min: 0, max: 359, step: 15 },
@@ -1714,13 +1714,7 @@ export const ObjectRegistry = {
       code: '\\begin{tikzpicture}\n  \\draw[->] (-3,0) -- (3,0) node[right] {$x$};\n  \\draw[->] (0,-2) -- (0,2) node[above] {$y$};\n  \\draw[blue,thick,domain=-2.5:2.5] plot (\\x,{\\x*\\x*0.5-1});\n\\end{tikzpicture}',
       rotation: 0,
     },
-    Component: ({ props }) => (
-      <TikZRenderer
-        code={props.code}
-        width={props.width || 400}
-        height={props.height || 300}
-      />
-    ),
+    Component: TikZKonvaNode,
     properties: [
       { name: 'width',  label: 'Width',  type: 'number' },
       { name: 'height', label: 'Height', type: 'number' },
@@ -2091,8 +2085,8 @@ export const ObjectRegistry = {
     name: 'Isometric Cube',
     icon: <Box size={18} />,
     defaultProps: { width: 80, height: 50, depth: 50, topFill: '#60a5fa', leftFill: '#1d4ed8', rightFill: '#3b82f6', stroke: '#1e3a8a', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps }) => {
-      const { x = 0, y = 0, width, height, depth, topFill, leftFill, rightFill, stroke, strokeWidth } = shapeProps;
+    Component: ({ props }) => {
+      const { x = 0, y = 0, width, height, depth, topFill, leftFill, rightFill, stroke, strokeWidth } = props;
       return (
         <IsometricCube
           width={width} height={height} depth={depth}
@@ -2120,8 +2114,8 @@ export const ObjectRegistry = {
     name: 'Cylinder',
     icon: <Database size={18} />,
     defaultProps: { width: 80, height: 120, fill: '#3b82f6', topFill: '#60a5fa', stroke: '#1e40af', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps }) => {
-      const { width, height, fill, topFill, stroke, strokeWidth } = shapeProps;
+    Component: ({ props }) => {
+      const { width, height, fill, topFill, stroke, strokeWidth } = props;
       return (
         <Cylinder
           width={width} height={height}
@@ -2147,8 +2141,8 @@ export const ObjectRegistry = {
     name: 'Block Arrow',
     icon: <ChevronRight size={18} />,
     defaultProps: { width: 120, height: 60, direction: 'right', shaftRatio: 0.45, headRatio: 0.40, fill: '#3b82f6', stroke: '#1e40af', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps }) => {
-      const { width, height, direction, shaftRatio, headRatio, fill, stroke, strokeWidth } = shapeProps;
+    Component: ({ props }) => {
+      const { width, height, direction, shaftRatio, headRatio, fill, stroke, strokeWidth } = props;
       return (
         <BlockArrow
           width={width} height={height}
@@ -2176,7 +2170,7 @@ export const ObjectRegistry = {
     name: 'Diamond',
     icon: <DiamondIcon size={18} />,
     defaultProps: { width: 100, height: 70, fill: '#3b82f6', stroke: '#1e40af', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps }) => <Diamond width={shapeProps.width} height={shapeProps.height} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    Component: ({ props }) => <Diamond width={props.width} height={props.height} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
     properties: [
       { name: 'width', label: 'Width', type: 'range', min: 20, max: 400, step: 4 },
       { name: 'height', label: 'Height', type: 'range', min: 20, max: 400, step: 4 },
@@ -2193,7 +2187,7 @@ export const ObjectRegistry = {
     name: 'Parallelogram',
     icon: <LayoutGrid size={18} />,
     defaultProps: { width: 120, height: 60, skew: 0.25, fill: '#8b5cf6', stroke: '#5b21b6', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps }) => <Parallelogram width={shapeProps.width} height={shapeProps.height} skew={shapeProps.skew} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    Component: ({ props }) => <Parallelogram width={props.width} height={props.height} skew={props.skew} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
     properties: [
       { name: 'width', label: 'Width', type: 'range', min: 20, max: 400, step: 4 },
       { name: 'height', label: 'Height', type: 'range', min: 20, max: 300, step: 4 },
@@ -2211,7 +2205,7 @@ export const ObjectRegistry = {
     name: 'Trapezoid',
     icon: <SquareSplitHorizontal size={18} />,
     defaultProps: { width: 120, height: 60, topRatio: 0.55, fill: '#10b981', stroke: '#065f46', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps }) => <Trapezoid width={shapeProps.width} height={shapeProps.height} topRatio={shapeProps.topRatio} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    Component: ({ props }) => <Trapezoid width={props.width} height={props.height} topRatio={props.topRatio} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
     properties: [
       { name: 'width', label: 'Width', type: 'range', min: 20, max: 400, step: 4 },
       { name: 'height', label: 'Height', type: 'range', min: 20, max: 300, step: 4 },
@@ -2229,7 +2223,7 @@ export const ObjectRegistry = {
     name: 'Star',
     icon: <Star size={18} />,
     defaultProps: { width: 80, height: 80, numPoints: 5, innerRatio: 0.45, fill: '#f59e0b', stroke: '#b45309', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps }) => <StarShape width={shapeProps.width} height={shapeProps.height} numPoints={shapeProps.numPoints} innerRatio={shapeProps.innerRatio} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    Component: ({ props }) => <StarShape width={props.width} height={props.height} numPoints={props.numPoints} innerRatio={props.innerRatio} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
     properties: [
       { name: 'width', label: 'Size', type: 'range', min: 20, max: 300, step: 4 },
       { name: 'numPoints', label: 'Points', type: 'range', min: 3, max: 12, step: 1 },
@@ -2247,7 +2241,7 @@ export const ObjectRegistry = {
     name: 'Heart',
     icon: <Heart size={18} />,
     defaultProps: { width: 90, height: 80, fill: '#ef4444', stroke: '#b91c1c', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps }) => <HeartShape width={shapeProps.width} height={shapeProps.height} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    Component: ({ props }) => <HeartShape width={props.width} height={props.height} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
     properties: [
       { name: 'width', label: 'Width', type: 'range', min: 20, max: 400, step: 4 },
       { name: 'height', label: 'Height', type: 'range', min: 20, max: 400, step: 4 },
@@ -2264,7 +2258,7 @@ export const ObjectRegistry = {
     name: 'Crescent Moon',
     icon: <Star size={18} />,
     defaultProps: { width: 70, height: 80, offsetRatio: 0.35, fill: '#fbbf24', stroke: '#92400e', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps }) => <Crescent width={shapeProps.width} height={shapeProps.height} offsetRatio={shapeProps.offsetRatio} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    Component: ({ props }) => <Crescent width={props.width} height={props.height} offsetRatio={props.offsetRatio} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
     properties: [
       { name: 'width', label: 'Width', type: 'range', min: 20, max: 300, step: 4 },
       { name: 'height', label: 'Height', type: 'range', min: 20, max: 300, step: 4 },
@@ -2282,7 +2276,7 @@ export const ObjectRegistry = {
     name: 'Lightning Bolt',
     icon: <Zap size={18} />,
     defaultProps: { width: 60, height: 100, fill: '#fbbf24', stroke: '#92400e', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps }) => <LightningBolt width={shapeProps.width} height={shapeProps.height} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    Component: ({ props }) => <LightningBolt width={props.width} height={props.height} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
     properties: [
       { name: 'width', label: 'Width', type: 'range', min: 20, max: 300, step: 4 },
       { name: 'height', label: 'Height', type: 'range', min: 20, max: 400, step: 4 },
@@ -2299,7 +2293,7 @@ export const ObjectRegistry = {
     name: 'Cross / Plus',
     icon: <Plus size={18} />,
     defaultProps: { width: 80, height: 80, armRatio: 0.38, fill: '#ef4444', stroke: '#b91c1c', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps }) => <CrossShape width={shapeProps.width} height={shapeProps.height} armRatio={shapeProps.armRatio} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    Component: ({ props }) => <CrossShape width={props.width} height={props.height} armRatio={props.armRatio} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
     properties: [
       { name: 'width', label: 'Width', type: 'range', min: 20, max: 400, step: 4 },
       { name: 'height', label: 'Height', type: 'range', min: 20, max: 400, step: 4 },
@@ -2317,7 +2311,7 @@ export const ObjectRegistry = {
     name: 'Cloud',
     icon: <Cloud size={18} />,
     defaultProps: { width: 120, height: 80, fill: '#e2e8f0', stroke: '#94a3b8', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps }) => <CloudShape width={shapeProps.width} height={shapeProps.height} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    Component: ({ props }) => <CloudShape width={props.width} height={props.height} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
     properties: [
       { name: 'width', label: 'Width', type: 'range', min: 40, max: 400, step: 4 },
       { name: 'height', label: 'Height', type: 'range', min: 30, max: 300, step: 4 },
@@ -2334,7 +2328,7 @@ export const ObjectRegistry = {
     name: 'Teardrop',
     icon: <Droplets size={18} />,
     defaultProps: { width: 60, height: 90, fill: '#3b82f6', stroke: '#1e40af', strokeWidth: 1.5, label: '' },
-    Component: ({ shapeProps }) => <Teardrop width={shapeProps.width} height={shapeProps.height} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    Component: ({ props }) => <Teardrop width={props.width} height={props.height} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
     properties: [
       { name: 'width', label: 'Width', type: 'range', min: 10, max: 300, step: 4 },
       { name: 'height', label: 'Height', type: 'range', min: 20, max: 400, step: 4 },
@@ -2351,7 +2345,7 @@ export const ObjectRegistry = {
     name: 'Tag / Label',
     icon: <Tag size={18} />,
     defaultProps: { width: 110, height: 50, cornerRadius: 6, fill: '#fef3c7', stroke: '#d97706', strokeWidth: 1.5, label: 'Label', fontSize: 13, fontColor: '#92400e' },
-    Component: ({ shapeProps }) => <TagLabel width={shapeProps.width} height={shapeProps.height} cornerRadius={shapeProps.cornerRadius} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} label={shapeProps.label} fontSize={shapeProps.fontSize} fontColor={shapeProps.fontColor} />,
+    Component: ({ props }) => <TagLabel width={props.width} height={props.height} cornerRadius={props.cornerRadius} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} label={props.label} fontSize={props.fontSize} fontColor={props.fontColor} />,
     properties: [
       { name: 'width', label: 'Width', type: 'range', min: 40, max: 400, step: 4 },
       { name: 'height', label: 'Height', type: 'range', min: 20, max: 200, step: 4 },
@@ -2371,7 +2365,7 @@ export const ObjectRegistry = {
     name: 'No / Prohibited',
     icon: <Ban size={18} />,
     defaultProps: { width: 80, height: 80, fill: '#fee2e2', stroke: '#ef4444', strokeWidth: 3, label: '' },
-    Component: ({ shapeProps }) => <NoSign width={shapeProps.width} height={shapeProps.height} fill={shapeProps.fill} stroke={shapeProps.stroke} strokeWidth={shapeProps.strokeWidth} />,
+    Component: ({ props }) => <NoSign width={props.width} height={props.height} fill={props.fill} stroke={props.stroke} strokeWidth={props.strokeWidth} />,
     properties: [
       { name: 'width', label: 'Size', type: 'range', min: 20, max: 400, step: 4 },
       { name: 'fill', label: 'Fill', type: 'color' },
@@ -2387,8 +2381,8 @@ export const ObjectRegistry = {
     name: 'Callout / Speech Bubble',
     icon: <MessageSquare size={18} />,
     defaultProps: { width: 140, height: 80, cornerRadius: 12, tailDir: 'bottom-left', tailSize: 22, fill: '#ffffff', stroke: '#334155', strokeWidth: 1.5, label: '', fontSize: 14, fontColor: '#1e293b' },
-    Component: ({ shapeProps }) => {
-      const { width, height, cornerRadius, tailDir, tailSize, fill, stroke, strokeWidth, label, fontSize, fontColor } = shapeProps;
+    Component: ({ props }) => {
+      const { width, height, cornerRadius, tailDir, tailSize, fill, stroke, strokeWidth, label, fontSize, fontColor } = props;
       return (
         <Callout
           width={width} height={height}

@@ -52,5 +52,5 @@ export default function CircularArrow({
     'Z',
   ].join(' ');
 
-  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} listening={false} />;
+  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth}  />;
 }

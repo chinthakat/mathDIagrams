@@ -64,6 +64,8 @@ export default function TabBar({ documents, activeDocId, setActiveDocId, createD
       <button className="tab-add-btn" onClick={createDoc} title="New Diagram">
         <Plus size={18} />
       </button>
+      
+      {/* Portal target removed from here, moved to App.jsx sub-toolbar */}
     </div>
   );
 }

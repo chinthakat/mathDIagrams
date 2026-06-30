@@ -65,6 +65,7 @@ body {
 
 .canvas-area {
   grid-column: 2;
+  flex: 1;
   position: relative;
   background-color: #0f172a;
   background-image: 
@@ -79,6 +80,9 @@ body {
 
 .properties-panel {
   grid-column: 3;
+  width: 300px;
+  min-width: 300px;
+  flex-shrink: 0;
   background-color: var(--bg-panel);
   border-left: 1px solid var(--border-color);
   padding: 24px 20px;

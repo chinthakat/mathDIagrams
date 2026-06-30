@@ -22,7 +22,15 @@
       "Bash(git remote *)",
       "Bash(git fetch *)",
       "Bash(git checkout *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git ls-tree *)",
+      "Bash(xargs grep -l \"sk-ant-api03\\\\|AIzaSy\\\\|sk-19bc643e\")",
+      "Bash(npx vite *)",
+      "Bash(powershell -NoProfile -Command \"Get-Content 'C:\\\\Projects\\\\MathsDIagrams\\\\app\\\\package.json' | ConvertFrom-Json | ConvertTo-Json -Depth 10\")",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget"
     ]
   }
 }

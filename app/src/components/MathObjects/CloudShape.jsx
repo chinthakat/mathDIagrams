@@ -17,5 +17,5 @@ export default function CloudShape({ width = 120, height = 80, fill = '#e2e8f0',
     `A ${s(18, 18)} 0 0 1 ${s(45, 30)}`,
     'Z',
   ].join(' ');
-  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} listening={false} />;
+  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth}  />;
 }

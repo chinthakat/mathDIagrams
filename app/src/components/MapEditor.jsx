@@ -138,14 +138,18 @@ export default function MapEditor({ globalMode, setGlobalMode, globalLoadedData,
 
   const addClipart = (item) => {
     const newId = Date.now().toString();
-    setShapes([...shapes, { id: newId, type: 'rasterImage', x: 250, y: 250, src: item.url, width: 80, height: 80 }]);
+    const rx = 400 + (Math.floor(Math.random() * 7) - 3) * 20;
+    const ry = 300 + (Math.floor(Math.random() * 7) - 3) * 20;
+    setShapes([...shapes, { id: newId, type: 'rasterImage', x: rx, y: ry, src: item.url, width: 80, height: 80 }]);
     setSelectedId(newId);
   };
 
   const addShape = (type) => {
     const newId = Date.now().toString();
     const regObj = ObjectRegistry[type];
-    const baseProps = { id: newId, type, x: 250, y: 250 };
+    const rx = 400 + (Math.floor(Math.random() * 7) - 3) * 20;
+    const ry = 300 + (Math.floor(Math.random() * 7) - 3) * 20;
+    const baseProps = { id: newId, type, x: rx, y: ry };
     const newShape = { ...baseProps, ...(regObj?.defaultProps || {}) };
     setShapes([...shapes, newShape]);
     setSelectedId(newId);
@@ -356,6 +360,9 @@ export default function MapEditor({ globalMode, setGlobalMode, globalLoadedData,
           Map Editor Tools
         </div>
         
+        {/* Portal target for the CanvasEditor2D toolbar */}
+        <div id="map-canvas-toolbar-portal" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}></div>
+
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button className="btn-icon" onClick={handleUndo} title="Undo (Ctrl+Z)" disabled={!activeDoc?.history?.length}>
             <Undo size={18} />
@@ -611,6 +618,7 @@ export default function MapEditor({ globalMode, setGlobalMode, globalLoadedData,
             mapTheme={mapTheme}
             setMapTheme={updateDocTheme}
             hideLocalControls={true}
+            toolbarPortalId="map-canvas-toolbar-portal"
           />
 
           {/* Floating AI Question Card */}

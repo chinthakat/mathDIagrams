@@ -73,7 +73,7 @@ export default function CurvedArrow({
       scaleX={sx} scaleY={sy}
       x={tx} y={ty}
       fill={fill} stroke={stroke} strokeWidth={strokeWidth / Math.max(sx, sy)}
-      listening={false}
+      
     />
   );
 }

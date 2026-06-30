@@ -51,7 +51,7 @@ export default function DigitalClock({ props = {} }) {
         width={width} height={height}
         cornerRadius={cornerRadius + 2}
         fill="rgba(0,0,0,0.25)"
-        listening={false}
+        
       />
       {/* Outer border */}
       <Rect
@@ -59,7 +59,7 @@ export default function DigitalClock({ props = {} }) {
         width={width} height={height}
         cornerRadius={cornerRadius + 2}
         fill={borderColor}
-        listening={false}
+        
       />
       {/* Screen bezel */}
       <Rect
@@ -67,7 +67,7 @@ export default function DigitalClock({ props = {} }) {
         width={width - bw * 2} height={height - bw * 2}
         cornerRadius={cornerRadius}
         fill={bgColor}
-        listening={false}
+        
       />
       {/* Screen glare (lcd/alarm) */}
       {(style === 'lcd' || style === 'alarm') && (
@@ -76,7 +76,7 @@ export default function DigitalClock({ props = {} }) {
           width={(width - bw * 2) * 0.45} height={(height - bw * 2) * 0.35}
           cornerRadius={3}
           fill="rgba(255,255,255,0.12)"
-          listening={false}
+          
         />
       )}
       {/* Time text */}
@@ -91,7 +91,7 @@ export default function DigitalClock({ props = {} }) {
         fill={textColor}
         align="center"
         letterSpacing={style === 'station' ? 2 : 1}
-        listening={false}
+        
       />
       {/* LED glow effect */}
       {(style === 'led' || style === 'station') && (
@@ -110,7 +110,7 @@ export default function DigitalClock({ props = {} }) {
           shadowColor={textColor}
           shadowBlur={8}
           shadowOpacity={0.9}
-          listening={false}
+          
         />
       )}
       {/* Caption label */}
@@ -123,7 +123,7 @@ export default function DigitalClock({ props = {} }) {
           fontFamily="Arial"
           fill="#1e293b"
           align="center"
-          listening={false}
+          
         />
       ) : null}
     </Group>

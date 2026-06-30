@@ -39,5 +39,5 @@ export default function DoubleBlockArrow({
 
   const rot = direction === 'vertical' ? 90 : 0;
 
-  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} rotation={rot} listening={false} />;
+  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} rotation={rot}  />;
 }

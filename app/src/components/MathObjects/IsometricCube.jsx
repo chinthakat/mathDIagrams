@@ -43,19 +43,19 @@ export default function IsometricCube({
       <Line
         points={flat([T, TR, TF, TL])}
         fill={topFill} stroke={stroke} strokeWidth={strokeWidth}
-        closed listening={false}
+        closed 
       />
       {/* Left face */}
       <Line
         points={flat([TL, TF, BF, BL])}
         fill={leftFill} stroke={stroke} strokeWidth={strokeWidth}
-        closed listening={false}
+        closed 
       />
       {/* Right face */}
       <Line
         points={flat([TR, BR, BF, TF])}
         fill={rightFill} stroke={stroke} strokeWidth={strokeWidth}
-        closed listening={false}
+        closed 
       />
     </Group>
   );

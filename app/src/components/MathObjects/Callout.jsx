@@ -49,8 +49,8 @@ export default function Callout({
 
   return (
     <>
-      <Path data={body}     fill={fill} stroke={stroke} strokeWidth={strokeWidth} listening={false} />
-      <Path data={tailPath} fill={fill} stroke={stroke} strokeWidth={strokeWidth} listening={false} />
+      <Path data={body}     fill={fill} stroke={stroke} strokeWidth={strokeWidth}  />
+      <Path data={tailPath} fill={fill} stroke={stroke} strokeWidth={strokeWidth}  />
       {label ? (
         <Text
           text={label}
@@ -58,7 +58,7 @@ export default function Callout({
           width={w - r * 2} height={h - 12}
           align="center" verticalAlign="middle"
           fontSize={fontSize} fill={fontColor}
-          listening={false}
+          
         />
       ) : null}
     </>

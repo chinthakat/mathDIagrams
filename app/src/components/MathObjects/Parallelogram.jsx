@@ -8,5 +8,5 @@ export default function Parallelogram({ width = 120, height = 60, skew = 0.25, f
   const hw = w / 2, hh = h / 2;
   // bottom-left, bottom-right, top-right, top-left — skewed horizontally
   const points = [-hw + sk, hh, hw + sk, hh, hw - sk, -hh, -hw - sk, -hh];
-  return <Line points={points} fill={fill} stroke={stroke} strokeWidth={strokeWidth} closed listening={false} />;
+  return <Line points={points} fill={fill} stroke={stroke} strokeWidth={strokeWidth} closed  />;
 }

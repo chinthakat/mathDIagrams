@@ -49,5 +49,5 @@ export default function DiagonalArrow({
     'Z',
   ].join(' ');
 
-  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} rotation={Number(angle) || 45} listening={false} />;
+  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} rotation={Number(angle) || 45}  />;
 }

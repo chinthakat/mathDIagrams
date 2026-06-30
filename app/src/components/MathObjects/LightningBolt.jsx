@@ -14,5 +14,5 @@ export default function LightningBolt({ width = 60, height = 100, fill = '#fbbf2
     hw * 0.05, -hh * 0.05, // mid-right (lower)
     -hw * 0.4, -hh * 0.05, // mid-left
   ];
-  return <Line points={points} fill={fill} stroke={stroke} strokeWidth={strokeWidth} closed listening={false} />;
+  return <Line points={points} fill={fill} stroke={stroke} strokeWidth={strokeWidth} closed  />;
 }

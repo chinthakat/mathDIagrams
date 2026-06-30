@@ -16,7 +16,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   X, Sparkles, Loader, Save, ChevronDown, ChevronUp,
   Key, RotateCcw, Image as ImageIcon, Code, CheckCircle,
-  AlertTriangle, PlusSquare, RefreshCw,
+  AlertTriangle, PlusSquare, RefreshCw, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { ObjectRegistry } from '../registry/objectRegistry';
 import {
@@ -70,30 +70,6 @@ const S = {
   }),
   label:     { fontSize: '10px', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em' },
 };
-
-// ── Floating original-image reference ────────────────────────────────────────
-
-function ImageRef({ imageUrl }) {
-  const [open, setOpen] = useState(true);
-  return (
-    <div style={{
-      position: 'absolute', top: 10, right: 10, zIndex: 20,
-      background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px',
-      overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,.5)',
-      width: open ? '160px' : '34px', transition: 'width .2s',
-    }}>
-      <button onClick={() => setOpen(o => !o)} style={{ width: '100%', padding: '5px 8px', background: C.surface, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#94a3b8' }}>
-        <ImageIcon size={12} />
-        {open && <span style={{ fontSize: '10px', fontWeight: 700 }}>Original</span>}
-      </button>
-      {open && (
-        <div style={{ padding: '5px' }}>
-          <img src={imageUrl} alt="original" style={{ width: '100%', borderRadius: '3px', objectFit: 'contain', maxHeight: '120px', background: '#fff' }} />
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── Collapsible Question Reference Panel ─────────────────────────────────────
 
@@ -234,6 +210,7 @@ export default function DiagramEditorModal({ question, onClose, onSaved, viewMod
   const [tikzDrawerOpen, setTikzDrawerOpen] = useState(false);
   const [tikzCode, setTikzCode]    = useState('');
   const [inserting, setInserting]  = useState(false);
+  const [originalExpanded, setOriginalExpanded] = useState(true);
 
   // Konva state
   const [shapes, setShapes]        = useState(() => {
@@ -614,6 +591,10 @@ Canvas is 800x500 logical pixels. Respond with ONLY valid JSON array of shapes.`
       <div style={S.header}>
         <span style={{ fontSize: '14px', fontWeight: 700, color: '#f1f5f9', marginRight: '4px' }}>Edit Diagram</span>
         <span style={{ fontSize: '11px', color: C.muted }}>· {question.text?.slice(0, 60) || 'No text'}{question.text?.length > 60 ? '…' : ''}</span>
+        
+        {/* Portal target for the CanvasEditor2D toolbar */}
+        <div id="diagram-canvas-toolbar-portal" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}></div>
+
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Key size={11} color={C.muted} />
           <input
@@ -719,32 +700,71 @@ Canvas is 800x500 logical pixels. Respond with ONLY valid JSON array of shapes.`
             </div>
           )}
 
-            <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-              <CanvasEditor2D
-                shapes={shapes}
-                setShapes={setShapes}
-                selectedId={selectedId}
-                setSelectedId={setSelectedId}
-                stageRef={stageRef}
-                showGrid={false}
-                cropMode={cropMode}
-                cropBox={cropBox}
-                setCropBox={setCropBox}
-              />
-              {imageUrl && <ImageRef imageUrl={imageUrl} />}
-
-              {/* Large centre overlay when canvas is empty and analysing */}
-              {shapes.length === 0 && generating && (
+            <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden' }}>
+              
+              {/* ── Side-by-side Original Image Panel ── */}
+              {imageUrl && (
                 <div style={{
-                  position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', justifyContent: 'center', gap: '10px',
-                  pointerEvents: 'none',
+                  width: originalExpanded ? '33.33%' : '40px',
+                  borderRight: `1px solid ${C.border}`,
+                  background: C.surface,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'width 0.2s ease',
+                  flexShrink: 0,
+                  overflow: 'hidden'
                 }}>
-                  <Loader size={32} color="#7c3aed" className="spin" />
-                  <div style={{ fontSize: '13px', color: '#94a3b8' }}>{analysisStatusText}</div>
+                  {/* Header bar */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: originalExpanded ? 'space-between' : 'center', padding: '10px 8px', borderBottom: `1px solid ${C.border}`, background: C.bg }}>
+                    {originalExpanded && <span style={{ fontSize: '11px', fontWeight: 700, color: C.text, textTransform: 'uppercase', letterSpacing: '0.05em' }}><ImageIcon size={12} style={{marginRight: 6, verticalAlign:'-2px'}}/> Original Image</span>}
+                    <button onClick={() => setOriginalExpanded(!originalExpanded)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, padding: 2 }} title={originalExpanded ? "Collapse" : "Expand Original"}>
+                      {originalExpanded ? <ChevronLeft size={16} /> : <ImageIcon size={16} />}
+                    </button>
+                  </div>
+                  
+                  {/* Image Content */}
+                  {originalExpanded && (
+                    <div style={{ flex: 1, padding: '12px', overflow: 'auto', display: 'flex', justifyContent: 'center' }}>
+                      <img src={imageUrl} alt="original" style={{ maxWidth: '100%', objectFit: 'contain', background: '#fff', borderRadius: '4px', border: `1px solid ${C.border}`, alignSelf: 'flex-start' }} />
+                    </div>
+                  )}
+                  {!originalExpanded && (
+                    <div style={{ padding: '14px 0', display: 'flex', justifyContent: 'center' }}>
+                       <span style={{ fontSize: '10px', fontWeight: 700, writingMode: 'vertical-rl', textTransform: 'uppercase', letterSpacing: '0.05em', color: C.muted }}>Original</span>
+                    </div>
+                  )}
                 </div>
               )}
 
+              {/* ── Canvas Editor ── */}
+              <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+                <CanvasEditor2D
+                  shapes={shapes}
+                  setShapes={setShapes}
+                  selectedId={selectedId}
+                  setSelectedId={setSelectedId}
+                  stageRef={stageRef}
+                  showGrid={true}
+                  showNumberedGrid={true}
+                  isExporting={saving}
+                  cropMode={cropMode}
+                  cropBox={cropBox}
+                  setCropBox={setCropBox}
+                  toolbarPortalId="diagram-canvas-toolbar-portal"
+                />
+
+                {/* Large centre overlay when canvas is empty and analysing */}
+                {shapes.length === 0 && generating && (
+                  <div style={{
+                    position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center', gap: '10px',
+                    pointerEvents: 'none',
+                  }}>
+                    <Loader size={32} color="#7c3aed" className="spin" />
+                    <div style={{ fontSize: '13px', color: '#94a3b8' }}>{analysisStatusText}</div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

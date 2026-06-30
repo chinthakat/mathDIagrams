@@ -19,27 +19,27 @@ export default function Cylinder({
         x={-rx} y={-bodyH / 2}
         width={w} height={bodyH}
         fill={fill} stroke={stroke} strokeWidth={strokeWidth}
-        listening={false}
+        
       />
       {/* Bottom ellipse (drawn before top so top overlaps cleanly) */}
       <Ellipse
         x={0} y={bodyH / 2}
         radiusX={rx} radiusY={ry}
         fill={fill} stroke={stroke} strokeWidth={strokeWidth}
-        listening={false}
+        
       />
       {/* Cover the seam between rect and bottom ellipse */}
       <Line
         points={[-rx, bodyH / 2, rx, bodyH / 2]}
         stroke={fill} strokeWidth={strokeWidth + 1}
-        listening={false}
+        
       />
       {/* Top ellipse */}
       <Ellipse
         x={0} y={-bodyH / 2}
         radiusX={rx} radiusY={ry}
         fill={topFill} stroke={stroke} strokeWidth={strokeWidth}
-        listening={false}
+        
       />
     </Group>
   );

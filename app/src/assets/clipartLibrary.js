@@ -413,6 +413,17 @@ export const CLIPART_ITEMS = [
   { id: 'fountain',      label: 'Fountain',       category: 'Geographic', emoji: '⛲', url: tw('26f2') },
   { id: 'airport',       label: 'Airport',        category: 'Geographic', emoji: '🛫', url: tw('1f6eb') },
   { id: 'farm',          label: 'Farm',           category: 'Geographic', emoji: '🌾', url: tw('1f33e') },
+
+  // ── Characters & Fantasy ──────────────────────────────────────────────────
+  { id: 'person',        label: 'Person / Stick Figure', category: 'Characters', emoji: '🧍', url: tw('1f9cd') },
+  { id: 'alien',         label: 'Alien',          category: 'Characters', emoji: '👽', url: tw('1f47d') },
+  { id: 'robotFace',     label: 'Robot Face',     category: 'Characters', emoji: '🤖', url: tw('1f916') },
+  { id: 'ghost',         label: 'Ghost',          category: 'Characters', emoji: '👻', url: tw('1f47b') },
+  { id: 'portal',        label: 'Portal',         category: 'Fantasy',    emoji: '🌀', url: tw('1f300') },
+  { id: 'crystalBall',   label: 'Crystal Ball',   category: 'Fantasy',    emoji: '🔮', url: tw('1f52e') },
+  { id: 'sparkles',      label: 'Sparkles',       category: 'Fantasy',    emoji: '✨', url: tw('2728') },
+  { id: 'door',          label: 'Door',           category: 'Objects',    emoji: '🚪', url: tw('1f6aa') },
+  { id: 'key',           label: 'Key',            category: 'Objects',    emoji: '🔑', url: tw('1f511') },
 ];
 
 export const CLIPART_CATEGORIES = [
@@ -420,4 +431,5 @@ export const CLIPART_CATEGORIES = [
   'Nature', 'Food', 'Characters', 'Faces',
   'Buildings', 'Vehicles',
   'Household', 'Stationery', 'Shopping', 'Sports', 'Geographic',
+  'Fantasy', 'Objects'
 ];

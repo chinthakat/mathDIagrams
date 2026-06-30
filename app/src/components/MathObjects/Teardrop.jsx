@@ -15,5 +15,5 @@ export default function Teardrop({ width = 60, height = 90, fill = '#3b82f6', st
     `C ${-hw} ${circleY - r * 0.5} ${-hw * 0.6} ${tipY + (hh - r) * 0.6} 0 ${tipY}`,
     'Z',
   ].join(' ');
-  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} listening={false} />;
+  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth}  />;
 }

@@ -50,7 +50,7 @@ export default function AnalogClock({ props = {} }) {
           stroke={rimColor}
           strokeWidth={isMajor ? 2.5 : 1}
           opacity={isMajor ? 1 : 0.45}
-          listening={false}
+          
         />
       );
     }
@@ -75,7 +75,7 @@ export default function AnalogClock({ props = {} }) {
             fontFamily="Arial"
             fontStyle="bold"
             fill={rimColor}
-            listening={false}
+            
           />
         );
       })
@@ -85,15 +85,15 @@ export default function AnalogClock({ props = {} }) {
     <Group>
       {/* Drop shadow */}
       {style !== 'minimal' && (
-        <Circle radius={r + rimWidth + 2} fill="rgba(0,0,0,0.12)" offsetX={-2} offsetY={-2} listening={false} />
+        <Circle radius={r + rimWidth + 2} fill="rgba(0,0,0,0.12)" offsetX={-2} offsetY={-2}  />
       )}
       {/* Rim */}
-      <Circle radius={r + rimWidth} fill={rimColor} listening={false} />
+      <Circle radius={r + rimWidth} fill={rimColor}  />
       {/* Face */}
-      <Circle radius={r} fill={faceColor} listening={false} />
+      <Circle radius={r} fill={faceColor}  />
       {/* Inner ring (classic) */}
       {style === 'classic' && (
-        <Circle radius={r * 0.96} fill="transparent" stroke={rimColor} strokeWidth={0.7} opacity={0.25} listening={false} />
+        <Circle radius={r * 0.96} fill="transparent" stroke={rimColor} strokeWidth={0.7} opacity={0.25}  />
       )}
       {/* Ticks */}
       {ticks}
@@ -103,13 +103,13 @@ export default function AnalogClock({ props = {} }) {
       <Line
         points={[-Math.cos(hourAngle)*hourHandLen*0.17, -Math.sin(hourAngle)*hourHandLen*0.17,
                   Math.cos(hourAngle)*hourHandLen, Math.sin(hourAngle)*hourHandLen]}
-        stroke={handColor} strokeWidth={hourHandW} lineCap="round" listening={false}
+        stroke={handColor} strokeWidth={hourHandW} lineCap="round" 
       />
       {/* Minute hand */}
       <Line
         points={[-Math.cos(minuteAngle)*minuteHandLen*0.14, -Math.sin(minuteAngle)*minuteHandLen*0.14,
                   Math.cos(minuteAngle)*minuteHandLen, Math.sin(minuteAngle)*minuteHandLen]}
-        stroke={handColor} strokeWidth={minuteHandW} lineCap="round" listening={false}
+        stroke={handColor} strokeWidth={minuteHandW} lineCap="round" 
       />
       {/* Second hand */}
       {showSeconds && (
@@ -117,19 +117,19 @@ export default function AnalogClock({ props = {} }) {
           <Line
             points={[-Math.cos(secondAngle)*r*0.2, -Math.sin(secondAngle)*r*0.2,
                       Math.cos(secondAngle)*secondHandLen, Math.sin(secondAngle)*secondHandLen]}
-            stroke={secondColor} strokeWidth={1.5} lineCap="round" listening={false}
+            stroke={secondColor} strokeWidth={1.5} lineCap="round" 
           />
         </>
       )}
       {/* Centre pivot */}
-      <Circle radius={r * 0.055} fill={handColor} listening={false} />
-      {showSeconds && <Circle radius={r * 0.03} fill={secondColor} listening={false} />}
+      <Circle radius={r * 0.055} fill={handColor}  />
+      {showSeconds && <Circle radius={r * 0.03} fill={secondColor}  />}
       {/* Label */}
       {label ? (
         <Text
           x={-r} y={r + rimWidth + 6} width={r * 2}
           text={label} fontSize={Math.max(10, r * 0.17)}
-          fontFamily="Arial" fill="#1e293b" align="center" listening={false}
+          fontFamily="Arial" fill="#1e293b" align="center" 
         />
       ) : null}
     </Group>

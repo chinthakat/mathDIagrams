@@ -47,5 +47,5 @@ export default function BentArrow({
   const rotations = { 'up-right': 0, 'down-right': 90, 'down-left': 180, 'up-left': 270 };
   const rot = rotations[direction] ?? 0;
 
-  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} rotation={rot} listening={false} />;
+  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} rotation={rot}  />;
 }

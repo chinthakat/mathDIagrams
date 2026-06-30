@@ -17,5 +17,5 @@ export default function CrossShape({ width = 80, height = 80, armRatio = 0.38, f
     `L ${-hw} ${-ay}`, `L ${-ax} ${-ay}`,
     'Z',
   ].join(' ');
-  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} listening={false} />;
+  return <Path data={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth}  />;
 }

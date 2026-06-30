@@ -12,7 +12,8 @@
 
 import { SHAPE_CATALOGUE, REGISTERED_COMPONENT_TYPES } from './claudeService.js';
 import { logModelCall, logEvent, clearSessionLog } from './pipelineLogger.js';
-import { generateGeminiImage, validateWithGemini, analyzeQuestionImageWithGemini, generateRepairShapesWithGemini } from './geminiService.js';
+import { generateGeminiImage, validateWithGemini, analyzeQuestionImageWithGemini, generateRepairShapesWithGemini, getOrCreateShapeCache } from './geminiService.js';
+import { CLIPART_ITEMS } from '../assets/clipartLibrary';
 
 
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
@@ -105,12 +106,13 @@ Analyse the image carefully and return ONLY valid JSON (no markdown, no preamble
   "shapeComponents": ["list of visible shape types: rectangle, circle, line, text, etc."],
   "diagramDescription": "precise description of every element — positions, labels, colours, how many parts each shape is divided into and how many are shaded",
   "questionContext": "what the question is asking",
-  "generationInstructions": "Step-by-step Konva-shape instructions for recreating this diagram. Include ALL shapes, exact division counts, shading counts, colours, and labels. IMPORTANT: When the image contains illustrations of animals, vehicles, fruit, or common objects (e.g. fish, butterflies, cars, apples), suggest using rasterImage with the corresponding clipart name/id (e.g. 'fishBlue', 'butterfly', 'apple', 'car') rather than drawing them with vectors. CLOCK & TIME SHAPES: When the image contains an analogue clock face (round, with hands), use type 'analogClock' with hours/minutes props. When it contains a digital clock display (rectangular LED/LCD screen with digits), use type 'digitalClock' with timeText prop. When it contains a departure/arrival board (dark board listing multiple times), use type 'departureBoard' with title and times (comma-separated, '?' for missing entry) props.",
-  "imagePrompt": "Detailed pixel-level instructions for an image AI to draw this diagram from scratch on a white background with black outlines. Describe the exact layout, each shape's position, size, colour, how many sections it is divided into, exactly which sections are shaded and which are white, and any text labels.",
+  "generationInstructions": "Step-by-step Konva-shape instructions for recreating this diagram. Include ALL shapes, exact division counts, shading counts, colours, and labels. Assume an 800x600 coordinate system with (0,0) at top-left. Explicitly state approximate X and Y coordinates for every shape. IMPORTANT: When the image contains illustrations of animals, vehicles, fruit, people, portals, or common objects, you MUST suggest using rasterImage with the EXACT matching clipart ID from the AVAILABLE RASTERIMAGE CLIPARTS list below, rather than drawing them with vectors. Mention the matched ID (e.g. 'person', 'portal') clearly in your instructions. CLOCK & TIME SHAPES: When the image contains an analogue clock face (round, with hands), use type 'analogClock' with hours/minutes props. When it contains a digital clock display (rectangular LED/LCD screen with digits), use type 'digitalClock' with timeText prop. When it contains a departure/arrival board (dark board listing multiple times), use type 'departureBoard' with title and times (comma-separated, '?' for missing entry) props.",
+  "imagePrompt": "Detailed pixel-level instructions for an image AI to draw this diagram from scratch on a white background with black outlines. Describe the exact layout, each shape's position (using the 800x600 grid), size, colour, how many sections it is divided into, exactly which sections are shaded and which are white, and any text labels.",
   "verificationChecklist": [
     "VISUAL checks only — describe exactly what must be physically visible in a correct rendering. No maths, no fraction answers, no ✓ or ✗.",
     "Format every item as a factual statement about pixels/colours/counts",
-    "Each item must be independently verifiable by looking at the image — no logic, no fractions as answers."
+    "Each item must be independently verifiable by looking at the image — no logic, no fractions as answers.",
+    "If the image contains real-world objects or complex items (clocks, animals, vehicles), add a checklist item to ensure they are rendered cleanly as cliparts or dedicated components (not as messy primitive lines or text placeholders)."
   ],
   "librarySuitability": {
     "hasEnoughObjects": true,
@@ -125,9 +127,17 @@ Analyse the image carefully and return ONLY valid JSON (no markdown, no preamble
 }
 
 AVAILABLE SHAPE COMPONENTS in the editor library:
-${REGISTERED_COMPONENT_TYPES.join(', ')}
+${SHAPE_CATALOGUE}
 
-Compare the original image against the available shape components. If the original image contains complex objects (such as a balance scale, a robot, etc.) that cannot be natively drawn using the basic shape components, list them in "librarySuitability" and set "hasEnoughObjects" to false. If all objects can be natively represented, set "hasEnoughObjects" to true and leave "missingObjects" empty.`;
+AVAILABLE RASTERIMAGE CLIPARTS:
+${CLIPART_ITEMS.map(c => `- ${c.id}: ${c.label} (Category: ${c.category})`).join('\n')}
+
+Compare the original image against the available shape components and cliparts. Review all component descriptions and characteristics. If the original image contains complex objects (such as a balance scale, a robot, etc.) that cannot be natively drawn using the basic shape components or available cliparts, list them in "librarySuitability" and set "hasEnoughObjects" to false. If all objects can be natively represented, set "hasEnoughObjects" to true and leave "missingObjects" empty.
+
+STRICT LOGICAL RULES FOR ANALYSIS:
+1. ONLY describe what you physically see in the diagram. Do not assume or guess based on the question context. If the image has a stick figure and a doorway, describe a stick figure and a doorway. Do NOT invent flowcharts, arrows, or boxes that are not physically present in the image.
+2. If there are characters, people, stick figures, animals, or objects (like a portal vortex), look up their names in the AVAILABLE RASTERIMAGE CLIPARTS list. You MUST write down their clipart IDs (e.g. "person" for a stick figure, "portal" for a space portal, "door" for an arch/doorway) and instruct the generator to draw them using "rasterImage".
+3. Check the shape registry: if the diagram contains scales, clocks, or departure boards, instruct the generator to use their dedicated component types (e.g., 'weighingScale', 'analogClock') instead of building them out of rectangles and text.`;
 
 export async function analyzeQuestionImage({ imageUrl, questionText, apiKey, pipelineProvider = 'claude', geminiApiKey = '', model = 'gemini-3.5-flash' }) {
   const systemPrompt = makeAnalyzeSystemPrompt();
@@ -279,11 +289,16 @@ ${SHAPE_CATALOGUE}
 Respond with ONLY valid JSON — an array of shape objects:
 [ { "type": "...", "x": ..., "y": ..., ... }, ... ]
 
-Canvas is 800×500 logical pixels. Centre is x=400, y=250.
-Keep all shapes within x: 20–780, y: 20–480 so nothing is clipped.
-Use concrete positions and sizes. Include text labels where needed.
+Canvas is an 800×600 coordinate system. X ranges 0–800 (left to right). Y ranges 0–600 (top to bottom).
+Keep all shapes within x: 20–780, y: 20–580 so nothing is clipped.
+Use concrete coordinates for positions and sizes. 
+
+CRITICAL: If the user feedback provides exact coordinates (e.g., "X: 200", "Y: 150"), you MUST place the objects at those exact coordinates.
+Use the grid lines visible in the feedback images to perfectly align shapes.
 
 COMPONENT SELECTION RULES (follow strictly):
+- REVIEW ALL available components in the SHAPE_CATALOGUE and the AVAILABLE RASTERIMAGE CLIPARTS list. Decide which component or clipart best fits the objects in the original diagram based on their descriptions and characteristics before generating shapes.
+- NEVER draw characters, people, animals, vehicles, fruit, portals, or other illustrative objects using primitive shapes (circles, lines, polygons). You MUST use "rasterImage" with the correct clipart ID (e.g., "person" for stick figures/people, "portal" for space portals, "door" for doorways/arches). Manual drawing of these objects is strictly forbidden and will fail validation.
 - Use "departureBoard" for any train/bus departure/arrival timetable showing multiple times.
 - Use "digitalClock" for any rectangular LED/LCD clock showing a single time (timeText prop).
 - Use "analogClock" for any round clock face with hands (hours, minutes props).
@@ -293,7 +308,7 @@ COMPONENT SELECTION RULES (follow strictly):
 - Use "rectangle", "circle", "triangle", "text" etc. for basic geometry.
 - NEVER use "rasterImage" for diagram structural elements (clocks, boards, graphs, shapes).
   Only use "rasterImage" for illustrative icons (animals, vehicles, food, people) when
-  no specific component type covers it — set src to the lowercase clipart ID.
+  no specific component type covers it — set src to the lowercase clipart ID from the cache list.
 - If the diagram requires a component type not in this list, output it anyway with a comment
   field: { "type": "MISSING_TYPE_NAME", "comment": "brief description of what this should be" }
   The system will detect it and notify the developer to add it to the library.
@@ -347,16 +362,22 @@ export async function generateRepairShapes({ analysis, feedbackHistory, userInst
     feedbackHistory.forEach((fb, i) => {
       prompt += `Attempt ${i + 1}: ${fb}\n`;
     });
-    prompt += `\nRedraw from scratch. Fix ALL issues listed above. Each shape must be fully within the canvas bounds (x: 20–780, y: 20–480).`;
+    prompt += `\nRedraw from scratch. Fix ALL issues listed above. Each shape must be fully within the canvas bounds (x: 20–780, y: 20–580). Pay close attention to any coordinate grid positions visible in the feedback image.`;
   }
 
   let rawShapes;
   if (pipelineProvider === 'gemini') {
+    const clipartNames = CLIPART_ITEMS.map(c => `- ${c.id}: ${c.label} (Category: ${c.category})`).join('\n');
+    const fullSystemInstruction = GENERATE_SYSTEM + '\n\nAVAILABLE RASTERIMAGE CLIPARTS:\n' + clipartNames;
+    const cacheName = await getOrCreateShapeCache(geminiApiKey, fullSystemInstruction, `models/${model}`);
+
     rawShapes = await generateRepairShapesWithGemini({
       prompt,
-      systemPrompt: GENERATE_SYSTEM,
+      systemPrompt: fullSystemInstruction,
       apiKey: geminiApiKey,
       model,
+      cachedContentName: cacheName,
+      attempt,
     });
   } else {
     const text = await callClaude({
@@ -392,7 +413,7 @@ Your job: produce a single, refined image-generation prompt that an image AI wil
 STRICT RULES for the prompt you write:
 1. Describe ONLY the diagram elements — grid lines, shapes, letters placed on cells, arrows, directional key labels (N↑ S↓ E→ W←). Nothing else.
 2. NEVER mention difficulty levels, question text, hints, challenge tasks, answer keys, or any prose that should appear in the image.
-3. Be exhaustive about spatial layout: exact grid size, exact cell positions of each label, shading, colours.
+3. Be exhaustive about spatial layout. Translate any 800x600 coordinates from the user feedback into exact relative positioning instructions for the image AI.
 4. Incorporate any user instructions as diagram-level changes only (e.g. "make harder" → reposition labels, don't add text to the image).
 5. Incorporate all previous failure feedback so those mistakes are not repeated.
 
@@ -434,6 +455,7 @@ Rules:
 - Each checklist item describes what MUST be physically visible. Check each one literally.
 - A shape with 3 out of 4 sections shaded blue passes "3 blue sections shaded" — do not override this with your own fraction analysis.
 - If the image is blank or has no visible content, set isCorrect to false immediately.
+- CRITICAL OBJECT USAGE RULE: Check if the diagram contains real-world objects (animals, food, vehicles) or complex domain elements (clocks, fraction circles, scales). If they look like messy, disjointed primitive drawings made of overlapping lines, or if they are just plain text placeholders instead of actual graphics, mark isCorrect to false. Provide explicit feedback telling the generator to use 'rasterImage' clip arts or the dedicated component types instead of raw vector lines.
 
 Return ONLY valid JSON (no markdown):
 {
@@ -481,6 +503,11 @@ function buildQuestionValuesBlock(questionData) {
   // Question text
   if (questionData.text) {
     lines.push(`Question text: "${questionData.text}"`);
+  }
+
+  // Explanation
+  if (questionData.explanation) {
+    lines.push(`Explanation: "${questionData.explanation}"`);
   }
 
   // Correct answer
@@ -736,6 +763,7 @@ export async function repairDiagramWithRetry({
           feedbackHistory,
           model: geminiVisionModel,
           apiKey: geminiApiKey,
+          attempt,
         });
         await logEvent({ stage: 'validated', attempt, message: `Gemini validation: ${validation.isCorrect ? 'PASS' : 'FAIL'}`, data: validation });
       } else {

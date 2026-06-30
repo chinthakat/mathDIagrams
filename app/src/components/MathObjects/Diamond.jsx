@@ -6,5 +6,5 @@ export default function Diamond({ width = 100, height = 70, fill = '#3b82f6', st
   const hh = Math.max(4, Number(height) || 70) / 2;
   // top, right, bottom, left
   const points = [0, -hh, hw, 0, 0, hh, -hw, 0];
-  return <Line points={points} fill={fill} stroke={stroke} strokeWidth={strokeWidth} closed listening={false} />;
+  return <Line points={points} fill={fill} stroke={stroke} strokeWidth={strokeWidth} closed  />;
 }

@@ -1,4 +1,5 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Stage, Layer, Transformer, Group, Rect, Circle, Line, Path, Arrow, Text } from 'react-konva';
 import {
   getConnectionPoints, resolveEndpoint, findNearestConnectionPoint,
@@ -254,6 +255,34 @@ const ShapeElement = ({
   );
 };
 
+// ── Coordinate Grid Overlay ───────────────────────────────────────────────────
+const GridOverlay = ({ width = 800, height = 600, gridSize = 100 }) => {
+  const lines = [];
+  const labels = [];
+  
+  // Vertical lines & X-axis labels
+  for (let x = 0; x <= width; x += gridSize) {
+    lines.push(<Line key={`v-${x}`} points={[x, 0, x, height]} stroke="rgba(148,163,184,0.2)" strokeWidth={1} listening={false} />);
+    if (x > 0) labels.push(<Text key={`tx-${x}`} x={x + 2} y={2} text={x.toString()} fontSize={10} fill="#64748b" listening={false} />);
+  }
+  
+  // Horizontal lines & Y-axis labels
+  for (let y = 0; y <= height; y += gridSize) {
+    lines.push(<Line key={`h-${y}`} points={[0, y, width, y]} stroke="rgba(148,163,184,0.2)" strokeWidth={1} listening={false} />);
+    if (y > 0) labels.push(<Text key={`ty-${y}`} x={2} y={y + 2} text={y.toString()} fontSize={10} fill="#64748b" listening={false} />);
+  }
+  
+  // Origin label
+  labels.push(<Text key="origin" x={2} y={2} text="0,0" fontSize={10} fill="#64748b" listening={false} />);
+  
+  return (
+    <Group listening={false}>
+      {lines}
+      {labels}
+    </Group>
+  );
+};
+
 // ── Background decorations (unchanged) ───────────────────────────────────────
 const BackgroundDecorations = ({ theme }) => {
   if (theme === 'parchment') {
@@ -295,7 +324,15 @@ export default function CanvasEditor2D({
   mapTheme: externalMapTheme, setMapTheme: externalSetMapTheme,
   hideLocalControls = false,
   cropMode = false, cropBox, setCropBox,
+  toolbarPortalId = 'canvas-toolbar-portal-target',
+  showNumberedGrid = false,
+  isExporting = false,
 }) {
+  const [portalTarget, setPortalTarget] = useState(null);
+  useEffect(() => {
+    setPortalTarget(document.getElementById(toolbarPortalId));
+  }, [toolbarPortalId]);
+
   const containerRef = useRef(null);
   const [dimensions, setDimensions]   = useState({ width: 800, height: 600 });
   const [stageConfig, setStageConfig] = useState({ scale: 1, x: 0, y: 0 });
@@ -1081,7 +1118,7 @@ export default function CanvasEditor2D({
       }}
     >
       {/* ── Controls overlay ── */}
-      {!hideLocalControls && (
+      {!hideLocalControls && !portalTarget && (
         <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 10, background: 'rgba(0,0,0,0.7)', padding: '10px', borderRadius: '8px', fontSize: '12px', color: '#fff', userSelect: 'none' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '8px' }}>
             <input type="checkbox" checked={snapToGrid} onChange={e => setSnapToGrid(e.target.checked)} />
@@ -1139,84 +1176,107 @@ export default function CanvasEditor2D({
       )}
 
       {/* ── Drawing Toolbar ── */}
-      <div style={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 10, background: '#1e293b', padding: '8px', borderRadius: '30px', display: 'flex', gap: '8px', alignItems: 'center', boxShadow: '0 10px 25px -5px rgba(0,0,0,.5)', border: '1px solid #334155' }}>
-        {/* Undo / Redo */}
-        <button onClick={undo} title="Undo (Ctrl+Z)" disabled={!historyRef.current?.length}
-          style={{ width: 36, height: 36, borderRadius: 18, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'transparent', color: '#94a3b8', opacity: historyRef.current?.length ? 1 : 0.35 }}>
-          <Undo2 size={16} />
-        </button>
-        <button onClick={redo} title="Redo (Ctrl+Y)" disabled={!futureRef.current?.length}
-          style={{ width: 36, height: 36, borderRadius: 18, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'transparent', color: '#94a3b8', opacity: futureRef.current?.length ? 1 : 0.35 }}>
-          <Redo2 size={16} />
-        </button>
-        <div style={{ width: 1, height: 24, background: '#334155' }} />
-        {[
-          { id: 'select',    icon: <MousePointer2 size={16} />, title: 'Select & Move (hold Shift to multi-select)' },
-          { id: 'connector', icon: <Workflow size={16} />,       title: 'Connector (orthogonal)' },
-          { id: 'pen',       icon: <Pen size={16} />,           title: 'Pen' },
-          { id: 'highlighter',icon: <Highlighter size={16} />,  title: 'Highlighter' },
-          { id: 'eraser',    icon: <Eraser size={16} />,        title: 'Eraser' },
-          { id: 'line',      icon: <Minus size={16} />,         title: 'Line' },
-          { id: 'rect',      icon: <SquareIcon size={16} />,    title: 'Rectangle' },
-          { id: 'ellipse',   icon: <CircleIcon size={16} />,    title: 'Ellipse' },
-        ].map(t => (
-          <button key={t.id} onClick={() => { setDrawMode(t.id); setSelectedId(null); setIsShapesMenuOpen(false); setDrawingConn(null); setConnPreview(null); }} title={t.title}
-            style={{ width: 36, height: 36, borderRadius: 18, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: drawMode === t.id ? '#3b82f6' : 'transparent', color: drawMode === t.id ? '#fff' : '#94a3b8' }}>
-            {t.icon}
-          </button>
-        ))}
-
-        <div style={{ width: 1, height: 24, background: '#334155' }} />
-
-        {/* Quick shapes */}
-        <div style={{ position: 'relative' }}>
-          <button onClick={() => setIsShapesMenuOpen(o => !o)} title="Quick Shapes"
-            style={{ width: 36, height: 36, borderRadius: 18, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: isShapesMenuOpen ? '#3b82f6' : 'transparent', color: isShapesMenuOpen ? '#fff' : '#94a3b8' }}>
-            <Shapes size={16} />
-          </button>
-          {isShapesMenuOpen && (
-            <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 10, background: '#1e293b', border: '1px solid #334155', borderRadius: 8, padding: 8, display: 'flex', flexDirection: 'column', gap: 4, boxShadow: '0 10px 25px -5px rgba(0,0,0,.5)', zIndex: 20 }}>
+      {(() => {
+        const toolbarContent = (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {!hideLocalControls && portalTarget && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', color: '#cbd5e1', background: '#1e293b', padding: '6px 12px', borderRadius: '20px', border: '1px solid #334155', userSelect: 'none' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', margin: 0 }}>
+                  <input type="checkbox" checked={snapToGrid} onChange={e => setSnapToGrid(e.target.checked)} style={{ margin: 0 }} />
+                  Snap to Grid (20px)
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', margin: 0 }}>
+                  Theme:
+                  <select value={mapTheme} onChange={e => setMapTheme(e.target.value)} style={{ background: '#0f172a', border: '1px solid #475569', color: 'white', borderRadius: '4px', padding: '2px 4px', fontSize: '11px', outline: 'none' }}>
+                    {['dark','paper','parchment','topography','grassland','desert','ocean','blueprint'].map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>)}
+                  </select>
+                </label>
+              </div>
+            )}
+            
+            <div style={{ position: portalTarget ? 'static' : 'absolute', top: portalTarget ? 'auto' : 20, left: portalTarget ? 'auto' : '50%', transform: portalTarget ? 'none' : 'translateX(-50%)', zIndex: 10, background: '#1e293b', padding: '8px', borderRadius: '30px', display: 'flex', gap: '8px', alignItems: 'center', boxShadow: portalTarget ? 'none' : '0 10px 25px -5px rgba(0,0,0,.5)', border: '1px solid #334155' }}>
+              {/* Undo / Redo */}
+              <button onClick={undo} title="Undo (Ctrl+Z)" disabled={!historyRef.current?.length}
+                style={{ width: 36, height: 36, borderRadius: 18, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'transparent', color: '#94a3b8', opacity: historyRef.current?.length ? 1 : 0.35 }}>
+                <Undo2 size={16} />
+              </button>
+              <button onClick={redo} title="Redo (Ctrl+Y)" disabled={!futureRef.current?.length}
+                style={{ width: 36, height: 36, borderRadius: 18, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'transparent', color: '#94a3b8', opacity: futureRef.current?.length ? 1 : 0.35 }}>
+                <Redo2 size={16} />
+              </button>
+              <div style={{ width: 1, height: 24, background: '#334155' }} />
               {[
-                { type: 'triangle',              icon: <Triangle size={16} />,         label: 'Triangle' },
-                { type: 'polygon', overrides: { sides: 5 }, icon: <Star size={16} />,  label: 'Pentagon' },
-                { type: 'polygon', overrides: { sides: 6 }, icon: <Hexagon size={16} />, label: 'Hexagon' },
-                { type: 'orthoConnector',         icon: <Workflow size={16} />,         label: 'Ortho Connector' },
-                { type: 'connectorArrow',         icon: <ArrowRight size={16} />,       label: 'Straight Arrow' },
-                { type: 'dashedConnector',        icon: <ArrowRight size={16} />,       label: 'Dashed Arrow' },
-                { type: 'doubleHeadedConnector',  icon: <ArrowRight size={16} />,       label: 'Double Arrow' },
-                { type: 'thickArrow',             icon: <ArrowRight size={16} />,       label: 'Thick Arrow' },
-                { type: 'annotationArrow',        icon: <ArrowRight size={16} />,       label: 'Annotation Arrow' },
-                { type: 'point',                  icon: <CircleIcon size={16} fill="currentColor" />, label: 'Point' },
-              ].map(s => (
-                <button key={s.label} onClick={() => stampShape(s.type, s.overrides || {})}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', border: 'none', color: '#cbd5e1', padding: '6px 12px', borderRadius: 4, cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#334155'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  {s.icon} {s.label}
+                { id: 'select',    icon: <MousePointer2 size={16} />, title: 'Select & Move (hold Shift to multi-select)' },
+                { id: 'connector', icon: <Workflow size={16} />,       title: 'Connector (orthogonal)' },
+                { id: 'pen',       icon: <Pen size={16} />,           title: 'Pen' },
+                { id: 'highlighter',icon: <Highlighter size={16} />,  title: 'Highlighter' },
+                { id: 'eraser',    icon: <Eraser size={16} />,        title: 'Eraser' },
+                { id: 'line',      icon: <Minus size={16} />,         title: 'Line' },
+                { id: 'rect',      icon: <SquareIcon size={16} />,    title: 'Rectangle' },
+                { id: 'ellipse',   icon: <CircleIcon size={16} />,    title: 'Ellipse' },
+              ].map(t => (
+                <button key={t.id} onClick={() => { setDrawMode(t.id); setSelectedId(null); setIsShapesMenuOpen(false); setDrawingConn(null); setConnPreview(null); }} title={t.title}
+                  style={{ width: 36, height: 36, borderRadius: 18, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: drawMode === t.id ? '#3b82f6' : 'transparent', color: drawMode === t.id ? '#fff' : '#94a3b8' }}>
+                  {t.icon}
                 </button>
               ))}
+
+              <div style={{ width: 1, height: 24, background: '#334155' }} />
+
+              {/* Quick shapes */}
+              <div style={{ position: 'relative' }}>
+                <button onClick={() => setIsShapesMenuOpen(o => !o)} title="Quick Shapes"
+                  style={{ width: 36, height: 36, borderRadius: 18, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: isShapesMenuOpen ? '#3b82f6' : 'transparent', color: isShapesMenuOpen ? '#fff' : '#94a3b8' }}>
+                  <Shapes size={16} />
+                </button>
+                {isShapesMenuOpen && (
+                  <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 10, background: '#1e293b', border: '1px solid #334155', borderRadius: 8, padding: 8, display: 'flex', flexDirection: 'column', gap: 4, boxShadow: '0 10px 25px -5px rgba(0,0,0,.5)', zIndex: 20 }}>
+                    {[
+                      { type: 'triangle',              icon: <Triangle size={16} />,         label: 'Triangle' },
+                      { type: 'polygon', overrides: { sides: 5 }, icon: <Star size={16} />,  label: 'Pentagon' },
+                      { type: 'polygon', overrides: { sides: 6 }, icon: <Hexagon size={16} />, label: 'Hexagon' },
+                      { type: 'orthoConnector',         icon: <Workflow size={16} />,         label: 'Ortho Connector' },
+                      { type: 'connectorArrow',         icon: <ArrowRight size={16} />,       label: 'Straight Arrow' },
+                      { type: 'dashedConnector',        icon: <ArrowRight size={16} />,       label: 'Dashed Arrow' },
+                      { type: 'doubleHeadedConnector',  icon: <ArrowRight size={16} />,       label: 'Double Arrow' },
+                      { type: 'thickArrow',             icon: <ArrowRight size={16} />,       label: 'Thick Arrow' },
+                      { type: 'annotationArrow',        icon: <ArrowRight size={16} />,       label: 'Annotation Arrow' },
+                      { type: 'point',                  icon: <CircleIcon size={16} fill="currentColor" />, label: 'Point' },
+                    ].map(s => (
+                      <button key={s.label} onClick={() => stampShape(s.type, s.overrides || {})}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', border: 'none', color: '#cbd5e1', padding: '6px 12px', borderRadius: 4, cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#334155'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        {s.icon} {s.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ width: 1, height: 24, background: '#334155' }} />
+
+              {/* Brush size */}
+              {['sm','md','lg'].map((sz, i) => (
+                <button key={sz} onClick={() => setBrushSize(sz)} title={sz}
+                  style={{ width: 24, height: 24, borderRadius: 4, border: 'none', cursor: 'pointer', background: brushSize === sz ? '#334155' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: (i+1)*3+2, height: (i+1)*3+2, borderRadius: '50%', background: brushSize === sz ? '#fff' : '#94a3b8' }} />
+                </button>
+              ))}
+
+              <div style={{ width: 1, height: 24, background: '#334155' }} />
+
+              {/* Colors */}
+              {['#ef4444','#3b82f6','#22c55e','#eab308','#000000','#ffffff'].map(col => (
+                <button key={col} onClick={() => setDrawColor(col)} title={col}
+                  style={{ width: 24, height: 24, borderRadius: 12, border: drawColor === col ? '2px solid white' : '1px solid #334155', cursor: 'pointer', background: col, transform: drawColor === col ? 'scale(1.1)' : 'scale(1)' }} />
+              ))}
             </div>
-          )}
-        </div>
+          </div>
+        );
 
-        <div style={{ width: 1, height: 24, background: '#334155' }} />
-
-        {/* Brush size */}
-        {['sm','md','lg'].map((sz, i) => (
-          <button key={sz} onClick={() => setBrushSize(sz)} title={sz}
-            style={{ width: 24, height: 24, borderRadius: 4, border: 'none', cursor: 'pointer', background: brushSize === sz ? '#334155' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: (i+1)*3+2, height: (i+1)*3+2, borderRadius: '50%', background: brushSize === sz ? '#fff' : '#94a3b8' }} />
-          </button>
-        ))}
-
-        <div style={{ width: 1, height: 24, background: '#334155' }} />
-
-        {/* Colors */}
-        {['#ef4444','#3b82f6','#22c55e','#eab308','#000000','#ffffff'].map(col => (
-          <button key={col} onClick={() => setDrawColor(col)} title={col}
-            style={{ width: 24, height: 24, borderRadius: 12, border: drawColor === col ? '2px solid white' : '1px solid #334155', cursor: 'pointer', background: col, transform: drawColor === col ? 'scale(1.1)' : 'scale(1)' }} />
-        ))}
-      </div>
+        return portalTarget ? createPortal(toolbarContent, portalTarget) : toolbarContent;
+      })()}
 
       {/* ── Floating label editor ── */}
       {editingLabel && (
@@ -1254,6 +1314,7 @@ export default function CanvasEditor2D({
       >
         <Layer>
           <BackgroundDecorations theme={mapTheme} />
+          {showNumberedGrid && !isExporting && <GridOverlay width={800} height={600} gridSize={100} />}
 
           {/* ── Regular shapes (non-connector) ── */}
           {shapes.filter(s => !CONNECTOR_TYPES.has(s.type)).map(shape => (

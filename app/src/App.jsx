@@ -146,12 +146,14 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
 
   const addShape = (type) => {
     const newId = Date.now().toString();
+    const rx = 400 + (Math.floor(Math.random() * 7) - 3) * 20;
+    const ry = 300 + (Math.floor(Math.random() * 7) - 3) * 20;
     
     if (is2D) {
       if (type === 'imageIcon') {
         setIconPickerCallback(() => (selectedIcon) => {
           const regObj = ObjectRegistry.imageIcon;
-          const baseProps = { id: newId, type: 'imageIcon', x: 400, y: 300 };
+          const baseProps = { id: newId, type: 'imageIcon', x: rx, y: ry };
           const newShape = { ...baseProps, ...(regObj?.defaultProps || {}), iconName: selectedIcon };
           setActiveShapes([...shapes2D, newShape]);
           setSelectedId2D(newId);
@@ -166,7 +168,7 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
       }
 
       const regObj = ObjectRegistry[type];
-      const baseProps = { id: newId, type, x: 400, y: 300 };
+      const baseProps = { id: newId, type, x: rx, y: ry };
       const newShape = { ...baseProps, ...(regObj?.defaultProps || {}) };
       setActiveShapes([...shapes2D, newShape]);
       setSelectedId2D(newId);
@@ -192,7 +194,9 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
 
   const addClipart = item => {
     const newId = Date.now().toString();
-    const newShape = { id: newId, type: 'rasterImage', x: 360, y: 210, src: item.url, width: 80, height: 80, opacity: 1, rotation: 0 };
+    const rx = 400 + (Math.floor(Math.random() * 7) - 3) * 20;
+    const ry = 300 + (Math.floor(Math.random() * 7) - 3) * 20;
+    const newShape = { id: newId, type: 'rasterImage', x: rx, y: ry, src: item.url, width: 80, height: 80, opacity: 1, rotation: 0 };
     setActiveShapes([...shapes2D, newShape]);
     setSelectedId2D(newId);
   };
@@ -442,6 +446,10 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
             </div>
           ) : '3D Builder Tools'}
         </div>
+
+        {/* Portal target for the CanvasEditor2D toolbar */}
+        <div id="app-canvas-toolbar-portal" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}></div>
+
         <div style={{ display: 'flex', gap: '8px' }}>
           {mode === '3D' && (
             <button 
@@ -537,6 +545,7 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
                 setSelectedId={setSelectedId2D}
                 stageRef={stageRef2D}
                 showGrid={mode === 'Equations'}
+                toolbarPortalId="app-canvas-toolbar-portal"
               />
             ) : (
               <CanvasEditor3D
