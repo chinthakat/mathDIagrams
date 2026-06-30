@@ -365,7 +365,7 @@ export async function callGemini({ systemInstruction, contents, model = 'gemini-
 /**
  * Analyze existing diagram with Gemini vision.
  */
-export async function analyzeQuestionImageWithGemini({ imageUrl, questionText, systemPrompt, apiKey, model = 'gemini-3.5-flash' }) {
+export async function analyzeQuestionImageWithGemini({ imageUrl, questionText, userInstructions = '', systemPrompt, apiKey, model = 'gemini-3.5-flash' }) {
   const parts = [];
   
   if (imageUrl.startsWith('data:')) {
@@ -381,7 +381,7 @@ export async function analyzeQuestionImageWithGemini({ imageUrl, questionText, s
     }
   }
 
-  parts.push({ text: `Question context: ${questionText || 'No question text provided.'}\n\nAnalyse this diagram and return the JSON classification.` });
+  parts.push({ text: `Question context: ${questionText || 'No question text provided.'}${userInstructions ? `\n\nUSER CORRECTION FEEDBACK / INSTRUCTIONS (incorporate these changes into your analysis and generation instructions):\n${userInstructions}` : ''}\n\nAnalyse this diagram and return the JSON classification.` });
 
   const messages = [{
     role: 'user',

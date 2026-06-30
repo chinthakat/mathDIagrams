@@ -151,13 +151,14 @@ STRICT LOGICAL RULES FOR ANALYSIS:
    For barGraph: extract exact bar labels and numeric values from the image. Include the chart title, x-axis label, and y-axis label in generationInstructions.`;
 
 
-export async function analyzeQuestionImage({ imageUrl, questionText, apiKey, pipelineProvider = 'claude', geminiApiKey = '', model = 'gemini-3.5-flash' }) {
+export async function analyzeQuestionImage({ imageUrl, questionText, userInstructions = '', apiKey, pipelineProvider = 'claude', geminiApiKey = '', model = 'gemini-3.5-flash' }) {
   const systemPrompt = makeAnalyzeSystemPrompt();
 
   if (pipelineProvider === 'gemini') {
     return analyzeQuestionImageWithGemini({
       imageUrl,
       questionText,
+      userInstructions,
       systemPrompt,
       apiKey: geminiApiKey,
       model,
@@ -168,7 +169,7 @@ export async function analyzeQuestionImage({ imageUrl, questionText, apiKey, pip
     role: 'user',
     content: [
       buildImageContent(imageUrl),
-      { type: 'text', text: `Question context: ${questionText || 'No question text provided.'}\n\nAnalyse this diagram and return the JSON classification.` },
+      { type: 'text', text: `Question context: ${questionText || 'No question text provided.'}${userInstructions ? `\n\nUSER CORRECTION FEEDBACK / INSTRUCTIONS (incorporate these changes into your analysis and generation instructions):\n${userInstructions}` : ''}\n\nAnalyse this diagram and return the JSON classification.` },
     ],
   }];
 
@@ -682,6 +683,7 @@ export async function repairDiagramWithRetry({
   const analysis = await analyzeQuestionImage({
     imageUrl,
     questionText: questionData.text,
+    userInstructions,
     apiKey,
     pipelineProvider,
     geminiApiKey,
