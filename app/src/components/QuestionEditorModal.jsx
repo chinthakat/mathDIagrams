@@ -4,14 +4,14 @@
  * Left panel  : editable question text, answer options, correct answer, explanation
  *               + AI repair controls (what to fix, feedback, provider/key settings)
  * Centre      : full Konva canvas (CanvasEditor2D) showing the diagram
- * Right panel : shape PropertiesPanel + pipeline progress log
+ * Right panel : shape PropertiesPanel + pipeline progress log + AI suggestions
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   X, Sparkles, Loader, Save, CheckCircle, XCircle, RotateCcw,
   ChevronRight, Key, Image as ImageIcon, Wand2, FileText, List,
-  CheckSquare, AlignLeft, ChevronLeft, Crop,
+  CheckSquare, AlignLeft, ChevronLeft, Crop, GripVertical,
 } from 'lucide-react';
 import CanvasEditor2D from './CanvasEditor2D';
 import PropertiesPanel from './PropertiesPanel';
@@ -34,7 +34,7 @@ const S = {
   body:     { display: 'flex', flex: 1, overflow: 'hidden' },
   footer:   { display: 'flex', gap: '8px', padding: '10px 16px', background: '#0f172a', borderTop: '1px solid #334155', flexShrink: 0, alignItems: 'center' },
 
-  leftPanel:  { width: '310px', borderRight: '1px solid #1e293b', display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0, background: '#0f172a' },
+  leftPanel:  { borderRight: '1px solid #1e293b', display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0, background: '#0f172a' },
   rightPanel: { width: '270px', borderLeft: '1px solid #1e293b', display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0, background: '#0f172a' },
   centre:     { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#1e293b', position: 'relative' },
 
@@ -64,36 +64,40 @@ function ProgressEntry({ entry }) {
   const genModel = isGemini ? vModel : 'Claude Sonnet';
 
   const icon = {
-    analyzing:        <Loader size={11} className="spin" style={{ color: '#60a5fa', flexShrink: 0 }} />,
-    analyzed:         <CheckCircle size={11} color="#34d399" style={{ flexShrink: 0 }} />,
-    extracting_values:<Loader size={11} className="spin" style={{ color: '#a78bfa', flexShrink: 0 }} />,
-    generating:       <Loader size={11} className="spin" style={{ color: '#a78bfa', flexShrink: 0 }} />,
-    generated:        <CheckCircle size={11} color="#34d399" style={{ flexShrink: 0 }} />,
-    rendering:        <Loader size={11} className="spin" style={{ color: '#fb923c', flexShrink: 0 }} />,
-    validating:       <Loader size={11} className="spin" style={{ color: '#fbbf24', flexShrink: 0 }} />,
-    validated:        entry.validation?.isCorrect ? <CheckCircle size={11} color="#34d399" style={{ flexShrink: 0 }} /> : <XCircle size={11} color="#f87171" style={{ flexShrink: 0 }} />,
-    retry:            <RotateCcw size={11} color="#f59e0b" style={{ flexShrink: 0 }} />,
-    error:             <XCircle size={11} color="#f87171" style={{ flexShrink: 0 }} />,
-    attempt_error:     <XCircle size={11} color="#f87171" style={{ flexShrink: 0 }} />,
-    missing_components:<XCircle size={11} color="#f59e0b" style={{ flexShrink: 0 }} />,
+    analyzing:          <Loader size={11} className="spin" style={{ color: '#60a5fa', flexShrink: 0 }} />,
+    analyzed:           <CheckCircle size={11} color="#34d399" style={{ flexShrink: 0 }} />,
+    extracting_values:  <Loader size={11} className="spin" style={{ color: '#a78bfa', flexShrink: 0 }} />,
+    generating:         <Loader size={11} className="spin" style={{ color: '#a78bfa', flexShrink: 0 }} />,
+    generated:          <CheckCircle size={11} color="#34d399" style={{ flexShrink: 0 }} />,
+    rendering:          <Loader size={11} className="spin" style={{ color: '#fb923c', flexShrink: 0 }} />,
+    validating:         <Loader size={11} className="spin" style={{ color: '#fbbf24', flexShrink: 0 }} />,
+    validated:          entry.validation?.isCorrect ? <CheckCircle size={11} color="#34d399" style={{ flexShrink: 0 }} /> : <XCircle size={11} color="#f87171" style={{ flexShrink: 0 }} />,
+    retry:              <RotateCcw size={11} color="#f59e0b" style={{ flexShrink: 0 }} />,
+    error:              <XCircle size={11} color="#f87171" style={{ flexShrink: 0 }} />,
+    attempt_error:      <XCircle size={11} color="#f87171" style={{ flexShrink: 0 }} />,
+    missing_components: <XCircle size={11} color="#f59e0b" style={{ flexShrink: 0 }} />,
+    reviewing_question: <Loader size={11} className="spin" style={{ color: '#34d399', flexShrink: 0 }} />,
+    review_complete:    <CheckCircle size={11} color="#34d399" style={{ flexShrink: 0 }} />,
   }[entry.stage] || <ChevronRight size={11} color="#475569" style={{ flexShrink: 0 }} />;
 
   const text = {
-    analyzing:         `Analysing with ${analysisModel}…`,
-    analyzed:          `Classified: ${entry.analysis?.diagramType || 'diagram'}`,
-    extracting_values: `OCR: extracting exact values…`,
-    refining_prompt:   `Refining prompt…`,
-    generating:        `Attempt ${entry.attempt}/${entry.maxAttempts} — Generating with ${genModel}…`,
-    generated:         entry.image ? `Attempt ${entry.attempt} — image generated` : `Attempt ${entry.attempt} — ${entry.shapes?.length || 0} shapes`,
-    rendering:         `Attempt ${entry.attempt} — Rendering…`,
-    validating:        `Attempt ${entry.attempt} — Validating…`,
-    validated:         entry.validation?.isCorrect
+    analyzing:          `Analysing with ${analysisModel}…`,
+    analyzed:           `Classified: ${entry.analysis?.diagramType || 'diagram'}`,
+    extracting_values:  `OCR: extracting exact values…`,
+    refining_prompt:    `Refining prompt…`,
+    generating:         `Attempt ${entry.attempt}/${entry.maxAttempts} — Generating with ${genModel}…`,
+    generated:          entry.image ? `Attempt ${entry.attempt} — image generated` : `Attempt ${entry.attempt} — ${entry.shapes?.length || 0} shapes`,
+    rendering:          `Attempt ${entry.attempt} — Rendering…`,
+    validating:         `Attempt ${entry.attempt} — Validating…`,
+    validated:          entry.validation?.isCorrect
       ? `Attempt ${entry.attempt} — ✓ PASSED`
       : `Attempt ${entry.attempt} — ✗ ${entry.validation?.feedback?.slice(0, 60) || 'FAILED'}`,
-    retry:             `Attempt ${entry.attempt} — retrying…`,
-    error:             `⚠ ${entry.message || 'Error'}`,
+    retry:              `Attempt ${entry.attempt} — retrying…`,
+    error:              `⚠ ${entry.message || 'Error'}`,
     attempt_error:      `⚠ Attempt ${entry.attempt}: ${entry.message || 'error'}`,
     missing_components: `⚠ Missing components: ${(entry.missingComponents || []).map(m => m.type).join(', ')}`,
+    reviewing_question: `Reviewing question fields against new diagram…`,
+    review_complete:    `✓ Review complete — AI suggestions ready in panel`,
   }[entry.stage] || entry.stage;
 
   return (
@@ -113,6 +117,95 @@ function CheckRow({ checked, onChange, label, icon: Icon }) {
       {Icon && <Icon size={12} style={{ color: checked ? '#a78bfa' : '#64748b', flexShrink: 0 }} />}
       <span style={{ color: checked ? '#e2e8f0' : '#94a3b8' }}>{label}</span>
     </label>
+  );
+}
+
+// ── AI Suggestions Panel ──────────────────────────────────────────────────────
+
+function AISuggestionsPanel({ original, suggested, onAccept, onAcceptAll, onDismiss }) {
+  const fields = [
+    { key: 'text',          label: 'Question Text' },
+    { key: 'options',       label: 'Answer Options' },
+    { key: 'correctAnswer', label: 'Correct Answer' },
+    { key: 'explanation',   label: 'Explanation' },
+  ];
+
+  const toStr = v => Array.isArray(v) ? v.map((o, i) => `${OPTION_KEYS[i]}) ${o}`).join('\n') : String(v || '');
+
+  const changedFields = fields.filter(({ key }) => {
+    const o = toStr(original[key]);
+    const s = toStr(suggested[key]);
+    return s && o !== s;
+  });
+
+  if (changedFields.length === 0) return (
+    <div style={{ padding: '10px 12px', borderTop: '1px solid #1e293b', fontSize: '11px', color: '#34d399' }}>
+      ✓ AI reviewed — no changes suggested.
+      <button onClick={onDismiss} style={{ marginLeft: 8, fontSize: '10px', background: 'none', border: 'none', color: '#475569', cursor: 'pointer' }}>Dismiss</button>
+    </div>
+  );
+
+  return (
+    <div style={{ borderTop: '1px solid #1e293b', display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0, maxHeight: '55%' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(52,211,153,0.06)', borderBottom: '1px solid #134e4a', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Sparkles size={11} color="#34d399" />
+          <span style={{ fontSize: '10px', fontWeight: 700, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.06em' }}>AI Suggestions</span>
+          <span style={{ fontSize: '10px', color: '#475569' }}>({changedFields.length} field{changedFields.length !== 1 ? 's' : ''})</span>
+        </div>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <button
+            onClick={onAcceptAll}
+            style={{ fontSize: '10px', padding: '3px 8px', background: '#065f46', color: '#34d399', border: '1px solid #134e4a', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+          >Accept All</button>
+          <button
+            onClick={onDismiss}
+            style={{ fontSize: '10px', padding: '3px 6px', background: 'transparent', color: '#475569', border: '1px solid #334155', borderRadius: '4px', cursor: 'pointer' }}
+          ><X size={10} /></button>
+        </div>
+      </div>
+
+      {/* Field diffs */}
+      <div style={{ overflowY: 'auto', flex: 1 }}>
+        {changedFields.map(({ key, label }) => {
+          const origStr = toStr(original[key]);
+          const suggStr = toStr(suggested[key]);
+          return (
+            <div key={key} style={{ padding: '8px 10px', borderBottom: '1px solid #0f172a' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
+                <button
+                  onClick={() => onAccept(key, suggested[key])}
+                  style={{ fontSize: '10px', padding: '2px 8px', background: '#065f46', color: '#34d399', border: '1px solid #134e4a', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                >Accept</button>
+              </div>
+              {/* Side-by-side */}
+              <div style={{ display: 'flex', gap: '5px' }}>
+                {/* Original */}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '9px', color: '#475569', fontWeight: 700, marginBottom: '2px', textTransform: 'uppercase' }}>Original</div>
+                  <div style={{
+                    background: '#0f172a', border: '1px solid #334155', borderRadius: '4px',
+                    padding: '4px 6px', fontSize: '11px', color: '#64748b', lineHeight: 1.4,
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                  }}>{origStr}</div>
+                </div>
+                {/* Suggested */}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '9px', color: '#34d399', fontWeight: 700, marginBottom: '2px', textTransform: 'uppercase' }}>AI Suggested</div>
+                  <div style={{
+                    background: 'rgba(52,211,153,0.06)', border: '1px solid #134e4a', borderRadius: '4px',
+                    padding: '4px 6px', fontSize: '11px', color: '#34d399', lineHeight: 1.4,
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                  }}>{suggStr}</div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -164,6 +257,14 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
   const [saveError, setSaveError] = useState(null);
   const [saved, setSaved]         = useState(false);
 
+  // ── Left panel resize ──────────────────────────────────────────────────────
+  const [leftWidth, setLeftWidth] = useState(310);
+  const draggingLeftRef = useRef(false);
+
+  // ── AI question review state ───────────────────────────────────────────────
+  const [aiSuggestions, setAiSuggestions] = useState(null);
+  const [reviewingQuestion, setReviewingQuestion] = useState(false);
+
   const imageUrl = resolveImageUrl(question.image || question.imageUrl || question.imageKey);
 
   // ── Canvas helpers ─────────────────────────────────────────────────────────
@@ -176,6 +277,27 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
     if (dir === 'down' && i < a.length - 1)[a[i], a[i + 1]] = [a[i + 1], a[i]];
     return a;
   }), []);
+
+  // ── Left panel drag resize ─────────────────────────────────────────────────
+  const handleLeftDragStart = useCallback((e) => {
+    e.preventDefault();
+    const startX    = e.clientX;
+    const startWidth = leftWidth;
+    draggingLeftRef.current = true;
+
+    const onMove = (ev) => {
+      if (!draggingLeftRef.current) return;
+      const newW = Math.max(180, Math.min(520, startWidth + (ev.clientX - startX)));
+      setLeftWidth(newW);
+    };
+    const onUp = () => {
+      draggingLeftRef.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [leftWidth]);
 
   // ── renderAndCapture for repair pipeline ──────────────────────────────────
   const renderAndCapture = useCallback(async (newShapes) => {
@@ -199,6 +321,7 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
     setRunning(true);
     setProgressLog([]);
     setMissingComponents([]);
+    setAiSuggestions(null);
     setSaved(false);
 
     // Build combined feedback: user text + selected fields context
@@ -230,6 +353,27 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
         setResult(outcome);
         if (outcome.shapes?.length) setShapes(outcome.shapes);
         if (outcome.missingComponents?.length) setMissingComponents(outcome.missingComponents);
+
+        // ── Auto-review question fields against the new diagram ────────────
+        if (outcome.success && (apiKey || geminiKey)) {
+          setReviewingQuestion(true);
+          setProgressLog(prev => [...prev, { stage: 'reviewing_question' }]);
+          try {
+            await new Promise(r => setTimeout(r, 350)); // let canvas re-render
+            const sugg = await reviewQuestionAgainstDiagram({
+              stageRef, qText, options, correctAnswer, explanation,
+              apiKey, geminiKey, pipelineProvider,
+            });
+            if (sugg) {
+              setAiSuggestions(sugg);
+              setProgressLog(prev => [...prev, { stage: 'review_complete' }]);
+            }
+          } catch (err) {
+            console.warn('Question review failed:', err);
+          } finally {
+            setReviewingQuestion(false);
+          }
+        }
       }
 
       // Text field fixes via Claude/Gemini (simple prompt)
@@ -319,6 +463,23 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
     }
   };
 
+  // ── Accept suggestion handlers ────────────────────────────────────────────
+  const handleAcceptSuggestion = useCallback((key, value) => {
+    if (key === 'text')          setQText(value);
+    else if (key === 'options')  setOptions(value);
+    else if (key === 'correctAnswer') setCorrectAnswer(value);
+    else if (key === 'explanation')   setExplanation(value);
+  }, []);
+
+  const handleAcceptAll = useCallback(() => {
+    if (!aiSuggestions) return;
+    if (aiSuggestions.text)          setQText(aiSuggestions.text);
+    if (aiSuggestions.options)       setOptions(aiSuggestions.options);
+    if (aiSuggestions.correctAnswer) setCorrectAnswer(aiSuggestions.correctAnswer);
+    if (aiSuggestions.explanation)   setExplanation(aiSuggestions.explanation);
+    setAiSuggestions(null);
+  }, [aiSuggestions]);
+
   const selectedShape = shapes.find(s => s.id === selectedId);
 
   return (
@@ -344,8 +505,8 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
       {/* Body */}
       <div style={S.body}>
 
-        {/* ── Left panel ── */}
-        <div style={S.leftPanel}>
+        {/* ── Left panel (resizable) ── */}
+        <div style={{ ...S.leftPanel, width: leftWidth + 'px' }}>
           <div style={S.scroll}>
 
             {/* Question text */}
@@ -501,6 +662,29 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
           </div>
         </div>
 
+        {/* ── Left panel drag handle ── */}
+        <div
+          onMouseDown={handleLeftDragStart}
+          title="Drag to resize panel"
+          style={{
+            width: '6px',
+            flexShrink: 0,
+            cursor: 'col-resize',
+            background: 'transparent',
+            borderRight: '1px solid #1e293b',
+            position: 'relative',
+            zIndex: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(124,58,237,0.35)'; }}
+          onMouseLeave={e => { if (!draggingLeftRef.current) e.currentTarget.style.background = 'transparent'; }}
+        >
+          <GripVertical size={12} color="#334155" style={{ pointerEvents: 'none' }} />
+        </div>
+
         {/* ── Centre — original image + canvas ── */}
         <div style={{ ...S.centre, flexDirection: 'row' }}>
           
@@ -573,10 +757,10 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
           </div>
         </div>
 
-        {/* ── Right panel — properties + log ── */}
+        {/* ── Right panel — properties + log + AI suggestions ── */}
         <div style={S.rightPanel}>
           {/* Properties */}
-          <div style={{ borderBottom: '1px solid #1e293b', overflow: 'hidden', maxHeight: '50%' }}>
+          <div style={{ borderBottom: '1px solid #1e293b', overflow: 'hidden', maxHeight: '30%' }}>
             <PropertiesPanel
               selectedShape={selectedShape}
               updateShape={updateShape}
@@ -594,7 +778,7 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
               Pipeline Progress
             </span>
           </div>
-          <div style={S.logBox}>
+          <div style={{ ...S.logBox, flex: aiSuggestions || reviewingQuestion ? '0 0 auto' : 1, maxHeight: aiSuggestions || reviewingQuestion ? '160px' : undefined }}>
             {progressLog.length === 0 ? (
               <div style={{ fontSize: '11px', color: '#334155', textAlign: 'center', padding: '16px 0' }}>
                 Select what to fix, add feedback,<br />then click "Run AI".
@@ -617,6 +801,23 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
               </div>
             )}
           </div>
+
+          {/* ── AI Question Review Suggestions ── */}
+          {reviewingQuestion && (
+            <div style={{ padding: '10px 12px', borderTop: '1px solid #1e293b', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(52,211,153,0.04)', flexShrink: 0 }}>
+              <Loader size={12} className="spin" color="#34d399" />
+              <span style={{ fontSize: '11px', color: '#34d399' }}>Reviewing question against diagram…</span>
+            </div>
+          )}
+          {aiSuggestions && !reviewingQuestion && (
+            <AISuggestionsPanel
+              original={{ text: qText, options, correctAnswer, explanation }}
+              suggested={aiSuggestions}
+              onAccept={handleAcceptSuggestion}
+              onAcceptAll={handleAcceptAll}
+              onDismiss={() => setAiSuggestions(null)}
+            />
+          )}
         </div>
       </div>
 
@@ -737,4 +938,101 @@ Return the corrected JSON object with the same keys.`;
     console.warn('fixQuestionFields failed:', e.message);
   }
   return {};
+}
+
+// ── Review question fields against the newly generated diagram ────────────────
+
+async function reviewQuestionAgainstDiagram({ stageRef, qText, options, correctAnswer, explanation, apiKey, geminiKey, pipelineProvider }) {
+  // Capture canvas screenshot
+  let screenshotBase64 = null;
+  if (stageRef?.current) {
+    try {
+      const dataUrl = stageRef.current.toDataURL({ pixelRatio: 1.5 });
+      screenshotBase64 = dataUrl.split(',')[1];
+    } catch (e) {
+      console.warn('Could not capture canvas for review:', e.message);
+    }
+  }
+  if (!screenshotBase64) return null;
+
+  const KEYS = ['A', 'B', 'C', 'D', 'E'];
+
+  const systemPrompt = `You are a mathematics teacher reviewing a multiple-choice question against a freshly generated diagram.
+Carefully compare the question text, answer options, correct answer, and explanation against what is ACTUALLY visible in the diagram.
+Suggest corrections or refinements where the text does not match the diagram, or where accuracy can be improved.
+If a field is already correct and well-worded, return it unchanged.
+
+Return ONLY a single valid JSON object with exactly these four keys:
+{
+  "text": "<corrected or unchanged question text>",
+  "options": ["<option A>", "<option B>", "<option C>", "<option D>"],
+  "correctAnswer": "<letter A, B, C or D>",
+  "explanation": "<corrected or unchanged explanation>"
+}
+Do not add any commentary outside the JSON.`;
+
+  const userMsg = `Current question data:
+Question: ${qText}
+Options: ${options.map((o, i) => `${KEYS[i]}) ${o}`).join(' | ')}
+Correct Answer: ${correctAnswer}
+Explanation: ${explanation}
+
+Please review the attached diagram image and return the corrected JSON.`;
+
+  try {
+    if (pipelineProvider === 'gemini' && geminiKey) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: [{
+            role: 'user',
+            parts: [
+              { inlineData: { mimeType: 'image/png', data: screenshotBase64 } },
+              { text: userMsg },
+            ],
+          }],
+          generationConfig: { responseMimeType: 'application/json' },
+        }),
+      });
+      if (!resp.ok) throw new Error(`Gemini review error: ${resp.status}`);
+      const data = await resp.json();
+      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || 'null';
+      return JSON.parse(raw);
+    }
+
+    if (apiKey) {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: 'image/png', data: screenshotBase64 } },
+              { type: 'text', text: userMsg },
+            ],
+          }],
+        }),
+      });
+      if (!resp.ok) throw new Error(`Claude review error: ${resp.status}`);
+      const data = await resp.json();
+      const raw = data.content?.[0]?.text || 'null';
+      const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+      return JSON.parse(cleaned);
+    }
+  } catch (e) {
+    console.warn('reviewQuestionAgainstDiagram failed:', e.message);
+  }
+  return null;
 }
