@@ -164,21 +164,7 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
   const [saveError, setSaveError] = useState(null);
   const [saved, setSaved]         = useState(false);
 
-  // ── Auto-reconstruct if no shapes ─────────────────────────────────────────
   const imageUrl = resolveImageUrl(question.image || question.imageUrl || question.imageKey);
-  const [reconstructing, setReconstructing] = useState(false);
-
-  useEffect(() => {
-    if (shapes.length === 0 && imageUrl && !reconstructing) {
-      setReconstructing(true);
-      const key = getApiKey();
-      if (!key) return;
-      analyseImageForEditing(imageUrl, key)
-        .then(r => { if (r?.shapes?.length) setShapes(r.shapes); })
-        .catch(() => {})
-        .finally(() => setReconstructing(false));
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Canvas helpers ─────────────────────────────────────────────────────────
   const updateShape  = useCallback((id, p) => setShapes(prev => prev.map(s => s.id === id ? { ...s, ...p } : s)), []);
@@ -552,15 +538,6 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
 
           {/* ── Canvas Editor ── */}
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-            {reconstructing && shapes.length === 0 && (
-              <div style={{
-                position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center', gap: '10px', zIndex: 10, pointerEvents: 'none',
-              }}>
-                <Loader size={28} color="#7c3aed" className="spin" />
-                <span style={{ fontSize: '13px', color: '#94a3b8' }}>Reconstructing diagram from image…</span>
-              </div>
-            )}
             {cropMode && (
               <div style={{
                 position: 'absolute', top: 12, left: 12, right: 12, zIndex: 50,
