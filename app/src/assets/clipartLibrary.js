@@ -10,7 +10,17 @@
 const TW = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg';
 const tw  = code => `${TW}/${code}.svg`;
 
+// ── Custom SVG data URIs for objects not in Unicode emoji ─────────────────────
+// These are hand-crafted SVGs encoded as data URIs for use as clipart.
+
+const SUBMARINE_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 60'%3E%3C!-- hull --%3E%3Cellipse cx='48' cy='38' rx='38' ry='16' fill='%234a90d9' stroke='%231e3a5f' stroke-width='2.5'/%3E%3C!-- conning tower --%3E%3Crect x='42' y='20' width='18' height='14' rx='3' fill='%235aa3e8' stroke='%231e3a5f' stroke-width='2'/%3E%3C!-- periscope --%3E%3Crect x='50' y='10' width='4' height='14' rx='2' fill='%231e3a5f'/%3E%3Crect x='47' y='10' width='10' height='3' rx='1.5' fill='%231e3a5f'/%3E%3C!-- porthole --%3E%3Ccircle cx='38' cy='38' r='6' fill='%23aad4f5' stroke='%231e3a5f' stroke-width='2'/%3E%3Ccircle cx='38' cy='38' r='3' fill='%23d0eafc'/%3E%3C!-- propeller --%3E%3Cellipse cx='86' cy='32' rx='3' ry='8' fill='%231e3a5f' transform='rotate(-20 86 32)'/%3E%3Cellipse cx='86' cy='44' rx='3' ry='8' fill='%231e3a5f' transform='rotate(20 86 44)'/%3E%3Ccircle cx='86' cy='38' r='3.5' fill='%234a90d9' stroke='%231e3a5f' stroke-width='1.5'/%3E%3C!-- tail fin --%3E%3Cpolygon points='84,38 96,28 96,48' fill='%234a90d9' stroke='%231e3a5f' stroke-width='2'/%3E%3C!-- nose --%3E%3Cellipse cx='10' cy='38' rx='6' ry='12' fill='%235aa3e8' stroke='%231e3a5f' stroke-width='2'/%3E%3C!-- bottom fin --%3E%3Cpolygon points='55,54 65,54 60,62' fill='%234a90d9' stroke='%231e3a5f' stroke-width='1.5'/%3E%3C/svg%3E`;
+
 export const CLIPART_ITEMS = [
+
+  // ── Transport %26 Places ───────────────────────────────────────────────────────
+  { id: 'elevator',      label: 'Elevator / Lift', category: 'Transport', emoji: '🛗', url: tw('1f6d7') },
+  { id: 'anchor',        label: 'Anchor',          category: 'Transport', emoji: '⚓', url: tw('2693') },
+  { id: 'submarine',     label: 'Submarine',       category: 'Transport', emoji: '🚢', url: SUBMARINE_SVG },
 
   // ── Sea Life (multiple fish variants — commonly used in maths problems) ──
   { id: 'fishBlue',      label: 'Fish',          category: 'Sea Life',  emoji: '🐟', url: tw('1f41f') },
@@ -427,7 +437,7 @@ export const CLIPART_ITEMS = [
 ];
 
 export const CLIPART_CATEGORIES = [
-  'Sea Life', 'Insects', 'Animals', 'Birds', 'Flowers',
+  'Transport', 'Sea Life', 'Insects', 'Animals', 'Birds', 'Flowers',
   'Nature', 'Food', 'Characters', 'Faces',
   'Buildings', 'Vehicles',
   'Household', 'Stationery', 'Shopping', 'Sports', 'Geographic',
