@@ -148,7 +148,7 @@ function extractGrade(exam) {
   return m ? `Grade ${m[1]}` : '';
 }
 
-export default function MockExamBrowser() {
+export default function MockExamBrowser({ initialSelectedExam, initialGradeFilter, onSelectExam }) {
   const [hasKeys, setHasKeys] = useState(!!(getLmsApiKey() || import.meta.env.VITE_LMS_API_KEY));
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -157,7 +157,7 @@ export default function MockExamBrowser() {
   const [examQuestions, setExamQuestions] = useState(null);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [search, setSearch] = useState('');
-  const [gradeFilter, setGradeFilter] = useState('');
+  const [gradeFilter, setGradeFilter] = useState(initialGradeFilter || '');
   const [editRepairQuestion, setEditRepairQuestion] = useState(null);
   const [viewQuestion, setViewQuestion] = useState(null);
 
@@ -182,8 +182,9 @@ export default function MockExamBrowser() {
 
   useEffect(() => { if (hasKeys) loadExams(); }, [hasKeys, loadExams]);
 
-  const selectExam = async (exam) => {
+  const selectExam = useCallback(async (exam) => {
     setSelectedExam(exam);
+    onSelectExam?.(extractGrade(exam), exam);
     setExamQuestions(null);
     setLoadingQuestions(true);
     try {
@@ -194,7 +195,32 @@ export default function MockExamBrowser() {
     } finally {
       setLoadingQuestions(false);
     }
-  };
+  }, [onSelectExam]);
+
+  // Sync selection from initialSelectedExam prop (from Welcome Wizard)
+  useEffect(() => {
+    if (initialSelectedExam) {
+      // Find matching exam in loaded list or use the prop directly
+      const match = exams.find(e => e.id === initialSelectedExam.id);
+      if (match) {
+        // If already selected, do not reload questions to avoid infinite loop / redundant fetch
+        if (selectedExam?.id !== match.id) {
+          selectExam(match);
+        }
+      } else {
+        if (selectedExam?.id !== initialSelectedExam.id) {
+          selectExam(initialSelectedExam);
+        }
+      }
+    }
+  }, [initialSelectedExam, exams, selectedExam, selectExam]);
+
+  // Sync gradeFilter if it changes from parent
+  useEffect(() => {
+    if (initialGradeFilter !== undefined) {
+      setGradeFilter(initialGradeFilter || '');
+    }
+  }, [initialGradeFilter]);
 
   // Derive grade levels from loaded exams
   const gradeOptions = [...new Set(

@@ -14,7 +14,7 @@ import SampleImageModal from './components/SampleImageModal';
 import { ObjectRegistry } from './registry/objectRegistry';
 import TopNavigation from './components/TopNavigation';
 
-function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData }) {
+function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData, autoOpenWizard, setAutoOpenWizard }) {
   const mode = globalMode || '2D';
   const setMode = setGlobalMode || (() => {});
   const is2D = mode === '2D';
@@ -28,6 +28,14 @@ function App({ globalMode, setGlobalMode, globalLoadedData, setGlobalLoadedData 
 
   // Wizard Modal State
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+
+  // Trigger Diagram Wizard Modal from Welcome Wizard Selection
+  useEffect(() => {
+    if (autoOpenWizard) {
+      setIsWizardOpen(true);
+      setAutoOpenWizard(false);
+    }
+  }, [autoOpenWizard, setAutoOpenWizard]);
 
   // Sample Image Clone Modal State
   const [isSampleImageOpen, setIsSampleImageOpen] = useState(false);
