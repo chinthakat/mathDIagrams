@@ -346,7 +346,12 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
           validationMode: pipelineProvider === 'gemini' ? 'gemini' : 'claude',
           pipelineProvider,
           geminiVisionModel,
-          onProgress: entry => setProgressLog(prev => [...prev, entry]),
+          onProgress: entry => {
+            setProgressLog(prev => [...prev, entry]);
+            if (entry.stage === 'missing_components' && entry.missingComponents?.length) {
+              setMissingComponents(entry.missingComponents);
+            }
+          },
           renderAndCapture,
           maxRetries: 3,
         });
@@ -785,18 +790,28 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
               </div>
             ) : progressLog.map((e, i) => <ProgressEntry key={i} entry={e} />)}
             {missingComponents.length > 0 && (
-              <div style={{ marginTop: '10px', background: 'rgba(245,158,11,0.1)', border: '1px solid #f59e0b', borderRadius: '6px', padding: '8px 10px', fontSize: '11px', color: '#fcd34d' }}>
-                <strong style={{ display: 'block', marginBottom: '4px' }}>⚠ Missing Components</strong>
-                <span style={{ color: '#94a3b8', fontSize: '10px', display: 'block', marginBottom: '4px' }}>
-                  These types were requested but don't exist in the component library:
+              <div style={{ marginTop: '10px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.5)', borderRadius: '8px', padding: '10px 12px', fontSize: '11px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '14px' }}>⚠️</span>
+                  <strong style={{ color: '#fbbf24', fontSize: '11px', fontWeight: 700 }}>Diagram Generation Halted</strong>
+                </div>
+                <span style={{ color: '#94a3b8', fontSize: '10px', display: 'block', marginBottom: '6px', lineHeight: '1.5' }}>
+                  The AI could not generate this diagram because the following objects are not yet in the component library. The diagram requires these to be built first:
                 </span>
-                {missingComponents.map((m, i) => {
-                  const type = typeof m === 'string' ? m : m.type;
-                  const comment = typeof m === 'object' && m.comment ? ` — ${m.comment}` : '';
-                  return <div key={i} style={{ fontFamily: 'monospace', fontSize: '11px', color: '#f59e0b' }}>• {type}<span style={{ color: '#94a3b8', fontFamily: 'inherit' }}>{comment}</span></div>;
-                })}
-                <span style={{ color: '#64748b', fontSize: '10px', display: 'block', marginTop: '4px' }}>
-                  Add these to the object registry to use them.
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
+                  {missingComponents.map((m, i) => {
+                    const type = typeof m === 'string' ? m : m.type;
+                    const comment = typeof m === 'object' && m.comment ? m.comment : '';
+                    return (
+                      <div key={i} style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: '4px', padding: '4px 8px' }}>
+                        <span style={{ fontFamily: 'monospace', fontSize: '11px', color: '#fbbf24', fontWeight: 600 }}>• {type}</span>
+                        {comment && <span style={{ color: '#94a3b8', fontSize: '10px', display: 'block', marginTop: '2px', paddingLeft: '10px' }}>{comment}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+                <span style={{ color: '#64748b', fontSize: '10px', display: 'block', lineHeight: '1.5' }}>
+                  💡 Ask the developer to add these components to the object library, then try again.
                 </span>
               </div>
             )}

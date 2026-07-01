@@ -658,7 +658,8 @@ SHAPE RULES:
 • IRREGULAR SHAPES (L-shape, notched rect, trapezoid): use customPolygon with points relative to shape x,y.
 • TEXT LABELS: add a text shape for every visible number, letter, or word.
 
-Also identify visual elements that CANNOT be represented by the registered components.
+CRITICAL — NO WORKAROUNDS FOR MISSING DIAGRAM COMPONENTS:
+If the diagram contains a complex layout (like a table grid, lift/elevator shaft, calendar page) or specific illustration (like a submarine, specialized vehicle, animal, custom tool) that is NOT present in the SHAPE_CATALOGUE and has no matching clipart in the registered cliparts list, do NOT try to trace or suggest drawing them using generic shapes (lines, rectangles, customPolygon). You MUST list them in the "missingComponents" array in the JSON response, describing the missing component and why it is needed.
 
 Respond ONLY with valid JSON:
 {

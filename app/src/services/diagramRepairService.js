@@ -330,6 +330,10 @@ COMPONENT SELECTION RULES (follow strictly):
   • "objectArray"   → grid arrays (multiplication arrays) or scattered groups of identical clipart items/circles representing count sets.
   • "vennDiagram"   → two overlapping circles with labelled regions.
   NEVER manually draw a chart, table, or array using individual rectangles/lines/circles when a dedicated component is available.
+  
+- CRITICAL — NO WORKAROUNDS FOR MISSING COMPONENTS:
+  If the original diagram contains a complex layout (like a table grid, lift/elevator shaft, balance scale, calendar page) or specific illustration (like a submarine, specialized vehicle, animal, custom tool) that is NOT present in the SHAPE_CATALOGUE and has no matching clipart in the AVAILABLE RASTERIMAGE CLIPARTS, do NOT try to draw it manually using primitive shapes (circles, lines, rectangles, polygons). Instead, you MUST output a single shape object representing the missing element with its conceptual lowercase type name (e.g., { "type": "lift", "comment": "Elevator shaft showing levels B to D" } or { "type": "submarine", "comment": "Submarine clipart icon next to level D" }) and a "comment" field describing the missing component. The system will detect this and show a prompt to the developer to add it to the library.
+
 - Use "departureBoard" for any train/bus departure/arrival timetable showing multiple times.
 - Use "fractionCircle", "fractionRectangle", or "fractionBar" for fraction diagrams.
 - Use "numberline" for number lines. Use "cartesianPlane" for coordinate grids.
@@ -410,10 +414,12 @@ export async function generateRepairShapes({ analysis, feedbackHistory, userInst
       attempt,
     });
   } else {
+    const clipartNames = CLIPART_ITEMS.map(c => `- ${c.id}: ${c.label} (Category: ${c.category})`).join('\n');
+    const fullSystemInstruction = GENERATE_SYSTEM + '\n\nAVAILABLE RASTERIMAGE CLIPARTS:\n' + clipartNames;
     const text = await callClaude({
       stage: 'generate', attempt,
       model: 'claude-sonnet-4-6',
-      system: GENERATE_SYSTEM,
+      system: fullSystemInstruction,
       messages: [{ role: 'user', content: prompt }],
       apiKey, maxTokens: 4096,
     });
@@ -720,6 +726,36 @@ export async function repairDiagramWithRetry({
   let prevImageBase64 = null;
   let allMissingComponents = []; // accumulate across attempts
 
+  // Pre-load missing components identified in Step 1 analysis phase
+  if (analysis?.librarySuitability?.hasEnoughObjects === false && Array.isArray(analysis.librarySuitability.missingObjects)) {
+    analysis.librarySuitability.missingObjects.forEach(m => {
+      const name = m.name || 'unknown';
+      const comment = m.description || '';
+      if (!allMissingComponents.some(c => c.type.toLowerCase() === name.toLowerCase())) {
+        allMissingComponents.push({
+          type: name,
+          comment: comment
+        });
+      }
+    });
+  }
+
+  // If missing components were identified in analysis phase, abort repair early and show feedback
+  if (allMissingComponents.length > 0) {
+    await logEvent({ stage: 'missing_components', message: 'Aborting repair early due to missing components identified in analysis phase', data: { missingComponents: allMissingComponents } });
+    onProgress({ stage: 'missing_components', attempt: 0, maxAttempts: maxRetries, missingComponents: allMissingComponents, pipelineProvider });
+    return {
+      shapes: [],
+      image: null,
+      analysis,
+      attempts: 0,
+      success: false,
+      validation: { isCorrect: false, feedback: `Missing components: ${allMissingComponents.map(m => m.type).join(', ')}` },
+      generationMode,
+      missingComponents: allMissingComponents
+    };
+  }
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     await logEvent({ stage: 'attempt_start', attempt, maxAttempts: maxRetries, message: `Starting attempt ${attempt}` });
 
@@ -769,13 +805,30 @@ export async function repairDiagramWithRetry({
           questionValues,
         });
         const missingComponents = shapes.__missingComponents || [];
-        if (missingComponents.length) allMissingComponents.push(...missingComponents);
+        if (missingComponents.length) {
+          missingComponents.forEach(m => {
+            if (!allMissingComponents.some(c => c.type.toLowerCase() === m.type.toLowerCase())) {
+              allMissingComponents.push(m);
+            }
+          });
+        }
         lastShapes = shapes;
         await logEvent({ stage: 'generated', attempt, message: `${shapes.length} shapes generated`, data: { shapeTypes: shapes.map(s => s.type), missingComponents } });
         if (missingComponents.length > 0) {
-          onProgress({ stage: 'missing_components', attempt, maxAttempts: maxRetries, missingComponents, pipelineProvider });
+          onProgress({ stage: 'missing_components', attempt, maxAttempts: maxRetries, missingComponents: allMissingComponents, pipelineProvider });
+          onProgress({ stage: 'generated', attempt, maxAttempts: maxRetries, shapes, analysis, missingComponents: allMissingComponents, pipelineProvider, geminiVisionModel });
+          return {
+            shapes,
+            image: null,
+            analysis,
+            attempts: attempt,
+            success: false,
+            validation: { isCorrect: false, feedback: `Missing components: ${allMissingComponents.map(m => m.type).join(', ')}` },
+            generationMode,
+            missingComponents: allMissingComponents
+          };
         }
-        onProgress({ stage: 'generated', attempt, maxAttempts: maxRetries, shapes, analysis, missingComponents, pipelineProvider, geminiVisionModel });
+        onProgress({ stage: 'generated', attempt, maxAttempts: maxRetries, shapes, analysis, missingComponents: allMissingComponents, pipelineProvider, geminiVisionModel });
 
 
         onProgress({ stage: 'rendering', attempt, maxAttempts: maxRetries, shapes });
