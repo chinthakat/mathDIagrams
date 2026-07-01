@@ -204,6 +204,124 @@ export async function analyzeQuestionImage({ imageUrl, questionText, userInstruc
 }
 
 
+// ── Step 1a: Pre-flight library compatibility check ────────────────────────────
+// A dedicated, laser-focused pass that asks ONE question:
+// "Can this diagram be fully reproduced using only the registered components?"
+// This runs BEFORE analysis to gate the entire pipeline.
+
+const makePrefightPrompt = () => {
+  const clipartList = CLIPART_ITEMS.map(c => `  • ${c.id}: ${c.label} (${c.category})`).join('\n');
+  return `You are a library compatibility checker for a mathematics diagram editor.
+
+Your job is to look at the diagram image and decide whether it can be FULLY reproduced using ONLY the components and cliparts listed below.
+
+═══════════════════════════════════════════════
+AVAILABLE SHAPE COMPONENTS:
+${SHAPE_CATALOGUE}
+
+AVAILABLE RASTERIMAGE CLIPARTS (use "rasterImage" component with src=id):
+${clipartList}
+═══════════════════════════════════════════════
+
+ANALYSIS RULES:
+1. Go through EVERY visual element in the image one by one.
+2. For each element, find a matching component or clipart from the lists above.
+3. If ANY element has NO match (not even an approximate one), mark it as missing.
+4. "dataTable" covers any plain grid/table of values. "rasterImage" with a clipart covers any icon illustration. "numberline" covers vertical or horizontal number lines.
+5. Be STRICT — do not assume the AI can "improvise" missing objects using rectangles/lines. A submarine icon is NOT drawable with rectangles. An elevator grid is NOT a dataTable.
+
+Return ONLY valid JSON — no markdown, no explanation:
+{
+  "canGenerate": true or false,
+  "coverage": [
+    { "element": "brief description of visible element", "matchedComponent": "component type or clipart id, or null", "matched": true or false }
+  ],
+  "missingObjects": [
+    {
+      "name": "lowercase short name e.g. 'submarine', 'lift'",
+      "description": "precise visual description of the missing object",
+      "suggestion": "what type of new component or clipart should be built to support this"
+    }
+  ],
+  "reason": "one-sentence summary of why generation cannot proceed (if canGenerate is false)"
+}
+
+If ALL elements are covered, set canGenerate=true and missingObjects=[].`;
+};
+
+async function preflightLibraryCheck({ imageUrl, apiKey, geminiApiKey, pipelineProvider, model }) {
+  const prompt = makePrefightPrompt();
+
+  try {
+    if (pipelineProvider === 'gemini' && geminiApiKey) {
+      const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+      const vModel = model || 'gemini-2.0-flash';
+
+      let imagePart;
+      if (imageUrl.startsWith('data:')) {
+        const [header, b64] = imageUrl.split(',');
+        const mimeType = header.match(/data:(image\/\w+)/)?.[1] || 'image/jpeg';
+        imagePart = { inlineData: { mimeType, data: b64 } };
+      } else {
+        // Fetch the image as base64 via server proxy to avoid CORS
+        try {
+          const proxyUrl = `/api/fetch-image?url=${encodeURIComponent(imageUrl)}`;
+          const res = await fetch(proxyUrl);
+          if (res.ok) {
+            const blob = await res.blob();
+            const b64 = await new Promise(resolve => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result.split(',')[1]);
+              reader.readAsDataURL(blob);
+            });
+            imagePart = { inlineData: { mimeType: blob.type || 'image/jpeg', data: b64 } };
+          } else {
+            imagePart = { fileData: { mimeType: 'image/jpeg', fileUri: imageUrl } };
+          }
+        } catch {
+          imagePart = { fileData: { mimeType: 'image/jpeg', fileUri: imageUrl } };
+        }
+      }
+
+      const body = {
+        contents: [{ role: 'user', parts: [imagePart, { text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json', temperature: 0.1 },
+      };
+
+      const resp = await fetch(`${GEMINI_BASE}/${vModel}:generateContent?key=${geminiApiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!resp.ok) throw new Error(`Gemini preflight check failed: ${resp.status}`);
+      const data = await resp.json();
+      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      return JSON.parse(extractJson(raw));
+
+    } else if (apiKey) {
+      // Claude Haiku path
+      const text = await callClaude({
+        stage: 'preflight', attempt: 0,
+        model: 'claude-haiku-4-5-20251001',
+        system: 'You are a library compatibility checker. Respond ONLY with valid JSON.',
+        messages: [{
+          role: 'user',
+          content: [buildImageContent(imageUrl), { type: 'text', text: prompt }],
+        }],
+        apiKey, maxTokens: 1024,
+      });
+      return JSON.parse(extractJson(text));
+    }
+  } catch (e) {
+    await logEvent({ stage: 'preflight', attempt: 0, message: `Preflight check failed (non-fatal): ${e.message}` });
+  }
+
+  // If preflight itself fails, allow pipeline to continue (fail-open)
+  return { canGenerate: true, missingObjects: [], coverage: [], reason: '' };
+}
+
+
 // ── Step 1b: Vision value extraction ──────────────────────────────────────────
 // A dedicated, laser-focused pass that reads the image and returns ONLY the
 // exact concrete values visible: times, numbers, sequences, labels.
@@ -683,6 +801,50 @@ export async function repairDiagramWithRetry({
   const isGeminiVal = validationMode === 'gemini' || pipelineProvider === 'gemini';
 
   await logEvent({ stage: 'start', message: 'Repair pipeline started', data: { questionId: questionData.id, generationMode, validationMode, maxRetries, pipelineProvider } });
+
+  // ── Step 0: Pre-flight library compatibility check ─────────────────────────
+  // Before doing anything else, check whether ALL elements in the diagram
+  // can be reproduced using registered components and cliparts.
+  // If not, abort immediately with a detailed list of what needs to be built.
+  onProgress({ stage: 'preflight_checking', attempt: 0, maxAttempts: maxRetries, pipelineProvider, geminiVisionModel });
+  const preflight = await preflightLibraryCheck({
+    imageUrl,
+    apiKey,
+    geminiApiKey,
+    pipelineProvider,
+    model: geminiVisionModel || 'gemini-2.0-flash',
+  });
+  await logEvent({ stage: 'preflight_done', message: `Library check: canGenerate=${preflight.canGenerate}`, data: preflight });
+
+  if (!preflight.canGenerate && preflight.missingObjects?.length > 0) {
+    const missingComponents = preflight.missingObjects.map(m => ({
+      type: m.name,
+      comment: m.description,
+      suggestion: m.suggestion || '',
+    }));
+    onProgress({
+      stage: 'preflight_blocked',
+      attempt: 0,
+      maxAttempts: maxRetries,
+      missingComponents,
+      preflight,
+      pipelineProvider,
+    });
+    await logEvent({ stage: 'preflight_blocked', message: 'Aborting — diagram requires components not in library', data: { missingComponents, reason: preflight.reason } });
+    return {
+      shapes: [],
+      image: null,
+      analysis: null,
+      attempts: 0,
+      success: false,
+      validation: { isCorrect: false, feedback: preflight.reason || `Missing components: ${missingComponents.map(m => m.type).join(', ')}` },
+      generationMode,
+      missingComponents,
+      preflightBlocked: true,
+      preflight,
+    };
+  }
+  onProgress({ stage: 'preflight_ok', attempt: 0, maxAttempts: maxRetries, preflight, pipelineProvider });
 
   // Step 1: Analyze with chosen provider
   onProgress({ stage: 'analyzing', attempt: 0, maxAttempts: maxRetries, pipelineProvider, geminiVisionModel });

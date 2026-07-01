@@ -76,6 +76,9 @@ function ProgressEntry({ entry }) {
     error:              <XCircle size={11} color="#f87171" style={{ flexShrink: 0 }} />,
     attempt_error:      <XCircle size={11} color="#f87171" style={{ flexShrink: 0 }} />,
     missing_components: <XCircle size={11} color="#f59e0b" style={{ flexShrink: 0 }} />,
+    preflight_checking: <Loader size={11} className="spin" style={{ color: '#38bdf8', flexShrink: 0 }} />,
+    preflight_ok:       <CheckCircle size={11} color="#34d399" style={{ flexShrink: 0 }} />,
+    preflight_blocked:  <XCircle size={11} color="#f59e0b" style={{ flexShrink: 0 }} />,
     reviewing_question: <Loader size={11} className="spin" style={{ color: '#34d399', flexShrink: 0 }} />,
     review_complete:    <CheckCircle size={11} color="#34d399" style={{ flexShrink: 0 }} />,
   }[entry.stage] || <ChevronRight size={11} color="#475569" style={{ flexShrink: 0 }} />;
@@ -96,6 +99,9 @@ function ProgressEntry({ entry }) {
     error:              `⚠ ${entry.message || 'Error'}`,
     attempt_error:      `⚠ Attempt ${entry.attempt}: ${entry.message || 'error'}`,
     missing_components: `⚠ Missing components: ${(entry.missingComponents || []).map(m => m.type).join(', ')}`,
+    preflight_checking: `🔍 Checking library compatibility…`,
+    preflight_ok:       `✓ Library check passed — all objects available`,
+    preflight_blocked:  `🚫 Cannot generate — ${entry.missingComponents?.length || 0} missing object(s)`,
     reviewing_question: `Reviewing question fields against new diagram…`,
     review_complete:    `✓ Review complete — AI suggestions ready in panel`,
   }[entry.stage] || entry.stage;
@@ -243,6 +249,8 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
   const [running, setRunning]     = useState(false);
   const [progressLog, setProgressLog] = useState([]);
   const [missingComponents, setMissingComponents] = useState([]);
+  const [preflightResult, setPreflightResult] = useState(null);
+  const [preflightBlocked, setPreflightBlocked] = useState(false);
   const [originalExpanded, setOriginalExpanded] = useState(true);
   const [result, setResult]       = useState(null);
 
@@ -321,6 +329,8 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
     setRunning(true);
     setProgressLog([]);
     setMissingComponents([]);
+    setPreflightResult(null);
+    setPreflightBlocked(false);
     setAiSuggestions(null);
     setSaved(false);
 
@@ -348,7 +358,7 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
           geminiVisionModel,
           onProgress: entry => {
             setProgressLog(prev => [...prev, entry]);
-            if (entry.stage === 'missing_components' && entry.missingComponents?.length) {
+            if ((entry.stage === 'missing_components' || entry.stage === 'preflight_blocked') && entry.missingComponents?.length) {
               setMissingComponents(entry.missingComponents);
             }
           },
@@ -358,6 +368,10 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
         setResult(outcome);
         if (outcome.shapes?.length) setShapes(outcome.shapes);
         if (outcome.missingComponents?.length) setMissingComponents(outcome.missingComponents);
+        if (outcome.preflightBlocked) {
+          setPreflightBlocked(true);
+          setPreflightResult(outcome.preflight || null);
+        }
 
         // ── Auto-review question fields against the new diagram ────────────
         if (outcome.success && (apiKey || geminiKey)) {
@@ -790,29 +804,57 @@ export default function QuestionEditorModal({ question, onClose, onSaved }) {
               </div>
             ) : progressLog.map((e, i) => <ProgressEntry key={i} entry={e} />)}
             {missingComponents.length > 0 && (
-              <div style={{ marginTop: '10px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.5)', borderRadius: '8px', padding: '10px 12px', fontSize: '11px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '14px' }}>⚠️</span>
-                  <strong style={{ color: '#fbbf24', fontSize: '11px', fontWeight: 700 }}>Diagram Generation Halted</strong>
+              <div style={{ marginTop: '10px', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.5)', borderRadius: '8px', overflow: 'hidden', fontSize: '11px' }}>
+                <div style={{ background: 'rgba(245,158,11,0.15)', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(245,158,11,0.25)' }}>
+                  <span style={{ fontSize: '16px' }}>🚫</span>
+                  <div>
+                    <div style={{ color: '#fbbf24', fontWeight: 700, fontSize: '11px' }}>Diagram Generation Blocked</div>
+                    <div style={{ color: '#94a3b8', fontSize: '10px', marginTop: '1px' }}>
+                      {preflightResult?.reason || 'This diagram requires library objects that have not been built yet.'}
+                    </div>
+                  </div>
                 </div>
-                <span style={{ color: '#94a3b8', fontSize: '10px', display: 'block', marginBottom: '6px', lineHeight: '1.5' }}>
-                  The AI could not generate this diagram because the following objects are not yet in the component library. The diagram requires these to be built first:
-                </span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
-                  {missingComponents.map((m, i) => {
-                    const type = typeof m === 'string' ? m : m.type;
-                    const comment = typeof m === 'object' && m.comment ? m.comment : '';
-                    return (
-                      <div key={i} style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: '4px', padding: '4px 8px' }}>
-                        <span style={{ fontFamily: 'monospace', fontSize: '11px', color: '#fbbf24', fontWeight: 600 }}>• {type}</span>
-                        {comment && <span style={{ color: '#94a3b8', fontSize: '10px', display: 'block', marginTop: '2px', paddingLeft: '10px' }}>{comment}</span>}
+                <div style={{ padding: '8px 12px' }}>
+                  <div style={{ color: '#fbbf24', fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+                    Objects needed ({missingComponents.length})
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '8px' }}>
+                    {missingComponents.map((m, i) => {
+                      const type = typeof m === 'string' ? m : m.type;
+                      const comment = typeof m === 'object' && m.comment ? m.comment : '';
+                      const suggestion = typeof m === 'object' && m.suggestion ? m.suggestion : '';
+                      return (
+                        <div key={i} style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '5px', padding: '6px 8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <span style={{ color: '#f87171', fontSize: '10px' }}>✗</span>
+                            <span style={{ fontFamily: 'monospace', fontSize: '11px', color: '#fbbf24', fontWeight: 700 }}>{type}</span>
+                          </div>
+                          {comment && <div style={{ color: '#cbd5e1', fontSize: '10px', marginTop: '3px', paddingLeft: '15px', lineHeight: '1.4' }}>{comment}</div>}
+                          {suggestion && <div style={{ color: '#64748b', fontSize: '10px', marginTop: '2px', paddingLeft: '15px', fontStyle: 'italic' }}>💡 {suggestion}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {preflightResult?.coverage?.length > 0 && (
+                    <details style={{ marginBottom: '6px' }}>
+                      <summary style={{ color: '#475569', fontSize: '10px', cursor: 'pointer', userSelect: 'none', marginBottom: '4px' }}>
+                        View full element coverage ({preflightResult.coverage.filter(c => c.matched).length}/{preflightResult.coverage.length} matched)
+                      </summary>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
+                        {preflightResult.coverage.map((c, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '5px', fontSize: '10px', padding: '2px 0' }}>
+                            <span style={{ color: c.matched ? '#34d399' : '#f87171', flexShrink: 0, marginTop: '1px' }}>{c.matched ? '✓' : '✗'}</span>
+                            <span style={{ color: c.matched ? '#94a3b8' : '#fcd34d', flex: 1 }}>{c.element}</span>
+                            {c.matchedComponent && <span style={{ color: '#475569', fontFamily: 'monospace', fontSize: '9px', flexShrink: 0 }}>{c.matchedComponent}</span>}
+                          </div>
+                        ))}
                       </div>
-                    );
-                  })}
+                    </details>
+                  )}
+                  <div style={{ color: '#475569', fontSize: '10px', lineHeight: '1.5', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '6px' }}>
+                    Ask the developer to build the missing objects above, then run the AI again.
+                  </div>
                 </div>
-                <span style={{ color: '#64748b', fontSize: '10px', display: 'block', lineHeight: '1.5' }}>
-                  💡 Ask the developer to add these components to the object library, then try again.
-                </span>
               </div>
             )}
           </div>
