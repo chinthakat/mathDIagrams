@@ -70,6 +70,12 @@ import BaseTenBlocks from '../components/MathObjects/BaseTenBlocks';
 import ObjectArray from '../components/MathObjects/ObjectArray';
 import IsometricCube from '../components/MathObjects/IsometricCube';
 import Cylinder from '../components/MathObjects/Cylinder';
+import GraduatedCylinder from '../components/MathObjects/GraduatedCylinder';
+import Beaker from '../components/MathObjects/Beaker';
+import ConicalFlask from '../components/MathObjects/ConicalFlask';
+import TestTube from '../components/MathObjects/TestTube';
+import Thermometer from '../components/MathObjects/Thermometer';
+import BunsenBurner from '../components/MathObjects/BunsenBurner';
 import BlockArrow from '../components/MathObjects/BlockArrow';
 import Callout from '../components/MathObjects/Callout';
 import CurvedArrow from '../components/MathObjects/CurvedArrow';
@@ -92,7 +98,7 @@ import Teardrop from '../components/MathObjects/Teardrop';
 import TagLabel from '../components/MathObjects/TagLabel';
 import NoSign from '../components/MathObjects/NoSign';
 import RopeLoop from '../components/MathObjects/RopeLoop';
-import { PieChart as PieChartIcon, Grid3X3, Tally5, TrendingUp, Layers, Minus as MinusIcon, BarChart2, ImageIcon as PictIcon, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon, Bug, Waypoints, CornerDownRight, Spline, Code, Clock, Monitor, AlignLeft, Box, Database, ChevronRight, Diamond as DiamondIcon, Star, Zap, Plus, Tag, Ban } from 'lucide-react';
+import { PieChart as PieChartIcon, Grid3X3, Tally5, TrendingUp, Layers, Minus as MinusIcon, BarChart2, ImageIcon as PictIcon, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon, Bug, Waypoints, CornerDownRight, Spline, Code, Clock, Monitor, AlignLeft, Box, Database, ChevronRight, Diamond as DiamondIcon, Star, Zap, Plus, Tag, Ban, Beaker as BeakerIcon, FlaskConical, TestTube as TestTubeIcon, Thermometer as ThermometerIcon, Flame } from 'lucide-react';
 
 
 const getNumeric = (val, fallback) => {
@@ -2505,6 +2511,228 @@ export const ObjectRegistry = {
       { name: 'stroke',      label: 'Stroke',      type: 'color' },
       { name: 'strokeWidth', label: 'Stroke Width',type: 'range', min: 0, max: 6, step: 0.5 },
       { name: 'label',       label: 'Label',       type: 'text' },
+    ],
+  },
+
+  graduatedCylinder: {
+    id: 'graduatedCylinder',
+    category: '3D & Diagram',
+    name: 'Graduated Cylinder',
+    icon: <BeakerIcon size={18} />,
+    defaultProps: {
+      width: 90, height: 220, capacity: 250,
+      tickInterval: 10, labelInterval: 50,
+      liquidLevel: 150, liquidColor: '#d9d9d9', fill: '#ffffff',
+      stroke: '#1e293b', strokeWidth: 2,
+      showTicks: true, showLabels: true,
+      submergedCubes: 0, label: '',
+    },
+    Component: ({ props }) => (
+      <GraduatedCylinder
+        width={props.width} height={props.height} capacity={props.capacity}
+        tickInterval={props.tickInterval} labelInterval={props.labelInterval}
+        liquidLevel={props.liquidLevel} liquidColor={props.liquidColor} fill={props.fill}
+        stroke={props.stroke} strokeWidth={props.strokeWidth}
+        showTicks={props.showTicks} showLabels={props.showLabels}
+        submergedCubes={props.submergedCubes} label={props.label}
+      />
+    ),
+    properties: [
+      { name: 'width',          label: 'Width',              type: 'range', min: 30, max: 250, step: 4 },
+      { name: 'height',         label: 'Height',             type: 'range', min: 60, max: 500, step: 4 },
+      { name: 'capacity',       label: 'Scale Max (Capacity)', type: 'number' },
+      { name: 'tickInterval',   label: 'Minor Tick Interval', type: 'number' },
+      { name: 'labelInterval',  label: 'Labelled Tick Interval', type: 'number' },
+      { name: 'liquidLevel',    label: 'Liquid Level',       type: 'number' },
+      { name: 'liquidColor',    label: 'Liquid Color',       type: 'color' },
+      { name: 'fill',           label: 'Glass / Body Color', type: 'color' },
+      { name: 'stroke',         label: 'Stroke',             type: 'color' },
+      { name: 'strokeWidth',    label: 'Stroke Width',       type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'showTicks',      label: 'Show Tick Marks',    type: 'checkbox' },
+      { name: 'showLabels',     label: 'Show Tick Labels',   type: 'checkbox' },
+      { name: 'submergedCubes', label: 'Submerged Cubes',    type: 'range', min: 0, max: 12, step: 1 },
+      { name: 'label',          label: 'Caption',            type: 'text' },
+    ],
+  },
+
+  beaker: {
+    id: 'beaker',
+    category: 'Science & Lab',
+    name: 'Beaker',
+    icon: <BeakerIcon size={18} />,
+    defaultProps: {
+      width: 110, height: 130, capacity: 500,
+      tickInterval: 100, labelInterval: 100,
+      liquidLevel: 300, liquidColor: '#d9d9d9', fill: '#ffffff',
+      stroke: '#1e293b', strokeWidth: 2,
+      showTicks: true, showLabels: true, label: '',
+    },
+    Component: ({ props }) => (
+      <Beaker
+        width={props.width} height={props.height} capacity={props.capacity}
+        tickInterval={props.tickInterval} labelInterval={props.labelInterval}
+        liquidLevel={props.liquidLevel} liquidColor={props.liquidColor} fill={props.fill}
+        stroke={props.stroke} strokeWidth={props.strokeWidth}
+        showTicks={props.showTicks} showLabels={props.showLabels} label={props.label}
+      />
+    ),
+    properties: [
+      { name: 'width',         label: 'Width',                 type: 'range', min: 40, max: 260, step: 4 },
+      { name: 'height',        label: 'Height',                type: 'range', min: 40, max: 300, step: 4 },
+      { name: 'capacity',      label: 'Scale Max (Capacity)',  type: 'number' },
+      { name: 'tickInterval',  label: 'Minor Tick Interval',   type: 'number' },
+      { name: 'labelInterval', label: 'Labelled Tick Interval',type: 'number' },
+      { name: 'liquidLevel',   label: 'Liquid Level',          type: 'number' },
+      { name: 'liquidColor',   label: 'Liquid Color',          type: 'color' },
+      { name: 'fill',          label: 'Glass Color',           type: 'color' },
+      { name: 'stroke',        label: 'Stroke',                type: 'color' },
+      { name: 'strokeWidth',   label: 'Stroke Width',          type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'showTicks',     label: 'Show Tick Marks',       type: 'checkbox' },
+      { name: 'showLabels',    label: 'Show Tick Labels',      type: 'checkbox' },
+      { name: 'label',         label: 'Caption',               type: 'text' },
+    ],
+  },
+
+  conicalFlask: {
+    id: 'conicalFlask',
+    category: 'Science & Lab',
+    name: 'Conical Flask',
+    icon: <FlaskConical size={18} />,
+    defaultProps: {
+      width: 130, height: 140, neckWidth: 34, neckHeightRatio: 0.4,
+      capacity: 250, liquidLevel: 120, liquidColor: '#d9d9d9', fill: '#ffffff',
+      stroke: '#1e293b', strokeWidth: 2, label: '',
+    },
+    Component: ({ props }) => (
+      <ConicalFlask
+        width={props.width} height={props.height} neckWidth={props.neckWidth} neckHeightRatio={props.neckHeightRatio}
+        capacity={props.capacity} liquidLevel={props.liquidLevel} liquidColor={props.liquidColor} fill={props.fill}
+        stroke={props.stroke} strokeWidth={props.strokeWidth} label={props.label}
+      />
+    ),
+    properties: [
+      { name: 'width',           label: 'Base Width',        type: 'range', min: 40, max: 260, step: 4 },
+      { name: 'height',          label: 'Height',            type: 'range', min: 40, max: 300, step: 4 },
+      { name: 'neckWidth',       label: 'Neck Width',        type: 'range', min: 8, max: 80, step: 2 },
+      { name: 'neckHeightRatio', label: 'Neck Height Ratio', type: 'range', min: 0.1, max: 0.8, step: 0.05 },
+      { name: 'capacity',        label: 'Scale Max (Capacity)', type: 'number' },
+      { name: 'liquidLevel',     label: 'Liquid Level',      type: 'number' },
+      { name: 'liquidColor',     label: 'Liquid Color',      type: 'color' },
+      { name: 'fill',            label: 'Glass Color',       type: 'color' },
+      { name: 'stroke',          label: 'Stroke',            type: 'color' },
+      { name: 'strokeWidth',     label: 'Stroke Width',      type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'label',           label: 'Caption',           type: 'text' },
+    ],
+  },
+
+  testTube: {
+    id: 'testTube',
+    category: 'Science & Lab',
+    name: 'Test Tube',
+    icon: <TestTubeIcon size={18} />,
+    defaultProps: {
+      width: 34, height: 150, capacity: 20,
+      tickInterval: 5, labelInterval: 10,
+      liquidLevel: 12, liquidColor: '#d9d9d9', fill: '#ffffff',
+      stroke: '#1e293b', strokeWidth: 2,
+      showTicks: true, showLabels: false, label: '',
+    },
+    Component: ({ props }) => (
+      <TestTube
+        width={props.width} height={props.height} capacity={props.capacity}
+        tickInterval={props.tickInterval} labelInterval={props.labelInterval}
+        liquidLevel={props.liquidLevel} liquidColor={props.liquidColor} fill={props.fill}
+        stroke={props.stroke} strokeWidth={props.strokeWidth}
+        showTicks={props.showTicks} showLabels={props.showLabels} label={props.label}
+      />
+    ),
+    properties: [
+      { name: 'width',         label: 'Width',                 type: 'range', min: 14, max: 80, step: 2 },
+      { name: 'height',        label: 'Height',                type: 'range', min: 40, max: 260, step: 4 },
+      { name: 'capacity',      label: 'Scale Max (Capacity)',  type: 'number' },
+      { name: 'tickInterval',  label: 'Minor Tick Interval',   type: 'number' },
+      { name: 'labelInterval', label: 'Labelled Tick Interval',type: 'number' },
+      { name: 'liquidLevel',   label: 'Liquid Level',          type: 'number' },
+      { name: 'liquidColor',   label: 'Liquid Color',          type: 'color' },
+      { name: 'fill',          label: 'Glass Color',           type: 'color' },
+      { name: 'stroke',        label: 'Stroke',                type: 'color' },
+      { name: 'strokeWidth',   label: 'Stroke Width',          type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'showTicks',     label: 'Show Tick Marks',       type: 'checkbox' },
+      { name: 'showLabels',    label: 'Show Tick Labels',      type: 'checkbox' },
+      { name: 'label',         label: 'Caption',               type: 'text' },
+    ],
+  },
+
+  thermometer: {
+    id: 'thermometer',
+    category: 'Science & Lab',
+    name: 'Thermometer',
+    icon: <ThermometerIcon size={18} />,
+    defaultProps: {
+      width: 22, height: 180, minTemp: -10, maxTemp: 110, temperature: 37,
+      tickInterval: 10, labelInterval: 20,
+      liquidColor: '#ef4444', fill: '#ffffff',
+      stroke: '#1e293b', strokeWidth: 2,
+      showTicks: true, showLabels: true, label: '',
+    },
+    Component: ({ props }) => (
+      <Thermometer
+        width={props.width} height={props.height} minTemp={props.minTemp} maxTemp={props.maxTemp} temperature={props.temperature}
+        tickInterval={props.tickInterval} labelInterval={props.labelInterval}
+        liquidColor={props.liquidColor} fill={props.fill}
+        stroke={props.stroke} strokeWidth={props.strokeWidth}
+        showTicks={props.showTicks} showLabels={props.showLabels} label={props.label}
+      />
+    ),
+    properties: [
+      { name: 'width',         label: 'Tube Width',            type: 'range', min: 10, max: 50, step: 2 },
+      { name: 'height',        label: 'Height',                type: 'range', min: 60, max: 320, step: 4 },
+      { name: 'minTemp',       label: 'Scale Min (°)',         type: 'number' },
+      { name: 'maxTemp',       label: 'Scale Max (°)',         type: 'number' },
+      { name: 'temperature',   label: 'Reading (°)',           type: 'number' },
+      { name: 'tickInterval',  label: 'Minor Tick Interval',   type: 'number' },
+      { name: 'labelInterval', label: 'Labelled Tick Interval',type: 'number' },
+      { name: 'liquidColor',   label: 'Mercury Color',         type: 'color' },
+      { name: 'fill',          label: 'Glass Color',           type: 'color' },
+      { name: 'stroke',        label: 'Stroke',                type: 'color' },
+      { name: 'strokeWidth',   label: 'Stroke Width',          type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'showTicks',     label: 'Show Tick Marks',       type: 'checkbox' },
+      { name: 'showLabels',    label: 'Show Tick Labels',      type: 'checkbox' },
+      { name: 'label',         label: 'Caption',               type: 'text' },
+    ],
+  },
+
+  bunsenBurner: {
+    id: 'bunsenBurner',
+    category: 'Science & Lab',
+    name: 'Bunsen Burner',
+    icon: <Flame size={18} />,
+    defaultProps: {
+      width: 60, height: 130, flameHeight: 46, showFlame: true,
+      flameColor: '#60a5fa', innerFlameColor: '#bfdbfe',
+      baseColor: '#334155', barrelColor: '#94a3b8',
+      stroke: '#1e293b', strokeWidth: 2, label: '',
+    },
+    Component: ({ props }) => (
+      <BunsenBurner
+        width={props.width} height={props.height} flameHeight={props.flameHeight} showFlame={props.showFlame}
+        flameColor={props.flameColor} innerFlameColor={props.innerFlameColor}
+        baseColor={props.baseColor} barrelColor={props.barrelColor}
+        stroke={props.stroke} strokeWidth={props.strokeWidth} label={props.label}
+      />
+    ),
+    properties: [
+      { name: 'width',           label: 'Width',            type: 'range', min: 24, max: 160, step: 4 },
+      { name: 'height',          label: 'Height',           type: 'range', min: 50, max: 320, step: 4 },
+      { name: 'flameHeight',     label: 'Flame Height',     type: 'range', min: 10, max: 120, step: 2 },
+      { name: 'showFlame',       label: 'Show Flame',       type: 'checkbox' },
+      { name: 'flameColor',      label: 'Flame Color',      type: 'color' },
+      { name: 'innerFlameColor', label: 'Inner Flame Color',type: 'color' },
+      { name: 'baseColor',       label: 'Base/Collar Color',type: 'color' },
+      { name: 'barrelColor',     label: 'Barrel Color',     type: 'color' },
+      { name: 'stroke',          label: 'Stroke',           type: 'color' },
+      { name: 'strokeWidth',     label: 'Stroke Width',     type: 'range', min: 0, max: 6, step: 0.5 },
+      { name: 'label',           label: 'Caption',          type: 'text' },
     ],
   },
 

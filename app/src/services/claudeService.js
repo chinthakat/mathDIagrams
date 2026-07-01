@@ -109,6 +109,34 @@ Available shape types (use these exact strings for the "type" field):
 - spiderIcon: { size, fill, stroke, strokeWidth, label, labelPos } — stylised ant/spider creature with 6 legs; use for diagrams with insects/ants/spiders; label e.g. "(A)"
 - robot: { width, height, label, fill, stroke, strokeWidth } — renders a customizable 2D robot figure. Set label to "A", "B", etc. Use for scale balance problems involving robots.
 - weighingScale: { width, height, weightText, fill, stroke, strokeWidth } — renders a platform balance scale with a digital weight readout (e.g. weightText="85 kg").
+- graduatedCylinder: { width, height, capacity, tickInterval, labelInterval, liquidLevel, liquidColor, fill, stroke, strokeWidth, showTicks, showLabels, submergedCubes, label } — laboratory graduated/measuring cylinder with a tick-marked scale and a liquid fill.
+    • capacity — the scale's maximum value (e.g. 250 for a 0–250ml cylinder)
+    • tickInterval — spacing of unlabelled minor ticks (e.g. 10); labelInterval — spacing of labelled major ticks (e.g. 50)
+    • liquidLevel — current fill amount in the same units as capacity (e.g. 150 → liquid fills to the "150" mark)
+    • liquidColor — fill color of the liquid (use a light grey e.g. "#d9d9d9" for plain worksheet diagrams, or a color like "#60a5fa" for a colored liquid)
+    • submergedCubes — integer count of small unit-cube outlines drawn sitting in the liquid near the bottom; use for volume-by-displacement questions (e.g. "an object is dropped into the cylinder, raising the level from 150 to 210")
+    • Use for: measuring cylinders, volume/capacity reading questions, liquid measurement, density/displacement diagrams
+    • Example (two cylinders compared): { type:'graduatedCylinder', x:250, y:300, width:90, height:220, capacity:250, liquidLevel:150, label:'Cylinder A' } and { type:'graduatedCylinder', x:450, y:300, width:90, height:220, capacity:250, liquidLevel:210, submergedCubes:6, label:'Cylinder B' }
+- beaker: { width, height, capacity, tickInterval, labelInterval, liquidLevel, liquidColor, fill, stroke, strokeWidth, showTicks, showLabels, label } — straight-sided lab beaker with a slight taper, a pour spout at the top-right rim, and a coarse graduated scale.
+    • Visually distinct from graduatedCylinder (wider, tapered, has a spout) — use whichever silhouette best matches the question's image/description.
+    • Use for: beaker volume readings, mixing/pouring liquid questions, general "container of liquid" science diagrams
+    • Example: { type:'beaker', x:300, y:300, width:110, height:130, capacity:500, liquidLevel:300, label:'Beaker A' }
+- conicalFlask: { width, height, neckWidth, neckHeightRatio, capacity, liquidLevel, liquidColor, fill, stroke, strokeWidth, label } — Erlenmeyer/conical flask: narrow neck at top opening onto a wide flat base with tapered sides.
+    • neckWidth / neckHeightRatio — control how narrow/tall the neck is, for visually different flask silhouettes across questions
+    • Use for: chemistry/lab diagrams, swirling-liquid or titration questions, "which flask has more liquid" comparisons
+    • Example: { type:'conicalFlask', x:400, y:300, width:130, height:140, neckWidth:34, capacity:250, liquidLevel:120, label:'Flask B' }
+- testTube: { width, height, capacity, tickInterval, labelInterval, liquidLevel, liquidColor, fill, stroke, strokeWidth, showTicks, showLabels, label } — narrow tube with a rounded bottom and open top; fine-grained scale (small capacity, e.g. 0–20 mL).
+    • Use for: small-volume liquid measurement, test tube rack diagrams, colour-change/reaction questions
+    • Example: { type:'testTube', x:200, y:300, width:34, height:150, capacity:20, liquidLevel:12, label:'Tube 1' }
+- thermometer: { width, height, minTemp, maxTemp, temperature, tickInterval, labelInterval, liquidColor, fill, stroke, strokeWidth, showTicks, showLabels, label } — vertical thermometer with a bulb at the bottom, mercury column, and a labelled scale that can include negative values.
+    • minTemp/maxTemp — set the scale range (e.g. -10 to 110 for a lab thermometer, or -20 to 50 for a weather thermometer)
+    • temperature — the current reading (mercury rises/falls to this value)
+    • Use for: "what temperature does the thermometer show?", temperature reading/comparison questions, weather diagrams
+    • Example: { type:'thermometer', x:250, y:300, height:180, minTemp:-10, maxTemp:110, temperature:37, label:'Thermometer A' }
+- bunsenBurner: { width, height, flameHeight, showFlame, flameColor, innerFlameColor, baseColor, barrelColor, stroke, strokeWidth, label } — stylised Bunsen burner with a flared base, barrel, air-hole collar, and two-tone flame.
+    • showFlame — set false to show an unlit burner; flameHeight/flameColor vary the flame for different questions (e.g. comparing flame types)
+    • Use for: heating/combustion diagrams, lab safety questions, science apparatus diagrams
+    • Example: { type:'bunsenBurner', x:400, y:350, width:60, height:130, flameHeight:46, label:'Burner A' }
 - dottedLineArrow: { endX, endY, stroke, strokeWidth, dashSize, gapSize, pointerLength, pointerWidth } — dotted/dashed straight line with arrowhead from (0,0) to (endX,endY); use for dotted directional paths
 - elbowArrow: { endX, endY, elbowStyle, stroke, strokeWidth, dash, dashSize, gapSize, pointerLength, pointerWidth } — orthogonal/right-angle connector arrow (mermaid flowchart style); elbowStyle: 'h-v','v-h','mid'
 - bezierArrow: { endX, endY, curveStyle, curvature, stroke, strokeWidth, dash, dashSize, gapSize, pointerLength, pointerWidth } — smooth bezier curve arrow (plantuml style); curveStyle: 'auto','s-curve','c-curve'
@@ -583,7 +611,8 @@ export const REGISTERED_COMPONENT_TYPES = [
   'playground','airport','port','mapMarker','mapSprite','gridMap','scaleBar',
   'compassRose','sunDirection','flag','dataTable','coordAxes',
   'spiderIcon','dottedLineArrow','elbowArrow','bezierArrow','ropeLoop',
-  'robot', 'weighingScale',
+  'robot', 'weighingScale', 'graduatedCylinder',
+  'beaker', 'conicalFlask', 'testTube', 'thermometer', 'bunsenBurner',
   'analogClock', 'digitalClock', 'departureBoard',
 ];
 
