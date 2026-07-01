@@ -1121,35 +1121,45 @@ export const ObjectRegistry = {
     category: 'Buildings',
     name: 'Map Building',
     icon: <Building2 size={18} />,
-    defaultProps: { 
-      width: 80, 
-      height: 60, 
-      fill: "#3b82f6", 
-      stroke: "#1d4ed8", 
+    defaultProps: {
+      width: 80,
+      height: 60,
+      buildingType: 'house',
+      fill: "#3b82f6",
+      stroke: "#1d4ed8",
       strokeWidth: 2,
       label: "School",
       iconName: "School",
       showLabel: true,
-      rotation: 0 
+      rotation: 0
     },
     Component: ({ props }) => (
-      <MapBuilding 
-        width={props.width} 
-        height={props.height} 
-        fill={props.fill} 
-        stroke={props.stroke} 
+      <MapBuilding
+        width={props.width}
+        height={props.height}
+        buildingType={props.buildingType}
+        fill={props.fill}
+        stroke={props.stroke}
         strokeWidth={props.strokeWidth}
         label={props.label}
         iconName={props.iconName}
-        showLabel={props.showLabel} 
+        showLabel={props.showLabel}
       />
     ),
     properties: [
+      { name: 'buildingType', label: 'Structure Type', type: 'select', options: [
+        { value: 'house',     label: 'House (pitched roof)' },
+        { value: 'flatBlock', label: 'Flat Block' },
+        { value: 'tower',     label: 'Tower / Antenna' },
+        { value: 'dome',      label: 'Dome' },
+        { value: 'hangar',    label: 'Hangar (arched roof)' },
+      ]},
       { name: 'fill', label: 'Fill Color', type: 'color' },
       { name: 'stroke', label: 'Border Color', type: 'color' },
       { name: 'width', label: 'Width', type: 'number' },
       { name: 'height', label: 'Height', type: 'number' },
-      { name: 'label', label: 'Building Label', type: 'text' }
+      { name: 'label', label: 'Building Label', type: 'text' },
+      { name: 'iconName', label: 'Badge Icon', type: 'text' },
     ]
   },
   road: {

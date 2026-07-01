@@ -177,6 +177,23 @@ CLOCK QUESTION GUIDANCE:
   ✓ For elapsed time questions → show two analogClock or digitalClock shapes side by side
   ✓ Always label clocks if there are multiple (label: 'Clock A', 'Start', 'Finish', etc.)
 
+MAP & SPATIAL LAYOUT SHAPES — use these for floor plans, campus/building/space-station maps, town maps, treasure maps, or ANY question about which location is North/South/East/West/North-East/etc. of another:
+- gridMap: { width, height, rows, cols, showCompass, scaleText, landmarks: [{id,row,col,label,icon,color}], routes: [{id,path,color}], stroke } — a complete grid-based map with a built-in compass rose (top-right) and scale bar (bottom).
+    • landmarks[].row / landmarks[].col — 1-indexed grid position. row 1 = North-most row, increasing row = further South. col 1 = West-most column, increasing col = further East. This is what makes compass-direction questions answerable from the diagram.
+    • landmarks[].icon — icon name, one of: MapPin, Building, Home, Hospital, Store, School, Library, Tree, Mountain, Road, Car, Compass, Route, Footprints, Crosshair, Coffee, Restaurant, Mailbox, Flag, Star, DirectionArrow (pick whichever best matches the label's meaning; Crosshair/MapPin/Building are safe generic fallbacks)
+    • routes[].path — cell references joined by "-", e.g. "A1-A4-D4" (column letter + row number), draws a dashed route arrow between landmarks
+    • MANDATORY: for ANY question asking which room/module/place is North/South/East/West/North-East/North-West/South-East/South-West of another, you MUST use gridMap with landmarks positioned at the correct row/col — NEVER represent this as a hub-and-spoke node diagram (a central box with plain rectangles connected by lines radiating outward), because compass directions cannot be read off a radial node graph. If the source image shows a table/grid of labelled cells, reproduce it as a gridMap with matching rows/cols, not as a table or a node graph.
+    • Example (space station modules — "which module is South-West of Command Center?"): { type:'gridMap', x:400, y:300, width:360, height:360, rows:5, cols:5, showCompass:true, scaleText:'', landmarks:[ {id:'cc',row:3,col:3,label:'Command Center',icon:'Crosshair',color:'#3b82f6'}, {id:'ob',row:1,col:3,label:'Observatory',icon:'Star',color:'#8b5cf6'}, {id:'ol',row:5,col:1,label:'Oxygen Lab',icon:'Building',color:'#22c55e'} ] }
+- mapBuilding: { width, height, buildingType, fill, stroke, strokeWidth, label, iconName, showLabel } — a standalone labelled 2.5D structure for map scenes or campus/town layouts (used on its own, outside gridMap, or to decorate the canvas around a gridMap).
+    • buildingType — choose the silhouette that matches what the structure represents: 'house' (pitched roof — home, school, shop), 'flatBlock' (flat-roofed modern block — office, command centre, hospital, apartment), 'tower' (tall shaft with an antenna/mast — control tower, observatory, comms/solar array), 'dome' (rounded dome on a base — observatory, greenhouse, planetarium), 'hangar' (arched roof — warehouse, aircraft hangar, docking bay, garage)
+    • Vary buildingType (and fill color) across the structures in one diagram so each labelled location looks visually distinct — do not reuse the same buildingType/color for every landmark
+    • Use for: town/campus maps, "label the buildings" diagrams, scale/direction questions between named structures
+    • Example: { type:'mapBuilding', x:200, y:250, width:90, height:70, buildingType:'house', label:'School', iconName:'School', fill:'#3b82f6' } and { type:'mapBuilding', x:380, y:250, width:70, height:100, buildingType:'tower', label:'Observatory', iconName:'Star', fill:'#8b5cf6' }
+- mapMarker: { radius, color, label, iconName, showLabel } — a teardrop pin marking a single point on a map or coordinate plane.
+- compassRose: { radius, color, fill, fontSize } — a standalone decorative N/E/S/W compass rose for map diagrams not built with gridMap (gridMap already includes one via showCompass).
+- scaleBar: { width, height, color, unitText, fontSize } — a map scale reference bar, e.g. unitText:"100m".
+- Map scenery (optional decoration for map/town scenes): road { width, height, fill, lineColor }, roadJunction { junctionType:'cross'|'t-junction'|'y-junction'|'roundabout', size, fill, lineColor }, bridge { length, width, fill, lineColor, bridgeType:'suspension'|'beam'|'stone-arch', label }, footpath { length, width, color }, river { length, width, color }, lake { radius, color, stroke }, sea { width, height, color, stroke }, mountain { width, height, color, stroke }, playground { width, height, color, stroke }, airport { width, height, color, stroke, iconName }, port { width, height, color, stroke, iconName }.
+
 All shapes require: { type, x, y }
 
 Canvas is 800x600 logical pixels. Center is x=400, y=300.
@@ -608,7 +625,7 @@ export const REGISTERED_COMPONENT_TYPES = [
   'vennDiagram','annulus','bearings','spinner','factorTree',
   'angleMarker','point','rightAngleMarker','lengthMarker','ruler','text',
   'road','roadJunction','bridge','tree','river','lake','sea','mountain','footpath',
-  'playground','airport','port','mapMarker','mapSprite','gridMap','scaleBar',
+  'playground','airport','port','mapMarker','mapBuilding','mapSprite','gridMap','scaleBar',
   'compassRose','sunDirection','flag','dataTable','coordAxes',
   'spiderIcon','dottedLineArrow','elbowArrow','bezierArrow','ropeLoop',
   'robot', 'weighingScale', 'graduatedCylinder',
