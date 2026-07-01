@@ -15,12 +15,29 @@ const tw  = code => `${TW}/${code}.svg`;
 
 const SUBMARINE_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 60'%3E%3C!-- hull --%3E%3Cellipse cx='48' cy='38' rx='38' ry='16' fill='%234a90d9' stroke='%231e3a5f' stroke-width='2.5'/%3E%3C!-- conning tower --%3E%3Crect x='42' y='20' width='18' height='14' rx='3' fill='%235aa3e8' stroke='%231e3a5f' stroke-width='2'/%3E%3C!-- periscope --%3E%3Crect x='50' y='10' width='4' height='14' rx='2' fill='%231e3a5f'/%3E%3Crect x='47' y='10' width='10' height='3' rx='1.5' fill='%231e3a5f'/%3E%3C!-- porthole --%3E%3Ccircle cx='38' cy='38' r='6' fill='%23aad4f5' stroke='%231e3a5f' stroke-width='2'/%3E%3Ccircle cx='38' cy='38' r='3' fill='%23d0eafc'/%3E%3C!-- propeller --%3E%3Cellipse cx='86' cy='32' rx='3' ry='8' fill='%231e3a5f' transform='rotate(-20 86 32)'/%3E%3Cellipse cx='86' cy='44' rx='3' ry='8' fill='%231e3a5f' transform='rotate(20 86 44)'/%3E%3Ccircle cx='86' cy='38' r='3.5' fill='%234a90d9' stroke='%231e3a5f' stroke-width='1.5'/%3E%3C!-- tail fin --%3E%3Cpolygon points='84,38 96,28 96,48' fill='%234a90d9' stroke='%231e3a5f' stroke-width='2'/%3E%3C!-- nose --%3E%3Cellipse cx='10' cy='38' rx='6' ry='12' fill='%235aa3e8' stroke='%231e3a5f' stroke-width='2'/%3E%3C!-- bottom fin --%3E%3Cpolygon points='55,54 65,54 60,62' fill='%234a90d9' stroke='%231e3a5f' stroke-width='1.5'/%3E%3C/svg%3E`;
 
+// No Unicode emoji exists for these — hand-crafted SVGs, same pattern as SUBMARINE_SVG above.
+const PIGGY_BANK_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 80'%3E%3Crect x='20' y='68' width='8' height='10' rx='2' fill='%23e0729a' stroke='%238a2f52' stroke-width='2'/%3E%3Crect x='70' y='68' width='8' height='10' rx='2' fill='%23e0729a' stroke='%238a2f52' stroke-width='2'/%3E%3Cellipse cx='52' cy='45' rx='38' ry='26' fill='%23f9a8c9' stroke='%238a2f52' stroke-width='2.5'/%3E%3Cellipse cx='16' cy='46' rx='11' ry='9' fill='%23f6c3d8' stroke='%238a2f52' stroke-width='2'/%3E%3Ccircle cx='12' cy='46' r='1.8' fill='%238a2f52'/%3E%3Ccircle cx='20' cy='46' r='1.8' fill='%238a2f52'/%3E%3Cpolygon points='38,20 48,10 50,26' fill='%23f9a8c9' stroke='%238a2f52' stroke-width='2'/%3E%3Ccircle cx='34' cy='36' r='3' fill='%233a1420'/%3E%3Cpath d='M90,40 q8,-10 0,-16' fill='none' stroke='%238a2f52' stroke-width='2.5' stroke-linecap='round'/%3E%3Crect x='44' y='14' width='16' height='4' rx='2' fill='%233a1420' transform='rotate(-8 52 16)'/%3E%3Cellipse cx='52' cy='8' rx='6' ry='3' fill='%23f2c14e' stroke='%238a2f52' stroke-width='1.5'/%3E%3C/svg%3E`;
+
+const MEASURING_JUG_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 70 100'%3E%3Cpath d='M14,10 L50,10 L58,20 L52,22 L46,16 L44,86 Q44,92 38,92 L18,92 Q12,92 12,86 L14,10 Z' fill='%23dceaf5' fill-opacity='0.5' stroke='%232b5f8a' stroke-width='2.5'/%3E%3Cpath d='M46,50 L44,86 Q44,92 38,92 L18,92 Q12,92 12,86 L13.5,50 Z' fill='%237fc4ee' fill-opacity='0.6'/%3E%3Cpath d='M52,30 Q64,32 62,44 Q60,54 50,54' fill='none' stroke='%232b5f8a' stroke-width='3'/%3E%3Cline x1='16' y1='30' x2='24' y2='30' stroke='%232b5f8a' stroke-width='2'/%3E%3Cline x1='16' y1='48' x2='24' y2='48' stroke='%232b5f8a' stroke-width='2'/%3E%3Cline x1='15' y1='66' x2='24' y2='66' stroke='%232b5f8a' stroke-width='2'/%3E%3C/svg%3E`;
+
+const STAIRCASE_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 80'%3E%3Cpolygon points='5,75 25,75 25,60 45,60 45,45 65,45 65,30 85,30 85,15 95,15 95,75' fill='%23c9a679' stroke='%235c4326' stroke-width='2.5'/%3E%3Cline x1='25' y1='75' x2='25' y2='60' stroke='%235c4326' stroke-width='1.5'/%3E%3Cline x1='45' y1='75' x2='45' y2='45' stroke='%235c4326' stroke-width='1.5'/%3E%3Cline x1='65' y1='75' x2='65' y2='30' stroke='%235c4326' stroke-width='1.5'/%3E%3Cline x1='85' y1='75' x2='85' y2='15' stroke='%235c4326' stroke-width='1.5'/%3E%3C/svg%3E`;
+
+const LIGHTHOUSE_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 110'%3E%3Cellipse cx='30' cy='104' rx='26' ry='6' fill='%239aa5ab' stroke='%234a5459' stroke-width='2'/%3E%3Cpolygon points='20,100 24,40 36,40 40,100' fill='%23ffffff' stroke='%232b3338' stroke-width='2'/%3E%3Crect x='22' y='58' width='16' height='10' fill='%23d64545'/%3E%3Crect x='22' y='80' width='16' height='10' fill='%23d64545'/%3E%3Crect x='18' y='28' width='24' height='14' rx='2' fill='%232b3338' stroke='%232b3338' stroke-width='2'/%3E%3Ccircle cx='30' cy='35' r='4' fill='%23ffe066'/%3E%3Cpolygon points='42,35 60,24 60,46' fill='%23ffe89b' fill-opacity='0.55'/%3E%3Cpolygon points='16,22 44,22 38,8 22,8' fill='%23d64545' stroke='%232b3338' stroke-width='2'/%3E%3Crect x='24' y='90' width='12' height='16' fill='%235b4636' stroke='%232b3338' stroke-width='1.5'/%3E%3C/svg%3E`;
+
 export const CLIPART_ITEMS = [
 
   // ── Transport %26 Places ───────────────────────────────────────────────────────
   { id: 'elevator',      label: 'Elevator / Lift', category: 'Transport', emoji: '🛗', url: tw('1f6d7') },
   { id: 'anchor',        label: 'Anchor',          category: 'Transport', emoji: '⚓', url: tw('2693') },
   { id: 'submarine',     label: 'Submarine',       category: 'Transport', emoji: '🚢', url: SUBMARINE_SVG },
+  { id: 'staircase',     label: 'Staircase',       category: 'Transport', emoji: '🪜', url: STAIRCASE_SVG },
+  { id: 'ladder',        label: 'Ladder',          category: 'Transport', emoji: '🪜', url: tw('1fa9c') },
+  { id: 'lighthouse',    label: 'Lighthouse',      category: 'Transport', emoji: '🗼', url: LIGHTHOUSE_SVG },
+  { id: 'ringBuoy',      label: 'Ring Buoy',       category: 'Transport', emoji: '🛟', url: tw('1f6df') },
+  { id: 'divingMask',    label: 'Diving Mask',     category: 'Transport', emoji: '🤿', url: tw('1f93f') },
+  { id: 'trafficLight',  label: 'Traffic Light',   category: 'Transport', emoji: '🚦', url: tw('1f6a6') },
+  { id: 'stopSign',      label: 'Stop Sign',       category: 'Transport', emoji: '🛑', url: tw('1f6d1') },
+  { id: 'hook',          label: 'Hook',            category: 'Transport', emoji: '🪝', url: tw('1fa9d') },
 
   // ── Sea Life (multiple fish variants — commonly used in maths problems) ──
   { id: 'fishBlue',      label: 'Fish',          category: 'Sea Life',  emoji: '🐟', url: tw('1f41f') },
@@ -214,6 +231,9 @@ export const CLIPART_ITEMS = [
   { id: 'speedboat',     label: 'Speedboat',      category: 'Vehicles',  emoji: '🚤', url: tw('1f6a4') },
   { id: 'ship',          label: 'Ship',           category: 'Vehicles',  emoji: '🚢', url: tw('1f6a2') },
   { id: 'canoe',         label: 'Canoe',          category: 'Vehicles',  emoji: '🛶', url: tw('1f6f6') },
+  { id: 'ferry',         label: 'Ferry',          category: 'Vehicles',  emoji: '⛴️', url: tw('26f4') },
+  { id: 'cruiseShip',    label: 'Cruise Ship',    category: 'Vehicles',  emoji: '🛳️', url: tw('1f6f3') },
+  { id: 'cargoTruck',    label: 'Cargo Truck',    category: 'Vehicles',  emoji: '🚛', url: tw('1f69b') },
 
   // ── Buildings (multiple types — common in word problems) ──────────────────
   { id: 'house',         label: 'House',          category: 'Buildings', emoji: '🏠', url: tw('1f3e0') },
@@ -348,6 +368,10 @@ export const CLIPART_ITEMS = [
   { id: 'clock',         label: 'Clock',          category: 'Household', emoji: '🕐', url: tw('1f550') },
   { id: 'alarmClock',    label: 'Alarm Clock',    category: 'Household', emoji: '⏰', url: tw('23f0') },
   { id: 'thermometer',   label: 'Thermometer',    category: 'Household', emoji: '🌡️', url: tw('1f321') },
+  { id: 'hourglass',     label: 'Hourglass',      category: 'Household', emoji: '⏳', url: tw('23f3') },
+  { id: 'stopwatch',     label: 'Stopwatch',      category: 'Household', emoji: '⏱️', url: tw('23f1') },
+  { id: 'balanceScale',  label: 'Balance Scale',  category: 'Household', emoji: '⚖️', url: tw('2696') },
+  { id: 'measuringJug',  label: 'Measuring Jug',  category: 'Household', emoji: '🫗', url: MEASURING_JUG_SVG },
   { id: 'magnet',        label: 'Magnet',         category: 'Household', emoji: '🧲', url: tw('1f9f2') },
   { id: 'key',           label: 'Key',            category: 'Household', emoji: '🔑', url: tw('1f511') },
   { id: 'lock',          label: 'Lock',           category: 'Household', emoji: '🔒', url: tw('1f512') },
@@ -382,6 +406,10 @@ export const CLIPART_ITEMS = [
   { id: 'coin',          label: 'Coin',           category: 'Shopping',  emoji: '🪙', url: tw('1fa99') },
   { id: 'moneyBag',      label: 'Money Bag',      category: 'Shopping',  emoji: '💰', url: tw('1f4b0') },
   { id: 'creditCard',    label: 'Credit Card',    category: 'Shopping',  emoji: '💳', url: tw('1f4b3') },
+  { id: 'piggyBank',     label: 'Piggy Bank',     category: 'Shopping',  emoji: '🐷', url: PIGGY_BANK_SVG },
+  { id: 'purse',         label: 'Purse',          category: 'Shopping',  emoji: '👛', url: tw('1f45b') },
+  { id: 'banknote',      label: 'Banknote',       category: 'Shopping',  emoji: '💵', url: tw('1f4b5') },
+  { id: 'receipt',       label: 'Receipt',        category: 'Shopping',  emoji: '🧾', url: tw('1f9fe') },
   { id: 'gift',          label: 'Gift',           category: 'Shopping',  emoji: '🎁', url: tw('1f381') },
   { id: 'balloon',       label: 'Balloon',        category: 'Shopping',  emoji: '🎈', url: tw('1f388') },
   { id: 'camera',        label: 'Camera',         category: 'Shopping',  emoji: '📷', url: tw('1f4f7') },
@@ -404,6 +432,8 @@ export const CLIPART_ITEMS = [
   { id: 'trophy',        label: 'Trophy',         category: 'Sports',    emoji: '🏆', url: tw('1f3c6') },
   { id: 'medal',         label: 'Medal',          category: 'Sports',    emoji: '🏅', url: tw('1f3c5') },
   { id: 'bow',           label: 'Bow & Arrow',    category: 'Sports',    emoji: '🏹', url: tw('1f3f9') },
+  { id: 'dice',          label: 'Dice',           category: 'Sports',    emoji: '🎲', url: tw('1f3b2') },
+  { id: 'target',        label: 'Target',         category: 'Sports',    emoji: '🎯', url: tw('1f3af') },
 
   // ── Geographic ────────────────────────────────────────────────────────────
   { id: 'worldMap',      label: 'World Map',      category: 'Geographic', emoji: '🗺️', url: tw('1f5fa') },
@@ -432,8 +462,14 @@ export const CLIPART_ITEMS = [
   { id: 'portal',        label: 'Portal',         category: 'Fantasy',    emoji: '🌀', url: tw('1f300') },
   { id: 'crystalBall',   label: 'Crystal Ball',   category: 'Fantasy',    emoji: '🔮', url: tw('1f52e') },
   { id: 'sparkles',      label: 'Sparkles',       category: 'Fantasy',    emoji: '✨', url: tw('2728') },
-  { id: 'door',          label: 'Door',           category: 'Objects',    emoji: '🚪', url: tw('1f6aa') },
-  { id: 'key',           label: 'Key',            category: 'Objects',    emoji: '🔑', url: tw('1f511') },
+
+  // ── Maths Symbols ─────────────────────────────────────────────────────────
+  { id: 'mathPlus',      label: 'Plus',           category: 'Maths Symbols', emoji: '➕', url: tw('2795') },
+  { id: 'mathMinus',     label: 'Minus',          category: 'Maths Symbols', emoji: '➖', url: tw('2796') },
+  { id: 'mathMultiply',  label: 'Multiply',       category: 'Maths Symbols', emoji: '✖️', url: tw('2716') },
+  { id: 'mathDivide',    label: 'Divide',         category: 'Maths Symbols', emoji: '➗', url: tw('2797') },
+  { id: 'mathEquals',    label: 'Equals',         category: 'Maths Symbols', emoji: '🟰', url: tw('1f7f0') },
+  { id: 'numberInput',   label: 'Numbers',        category: 'Maths Symbols', emoji: '🔢', url: tw('1f522') },
 ];
 
 export const CLIPART_CATEGORIES = [
@@ -441,7 +477,7 @@ export const CLIPART_CATEGORIES = [
   'Nature', 'Food', 'Characters', 'Faces',
   'Buildings', 'Vehicles',
   'Household', 'Stationery', 'Shopping', 'Sports', 'Geographic',
-  'Fantasy', 'Objects'
+  'Fantasy', 'Maths Symbols'
 ];
 
 /**
