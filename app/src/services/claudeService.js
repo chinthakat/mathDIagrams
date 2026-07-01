@@ -112,6 +112,17 @@ Available shape types (use these exact strings for the "type" field):
 - dottedLineArrow: { endX, endY, stroke, strokeWidth, dashSize, gapSize, pointerLength, pointerWidth } — dotted/dashed straight line with arrowhead from (0,0) to (endX,endY); use for dotted directional paths
 - elbowArrow: { endX, endY, elbowStyle, stroke, strokeWidth, dash, dashSize, gapSize, pointerLength, pointerWidth } — orthogonal/right-angle connector arrow (mermaid flowchart style); elbowStyle: 'h-v','v-h','mid'
 - bezierArrow: { endX, endY, curveStyle, curvature, stroke, strokeWidth, dash, dashSize, gapSize, pointerLength, pointerWidth } — smooth bezier curve arrow (plantuml style); curveStyle: 'auto','s-curve','c-curve'
+- ropeLoop: { strands: [{ points: [[x,y],...], closed, knots: [pointIndex,...] }], stroke, highlightStroke, strokeWidth, tension, showEndCaps } — flexible rope/cord made of one or more curved strands (points relative to shape's x,y)
+    • strands[].points — waypoints the rope curve passes through smoothly (min 2, use more points to route the rope up over a hook and back down)
+    • strands[].closed — true to form a closed loop (e.g. a loop draped fully around a hook)
+    • strands[].knots — indices into that strand's points array where a small knot bump is drawn
+    • Use MULTIPLE strands to depict interlocking/overlapping loops or a rope crossing over/under itself — list each loop as its own strand entry
+    • Use for: rope, cord, string, elastic band, strap, or cable diagrams — loops, knots, pulley lines, rope draped over a hook. Pair with the "hook" clipart (rasterImage) for the anchor point.
+    • Example (loop hanging from a hook at x=400,y=100): { type:'ropeLoop', x:400, y:150, strands:[{ points:[[0,-40],[35,10],[0,60],[-35,10]], closed:true, knots:[2] }] }
+    • DIFFERENT LOOP SHAPES (e.g. comparing several loops side by side): vary the points to change the silhouette —
+      narrow/tall loop: [[0,-45],[18,-45],[18,45],[0,45]] (closed) · wide/rounded loop: [[0,-50],[40,-60],[70,-30],[70,30],[40,60],[0,50]] (closed)
+      long/thin drooping loop: [[0,-60],[10,60],[-10,90],[-25,60]] (open, closed:false) · loop with a second strand crossing through it: add a 2nd strands[] entry whose points pass through the first loop's bounding area.
+    • IMPORTANT: ropeLoop is ALWAYS available and can represent ANY rope/cord/loop/knot/strap/elastic-band shape, including several visually-different loop variants side by side (e.g. narrow vs wide vs tapered). NEVER list rope, cord, loop, knot, strap, or band shapes under missingComponents/missingObjects — always use ropeLoop with points tuned to match the specific silhouette instead.
 
 CLOCK & TIME SHAPES — use these for any time/clock related questions:
 - analogClock: { radius, hours, minutes, seconds, showSeconds, showNumbers, showTicks, faceColor, rimColor, handColor, secondColor, label, rimWidth, style }
@@ -571,7 +582,7 @@ export const REGISTERED_COMPONENT_TYPES = [
   'road','roadJunction','bridge','tree','river','lake','sea','mountain','footpath',
   'playground','airport','port','mapMarker','mapSprite','gridMap','scaleBar',
   'compassRose','sunDirection','flag','dataTable','coordAxes',
-  'spiderIcon','dottedLineArrow','elbowArrow','bezierArrow',
+  'spiderIcon','dottedLineArrow','elbowArrow','bezierArrow','ropeLoop',
   'robot', 'weighingScale',
   'analogClock', 'digitalClock', 'departureBoard',
 ];

@@ -91,6 +91,7 @@ import CloudShape from '../components/MathObjects/CloudShape';
 import Teardrop from '../components/MathObjects/Teardrop';
 import TagLabel from '../components/MathObjects/TagLabel';
 import NoSign from '../components/MathObjects/NoSign';
+import RopeLoop from '../components/MathObjects/RopeLoop';
 import { PieChart as PieChartIcon, Grid3X3, Tally5, TrendingUp, Layers, Minus as MinusIcon, BarChart2, ImageIcon as PictIcon, LayoutGrid, SquareSplitHorizontal, MoveHorizontal, Ruler as RulerIcon, Grid, BarChart3, Table, CircleDashed, ArrowRight, ArrowLeftRight, Navigation, Image as ImageIcon, Bug, Waypoints, CornerDownRight, Spline, Code, Clock, Monitor, AlignLeft, Box, Database, ChevronRight, Diamond as DiamondIcon, Star, Zap, Plus, Tag, Ban } from 'lucide-react';
 
 
@@ -2326,6 +2327,43 @@ export const ObjectRegistry = {
       { name: 'dashSize', label: 'Dash Size', type: 'range', min: 2, max: 20 },
       { name: 'gapSize', label: 'Gap Size', type: 'range', min: 2, max: 20 },
     ]
+  },
+
+  ropeLoop: {
+    id: 'ropeLoop',
+    category: 'Diagram Annotations',
+    name: 'Rope / Knot Loop',
+    icon: <Spline size={18} />,
+    defaultProps: {
+      strands: [{
+        points: [[0, -50], [45, -65], [85, -25], [70, 35], [10, 40], [-25, -5]],
+        closed: true,
+        knots: [],
+      }],
+      stroke: '#7a4a24',
+      highlightStroke: '#c9915a',
+      strokeWidth: 8,
+      tension: 0.5,
+      showEndCaps: true,
+      rotation: 0,
+    },
+    Component: ({ props }) => (
+      <RopeLoop
+        strands={props.strands}
+        stroke={props.stroke}
+        highlightStroke={props.highlightStroke}
+        strokeWidth={props.strokeWidth}
+        tension={props.tension}
+        showEndCaps={props.showEndCaps}
+      />
+    ),
+    properties: [
+      { name: 'stroke', label: 'Rope Color', type: 'color' },
+      { name: 'highlightStroke', label: 'Highlight Color', type: 'color' },
+      { name: 'strokeWidth', label: 'Thickness', type: 'range', min: 2, max: 24 },
+      { name: 'tension', label: 'Curve Smoothness', type: 'range', min: 0, max: 1, step: 0.05 },
+      { name: 'showEndCaps', label: 'Show End Caps', type: 'checkbox' },
+    ],
   },
 
   analogClock: {

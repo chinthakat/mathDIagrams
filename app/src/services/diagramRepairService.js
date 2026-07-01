@@ -138,6 +138,7 @@ STRICT LOGICAL RULES FOR ANALYSIS:
 1. ONLY describe what you physically see in the diagram. Do not assume or guess based on the question context. If the image has a stick figure and a doorway, describe a stick figure and a doorway. Do NOT invent flowcharts, arrows, or boxes that are not physically present in the image.
 2. If there are characters, people, stick figures, animals, or objects (like a portal vortex), look up their names in the AVAILABLE RASTERIMAGE CLIPARTS list. You MUST write down their clipart IDs (e.g. "person" for a stick figure, "portal" for a space portal, "door" for an arch/doorway) and instruct the generator to draw them using "rasterImage".
 3. Check the shape registry: if the diagram contains scales, clocks, or departure boards, instruct the generator to use their dedicated component types (e.g., 'weighingScale', 'analogClock') instead of building them out of rectangles and text.
+3a. Rope / cord / loop / knot / strap / elastic-band shapes (including several visually-different loop variants side by side, e.g. narrow vs wide vs tapered) are ALWAYS supported via the 'ropeLoop' component — see the ropeLoop entry in the shape catalogue below for how to vary its points to match different silhouettes. Do NOT list these under "librarySuitability.missingObjects" or set "hasEnoughObjects" to false because of them, even if the loops differ subtly in shape from each other.
 4. GRAPH TYPE IDENTIFICATION — match the image to the EXACT component type:
    - Vertical bars with DISCRETE category labels (e.g. Gold/Silver, Mon/Tue) → "barGraph"
    - Vertical bars touching each other with INTERVAL labels (e.g. 0–5, 5–10) → "histogram"
@@ -229,6 +230,7 @@ ANALYSIS RULES:
 3. If ANY element has NO match (not even an approximate one), mark it as missing.
 4. "dataTable" covers any plain grid/table of values. "rasterImage" with a clipart covers any icon illustration. "numberline" covers vertical or horizontal number lines.
 5. Be STRICT — do not assume the AI can "improvise" missing objects using rectangles/lines. A submarine icon is NOT drawable with rectangles. An elevator grid is NOT a dataTable.
+6. EXCEPTION — rope/cord/loop/knot/strap/elastic-band shapes (including several visually-different loop variants side by side) are ALWAYS matched by "ropeLoop" (see its entry above for how to vary its points for different silhouettes). Never mark these as missing.
 
 Return ONLY valid JSON — no markdown, no explanation:
 {
@@ -471,19 +473,11 @@ Do NOT include any explanation, markdown, or text outside the JSON array.`;
 
 // ── Post-generation: detect types not in the component registry ───────────────
 
-const KNOWN_TYPES = new Set([
-  'rasterImage','rectangle','circle','triangle','polygon','customPolygon','line',
-  'rightTriangle','isoscelesTriangle','equilateralTriangle','fractionCircle',
-  'fractionRectangle','fractionBar','numberline','cartesianPlane',
-  'barGraph','lineGraph','pieChart','histogram','dotPlot','stemLeafPlot','pictograph',
-  'tallyChart','tenFrame','baseTenBlocks','objectArray',
-  'vennDiagram','annulus','bearings','spinner','factorTree','angleMarker','point',
-  'rightAngleMarker','lengthMarker','ruler','text','road','roadJunction','bridge',
-  'tree','river','lake','sea','mountain','footpath','playground','airport','port',
-  'mapMarker','mapSprite','gridMap','scaleBar','compassRose','sunDirection','flag',
-  'dataTable','coordAxes','spiderIcon','dottedLineArrow','elbowArrow','bezierArrow',
-  'robot','weighingScale','analogClock','digitalClock','departureBoard',
-]);
+// Single source of truth — was previously a separately hand-maintained duplicate
+// of REGISTERED_COMPONENT_TYPES that silently drifted out of sync (new types added
+// to the catalogue in claudeService.js were never added here, so the generator
+// would pass preflight but then have its own shapes stripped at this step).
+const KNOWN_TYPES = new Set(REGISTERED_COMPONENT_TYPES);
 
 function validateShapeTypes(shapes) {
   const missing = [];
