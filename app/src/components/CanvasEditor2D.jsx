@@ -1333,6 +1333,7 @@ export default function CanvasEditor2D({
         ref={stageRef}
       >
         <Layer>
+          <Rect x={0} y={0} width={800} height={600} fill={currentTheme.bgColor} listening={false} />
           <BackgroundDecorations theme={mapTheme} />
           {showNumberedGrid && !isExporting && <GridOverlay width={800} height={600} gridSize={100} />}
 

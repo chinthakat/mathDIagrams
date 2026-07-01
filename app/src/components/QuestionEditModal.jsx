@@ -530,6 +530,7 @@ export default function QuestionEditModal({ question, onClose, onSaved }) {
                   <div style={{ ...S.canvasBox, overflow: 'hidden' }}>
                     <Stage ref={stageRef} width={800} height={500} style={{ background: '#fff', transform: 'scale(0.8)', transformOrigin: 'top left', display: 'block', width: '800px', height: '500px' }}>
                       <Layer>
+                        <Rect x={0} y={0} width={800} height={500} fill="#ffffff" listening={false} />
                         {shapes.map((s, i) => {
                           const regObj = ObjectRegistry[s.type];
                           if (!regObj?.Component) return null;
