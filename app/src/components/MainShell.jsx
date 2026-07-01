@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, HelpCircle } from 'lucide-react';
+import { Sparkles, Wand2 } from 'lucide-react';
 import App from '../App';
 import MapEditor from './MapEditor';
 import TopNavigation from './TopNavigation';
@@ -26,14 +26,14 @@ export default function MainShell() {
         </div>
         <TopNavigation mode={globalMode} setMode={setGlobalMode} />
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button 
-            className="btn" 
+          <button
+            className="btn"
             onClick={() => setShowWizard(true)}
-            style={{ padding: '6px 12px', fontSize: '12px', background: 'transparent', border: '1px solid #334155', display: 'flex', alignItems: 'center', gap: '6px', color: '#cbd5e1', fontWeight: '600', borderRadius: '6px', cursor: 'pointer' }}
-            onMouseOver={(e) => { e.currentTarget.style.color = 'white'; e.currentTarget.style.background = '#1e293b'; }}
-            onMouseOut={(e) => { e.currentTarget.style.color = '#cbd5e1'; e.currentTarget.style.background = 'transparent'; }}
+            style={{ padding: '6px 14px', fontSize: '12px', background: '#8b5cf6', border: '1px solid #8b5cf6', display: 'flex', alignItems: 'center', gap: '6px', color: 'white', fontWeight: '700', borderRadius: '6px', cursor: 'pointer', boxShadow: '0 0 0 rgba(139,92,246,0.5)' }}
+            onMouseOver={(e) => { e.currentTarget.style.background = '#7c3aed'; e.currentTarget.style.borderColor = '#7c3aed'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = '#8b5cf6'; e.currentTarget.style.borderColor = '#8b5cf6'; }}
           >
-            <HelpCircle size={14} /> Quick Start
+            <Wand2 size={14} /> Quick Wizard
           </button>
           <button 
             className="btn" 
