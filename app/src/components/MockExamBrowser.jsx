@@ -5,6 +5,9 @@ import {
   getLmsWriteKey, saveLmsWriteKey,
   fetchMockExamsPaginated, fetchQuizWithQuestions,
   resolveImageUrl,
+  fetchLocalMockExams,
+  saveLocalMockExams,
+  clearLocalMockExams
 } from '../services/lmsApiService.js';
 import DiagramEditorModal from './DiagramEditorModal.jsx';
 import QuestionEditorModal from './QuestionEditorModal.jsx';
@@ -18,7 +21,7 @@ const S = {
   btnPrimary: { background: '#3b82f6', color: '#fff' },
   btnGhost: { background: 'transparent', color: '#94a3b8', border: '1px solid #334155' },
   body: { display: 'flex', flex: 1, overflow: 'hidden' },
-  examList: { width: '280px', borderRight: '1px solid #1e293b', overflowY: 'auto', flexShrink: 0 },
+  examList: { width: '310px', borderRight: '1px solid #1e293b', overflowY: 'auto', flexShrink: 0 },
   examItem: { padding: '10px 14px', borderBottom: '1px solid #1e293b', cursor: 'pointer', userSelect: 'none' },
   examTitle: { fontSize: '13px', fontWeight: 600, color: '#e2e8f0', lineHeight: 1.4 },
   examMeta: { fontSize: '11px', color: '#64748b', marginTop: '2px' },
@@ -142,8 +145,10 @@ function QuestionCard({ question, examId, onEditRepair, onView }) {
 }
 
 function extractGrade(exam) {
-  if (exam.gradeLevel) return String(exam.gradeLevel);
-  // Parse from title e.g. "Grade 3 Mock Exam 2", "Grade 5 Mock Exam 1 A"
+  if (exam.gradeLevel) {
+    const gStr = String(exam.gradeLevel);
+    return gStr.startsWith('Grade') ? gStr : `Grade ${gStr}`;
+  }
   const m = (exam.title || '').match(/grade\s+(\d+)/i);
   return m ? `Grade ${m[1]}` : '';
 }
@@ -152,6 +157,7 @@ export default function MockExamBrowser({ initialSelectedExam, initialGradeFilte
   const [hasKeys, setHasKeys] = useState(!!(getLmsApiKey() || import.meta.env.VITE_LMS_API_KEY));
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState(null);
   const [selectedExam, setSelectedExam] = useState(null);
   const [examQuestions, setExamQuestions] = useState(null);
@@ -161,26 +167,61 @@ export default function MockExamBrowser({ initialSelectedExam, initialGradeFilte
   const [editRepairQuestion, setEditRepairQuestion] = useState(null);
   const [viewQuestion, setViewQuestion] = useState(null);
 
-  const loadExams = useCallback(async () => {
-    setLoading(true);
+  const loadExams = useCallback(async (forceSync = false) => {
+    if (forceSync) {
+      setIsSyncing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
-    setExams([]);
     try {
+      // 1. Try to fetch cached mock exams from local database first (if not forcing a sync)
+      if (!forceSync) {
+        const cached = await fetchLocalMockExams();
+        if (cached && cached.length > 0) {
+          console.log(`[Cache] Loaded ${cached.length} exams from local SQLite database.`);
+          setExams(cached);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 2. Fetch from SimplyMaths LMS API if cache empty or forcing sync
+      console.log('[Cache] Cache empty/sync requested. Fetching from LMS API...');
+      setExams([]);
+      const loadedList = [];
       await fetchMockExamsPaginated(batch => {
+        loadedList.push(...batch);
         setExams(prev => {
           const existingIds = new Set(prev.map(e => e.id));
           const newOnes = batch.filter(e => !existingIds.has(e.id));
           return [...prev, ...newOnes];
         });
       });
+
+      // 3. Cache the retrieved list in SQLite DB
+      if (loadedList.length > 0) {
+        const cachePayload = loadedList.map(e => ({
+          id: String(e.id),
+          title: String(e.title || ''),
+          gradeLevel: e.gradeLevel ? String(e.gradeLevel) : (e.title.match(/grade\s+(\d+)/i)?.[1] || ''),
+          questionCount: Number(e.questionIds?.length || e.questions?.length || 0),
+        }));
+        await saveLocalMockExams(cachePayload);
+
+        // Fetch back cleanly to format correctly
+        const freshList = await fetchLocalMockExams();
+        setExams(freshList);
+      }
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
+      setIsSyncing(false);
     }
   }, []);
 
-  useEffect(() => { if (hasKeys) loadExams(); }, [hasKeys, loadExams]);
+  useEffect(() => { if (hasKeys) loadExams(false); }, [hasKeys, loadExams]);
 
   const selectExam = useCallback(async (exam) => {
     setSelectedExam(exam);
@@ -274,13 +315,26 @@ export default function MockExamBrowser({ initialSelectedExam, initialGradeFilte
           <option value=''>All Grades</option>
           {gradeOptions.map(g => <option key={g} value={g}>{g}</option>)}
         </select>
-        <button style={{ ...S.btn, ...S.btnGhost }} onClick={loadExams} title="Refresh">
-          <RefreshCw size={13} /> Refresh
+        <button 
+          style={{ 
+            ...S.btn, 
+            ...S.btnGhost,
+            background: isSyncing ? 'rgba(124, 58, 237, 0.15)' : 'transparent',
+            color: isSyncing ? '#c084fc' : '#94a3b8',
+            borderColor: isSyncing ? '#7c3aed' : '#334155'
+          }} 
+          onClick={() => loadExams(true)} 
+          disabled={loading || isSyncing}
+          title="Sync/reload list of mock exams from SimplyMaths database to local cache"
+        >
+          <RefreshCw size={13} className={isSyncing ? "spin" : ""} /> 
+          {isSyncing ? 'Syncing DB...' : 'Sync DB'}
         </button>
         <button style={{ ...S.btn, ...S.btnGhost }} onClick={() => setHasKeys(false)} title="Change API keys">
           <Key size={13} />
         </button>
-        {loading && <Loader size={16} style={{ animation: 'spin 1s linear infinite', color: '#60a5fa' }} />}
+        {(loading || isSyncing) && <Loader size={16} style={{ animation: 'spin 1s linear infinite', color: '#60a5fa' }} />}
+        {isSyncing && <span style={{ fontSize: '11px', color: '#a78bfa' }}>Syncing server...</span>}
       </div>
 
       <div style={S.body}>
@@ -297,27 +351,74 @@ export default function MockExamBrowser({ initialSelectedExam, initialGradeFilte
               {search ? 'No exams match your search' : 'No mock exams found'}
             </div>
           )}
-          {filteredExams.map(exam => (
-            <div
-              key={exam.id}
-              style={{
-                ...S.examItem,
-                background: selectedExam?.id === exam.id ? '#1e3a5f' : 'transparent',
-              }}
-              onClick={() => selectExam(exam)}
-            >
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                {selectedExam?.id === exam.id ? <ChevronDown size={13} style={{ color: '#60a5fa', marginTop: '2px', flexShrink: 0 }} /> : <ChevronRight size={13} style={{ color: '#64748b', marginTop: '2px', flexShrink: 0 }} />}
-                <div>
-                  <div style={S.examTitle}>{exam.title}</div>
-                  <div style={S.examMeta}>
-                    {extractGrade(exam) && <span>{extractGrade(exam)} · </span>}
-                    {(exam.questionIds?.length || exam.questions?.length || 0)} questions
-                  </div>
+          {filteredExams.map(exam => {
+            const grade = extractGrade(exam);
+            const isSelected = selectedExam?.id === exam.id;
+            
+            // Color codes matching the wizard grade pills
+            const gradeColors = {
+              'Grade 3': { bg: 'rgba(124, 58, 237, 0.15)', text: '#c084fc' },
+              'Grade 4': { bg: 'rgba(245, 158, 11, 0.15)', text: '#fcd34d' },
+              'Grade 5': { bg: 'rgba(59, 130, 246, 0.15)', text: '#60a5fa' },
+              'Grade 6': { bg: 'rgba(16, 185, 129, 0.15)', text: '#34d399' },
+            }[grade] || { bg: 'rgba(100, 116, 139, 0.15)', text: '#94a3b8' };
+
+            return (
+              <div
+                key={exam.id}
+                style={{
+                  ...S.examItem,
+                  background: isSelected ? '#1e293b' : 'transparent',
+                  borderLeft: isSelected ? '3px solid #7c3aed' : 'none',
+                  paddingLeft: isSelected ? '11px' : '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}
+                onClick={() => selectExam(exam)}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '100%' }}>
+                  {isSelected ? <ChevronDown size={13} style={{ color: '#c084fc', flexShrink: 0 }} /> : <ChevronRight size={13} style={{ color: '#64748b', flexShrink: 0 }} />}
+                  <span style={{ 
+                    fontSize: '13px', 
+                    fontWeight: 600, 
+                    color: isSelected ? '#f1f5f9' : '#cbd5e1',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    flex: 1
+                  }}>
+                    {exam.title}
+                  </span>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', paddingLeft: '17px' }}>
+                  {grade && (
+                    <span style={{ 
+                      fontSize: '9px', 
+                      fontWeight: 700, 
+                      padding: '1px 6px', 
+                      borderRadius: '3px', 
+                      background: gradeColors.bg, 
+                      color: gradeColors.text 
+                    }}>
+                      {grade}
+                    </span>
+                  )}
+                  <span style={{ 
+                    fontSize: '9px', 
+                    fontWeight: 500, 
+                    padding: '1px 5px', 
+                    borderRadius: '3px', 
+                    background: 'rgba(255,255,255,0.03)', 
+                    color: '#64748b' 
+                  }}>
+                    {(exam.questionCount || exam.questionIds?.length || exam.questions?.length || 0)} questions
+                  </span>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Questions panel */}

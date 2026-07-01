@@ -15,3 +15,10 @@ model Generation {
   request   String   // JSON string
   payload   String   // JSON string
 }
+
+model MockExam {
+  id            String  @id
+  title         String
+  gradeLevel    String?
+  questionCount Int     @default(0)
+}

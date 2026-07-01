@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, BookOpen, Compass, Key, Search, ChevronRight, ChevronLeft, Loader, HelpCircle, X, ShieldAlert } from 'lucide-react';
-import { getLmsApiKey, saveLmsApiKey, getLmsWriteKey, saveLmsWriteKey, fetchMockExamsPaginated } from '../services/lmsApiService';
+import { Sparkles, BookOpen, Compass, Key, Search, ChevronRight, ChevronLeft, Loader, HelpCircle, X, ShieldAlert, RefreshCw } from 'lucide-react';
+import { 
+  getLmsApiKey, saveLmsApiKey, 
+  getLmsWriteKey, saveLmsWriteKey, 
+  fetchMockExamsPaginated,
+  fetchLocalMockExams,
+  saveLocalMockExams,
+  clearLocalMockExams
+} from '../services/lmsApiService';
 
 const S = {
   overlay: {
@@ -215,6 +222,7 @@ export default function WelcomeWizardModal({ isOpen, onClose, onSelectTemplateMo
   // Exam list fetching
   const [exams, setExams] = useState([]);
   const [loadingExams, setLoadingExams] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [fetchError, setFetchError] = useState(null);
 
   // Filters
@@ -225,25 +233,60 @@ export default function WelcomeWizardModal({ isOpen, onClose, onSelectTemplateMo
   // Auto-fetch mock exams if has API keys
   useEffect(() => {
     if (isOpen && hasKeys && exams.length === 0) {
-      loadExamsList();
+      loadExamsList(false);
     }
   }, [isOpen, hasKeys]);
 
-  const loadExamsList = async () => {
-    setLoadingExams(true);
+  const loadExamsList = async (forceSync = false) => {
+    if (forceSync) {
+      setIsSyncing(true);
+    } else {
+      setLoadingExams(true);
+    }
     setFetchError(null);
     try {
+      // 1. Try to get cached mock exams from local database first (if not forcing a sync)
+      if (!forceSync) {
+        const cached = await fetchLocalMockExams();
+        if (cached && cached.length > 0) {
+          console.log(`[Cache] Loaded ${cached.length} exams from local SQLite database.`);
+          setExams(cached);
+          setLoadingExams(false);
+          return;
+        }
+      }
+
+      // 2. If cache is empty or we are forcing sync, load from SimplyMaths LMS API
+      console.log('[Cache] Cache empty/sync requested. Fetching from LMS API...');
+      const loadedList = [];
       await fetchMockExamsPaginated((batch, isFinal) => {
+        loadedList.push(...batch);
         setExams(prev => {
           const ids = new Set(prev.map(e => e.id));
           const newItems = batch.filter(e => !ids.has(e.id));
           return [...prev, ...newItems];
         });
       });
+
+      // 3. Cache the loaded exams list into the local SQLite database for instant retrieval next time
+      if (loadedList.length > 0) {
+        const cachePayload = loadedList.map(e => ({
+          id: String(e.id),
+          title: String(e.title || ''),
+          gradeLevel: e.gradeLevel ? String(e.gradeLevel) : (e.title.match(/grade\s+(\d+)/i)?.[1] || ''),
+          questionCount: Number(e.questionIds?.length || e.questions?.length || 0),
+        }));
+        await saveLocalMockExams(cachePayload);
+        
+        // Refresh local state to match database format
+        const freshList = await fetchLocalMockExams();
+        setExams(freshList);
+      }
     } catch (err) {
       setFetchError(err.message);
     } finally {
       setLoadingExams(false);
+      setIsSyncing(false);
     }
   };
 
@@ -255,12 +298,15 @@ export default function WelcomeWizardModal({ isOpen, onClose, onSelectTemplateMo
     // Trigger load
     setExams([]);
     setTimeout(() => {
-      loadExamsList();
+      loadExamsList(true);
     }, 100);
   };
 
   const extractGrade = (exam) => {
-    if (exam.gradeLevel) return `Grade ${exam.gradeLevel}`;
+    if (exam.gradeLevel) {
+      const gStr = String(exam.gradeLevel);
+      return gStr.startsWith('Grade') ? gStr : `Grade ${gStr}`;
+    }
     const m = (exam.title || '').match(/grade\s+(\d+)/i);
     return m ? `Grade ${m[1]}` : 'Unassigned';
   };
@@ -426,56 +472,137 @@ export default function WelcomeWizardModal({ isOpen, onClose, onSelectTemplateMo
 
           {step === 3 && (
             <div>
-              {/* Search Bar */}
-              <div style={{ position: 'relative', marginBottom: '16px' }}>
-                <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                <input 
-                  style={{ ...S.input, paddingLeft: '32px', marginTop: 0 }}
-                  placeholder="Filter exams by title…"
-                  value={searchText}
-                  onChange={e => setSearchText(e.target.value)}
-                />
+              {/* Search & Sync Row */}
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                  <input 
+                    style={{ ...S.input, paddingLeft: '32px', marginTop: 0 }}
+                    placeholder="Filter exams by title…"
+                    value={searchText}
+                    onChange={e => setSearchText(e.target.value)}
+                  />
+                </div>
+                <button
+                  style={{ 
+                    ...S.btn, 
+                    ...S.btnGhost, 
+                    padding: '8px 14px', 
+                    background: isSyncing ? 'rgba(124, 58, 237, 0.15)' : 'rgba(30, 41, 59, 0.4)',
+                    color: isSyncing ? '#c084fc' : '#cbd5e1',
+                    borderColor: isSyncing ? '#7c3aed' : 'rgba(255,255,255,0.1)'
+                  }}
+                  disabled={loadingExams || isSyncing}
+                  onClick={() => loadExamsList(true)}
+                  title="Pull latest mock exams from SimplyMaths database and save to local SQLite cache"
+                >
+                  <RefreshCw size={13} className={isSyncing ? "spin" : ""} />
+                  {isSyncing ? "Syncing..." : "Sync Database"}
+                </button>
               </div>
 
               {loadingExams && (
                 <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>
                   <Loader size={24} className="spin" style={{ margin: '0 auto 12px', color: '#8b5cf6' }} />
-                  <p style={{ fontSize: '13px', margin: 0 }}>Fetching exams from SimplyMaths database...</p>
+                  <p style={{ fontSize: '13px', margin: 0 }}>Loading mock exams from local database cache...</p>
+                </div>
+              )}
+
+              {isSyncing && (
+                <div style={{ padding: '24px 16px', background: 'rgba(124, 58, 237, 0.05)', border: '1px dashed rgba(124, 58, 237, 0.2)', borderRadius: '12px', textAlign: 'center', marginBottom: '16px' }}>
+                  <Loader size={20} className="spin" style={{ margin: '0 auto 8px', color: '#c084fc' }} />
+                  <span style={{ fontSize: '12px', color: '#c084fc', fontWeight: 600 }}>Syncing with SimplyMaths production server...</span>
+                  <p style={{ fontSize: '11px', color: '#64748b', margin: '4px 0 0 0' }}>This pulls metadata for all mock exams to cache them locally. Subsequent loads will be instant.</p>
                 </div>
               )}
 
               {fetchError && (
                 <div style={{ padding: '20px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '12px', color: '#f87171', fontSize: '13px', marginBottom: '16px' }}>
-                  Error loading mock exams: {fetchError}. Please check your LMS keys.
+                  Error loading mock exams: {fetchError}. Please verify your LMS API keys.
                 </div>
               )}
 
-              {!loadingExams && !fetchError && getFilteredExams().length === 0 && (
+              {!loadingExams && !isSyncing && !fetchError && getFilteredExams().length === 0 && (
                 <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>
                   No exams found matching your search.
                 </div>
               )}
 
               <div style={{ maxHeight: '260px', overflowY: 'auto' }}>
-                {getFilteredExams().map(exam => (
-                  <div 
-                    key={exam.id}
-                    style={{ ...S.examItem, ...(selectedExam?.id === exam.id ? S.examItemActive : {}) }}
-                    onClick={() => setSelectedExam(exam)}
-                  >
-                    <div>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#f1f5f9' }}>{exam.title}</div>
-                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                        {extractGrade(exam)} · {(exam.questionIds?.length || exam.questions?.length || 0)} questions
+                {getFilteredExams().map(exam => {
+                  const grade = extractGrade(exam);
+                  const isSelected = selectedExam?.id === exam.id;
+                  
+                  // Color codes for different grades
+                  const gradeColors = {
+                    'Grade 3': { bg: 'rgba(124, 58, 237, 0.15)', text: '#c084fc' },
+                    'Grade 4': { bg: 'rgba(245, 158, 11, 0.15)', text: '#fcd34d' },
+                    'Grade 5': { bg: 'rgba(59, 130, 246, 0.15)', text: '#60a5fa' },
+                    'Grade 6': { bg: 'rgba(16, 185, 129, 0.15)', text: '#34d399' },
+                  }[grade] || { bg: 'rgba(100, 116, 139, 0.15)', text: '#94a3b8' };
+
+                  return (
+                    <div 
+                      key={exam.id}
+                      style={{ 
+                        ...S.examItem, 
+                        ...(isSelected ? S.examItemActive : {}),
+                        padding: '10px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px'
+                      }}
+                      onClick={() => setSelectedExam(exam)}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {exam.title}
+                        </div>
+                      </div>
+                      
+                      {/* Flag badges row */}
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+                        <span style={{ 
+                          fontSize: '10px', 
+                          fontWeight: 700, 
+                          padding: '2px 8px', 
+                          borderRadius: '4px', 
+                          background: gradeColors.bg, 
+                          color: gradeColors.text 
+                        }}>
+                          {grade}
+                        </span>
+                        <span style={{ 
+                          fontSize: '10px', 
+                          fontWeight: 600, 
+                          padding: '2px 6px', 
+                          borderRadius: '4px', 
+                          background: 'rgba(255,255,255,0.04)', 
+                          color: '#94a3b8',
+                          border: '1px solid rgba(255,255,255,0.02)'
+                        }}>
+                          {(exam.questionCount || exam.questionIds?.length || exam.questions?.length || 0)} Qs
+                        </span>
+                        
+                        {isSelected ? (
+                          <span style={{ 
+                            fontSize: '10px', 
+                            fontWeight: 800, 
+                            color: '#34d399', 
+                            background: 'rgba(52,211,153,0.1)', 
+                            padding: '2px 8px', 
+                            borderRadius: '4px' 
+                          }}>
+                            SELECTED
+                          </span>
+                        ) : (
+                          <ChevronRight size={13} color="#475569" />
+                        )}
                       </div>
                     </div>
-                    {selectedExam?.id === exam.id ? (
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#34d399', background: 'rgba(52,211,153,0.1)', padding: '2px 8px', borderRadius: '4px' }}>SELECTED</span>
-                    ) : (
-                      <ChevronRight size={14} color="#475569" />
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

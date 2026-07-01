@@ -67,6 +67,63 @@ app.delete('/api/generations/:id', async (req, res) => {
   }
 });
 
+// ── Cached Mock Exams ─────────────────────────────────────────────────────────
+
+// Get all cached mock exams
+app.get('/api/mock-exams', async (req, res) => {
+  try {
+    const exams = await prisma.mockExam.findMany({
+      orderBy: { title: 'asc' },
+    });
+    res.json(exams);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch cached mock exams' });
+  }
+});
+
+// Bulk insert/update mock exams
+app.post('/api/mock-exams/bulk', async (req, res) => {
+  try {
+    const exams = req.body; // array of { id, title, gradeLevel, questionCount }
+    if (!Array.isArray(exams)) {
+      return res.status(400).json({ error: 'Body must be an array of exams' });
+    }
+
+    // Delete existing cache first, then recreate
+    await prisma.mockExam.deleteMany({});
+    
+    // Create new entries
+    const created = await Promise.all(
+      exams.map(e =>
+        prisma.mockExam.create({
+          data: {
+            id: String(e.id),
+            title: String(e.title || ''),
+            gradeLevel: e.gradeLevel ? String(e.gradeLevel) : null,
+            questionCount: Number(e.questionCount || 0),
+          },
+        })
+      )
+    );
+    res.json({ success: true, count: created.length });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to bulk sync mock exams' });
+  }
+});
+
+// Clear cached mock exams
+app.delete('/api/mock-exams', async (req, res) => {
+  try {
+    await prisma.mockExam.deleteMany({});
+    res.status(204).send();
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to clear mock exams cache' });
+  }
+});
+
 // ── Pipeline repair logs ──────────────────────────────────────────────────────
 
 const LOG_DIR = path.join(__dirname, 'logs');

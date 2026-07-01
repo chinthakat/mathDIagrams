@@ -253,3 +253,27 @@ export async function uploadDiagramImage(base64Data, folder = 'diagram-editor') 
 
   return registration.publicUrl;
 }
+
+// ── Local SQLite Mock Exam Cache ──────────────────────────────────────────────
+
+export async function fetchLocalMockExams() {
+  const resp = await fetch('/api/mock-exams');
+  if (!resp.ok) throw new Error(`Local cache GET error: ${resp.status}`);
+  return resp.json();
+}
+
+export async function saveLocalMockExams(exams) {
+  const resp = await fetch('/api/mock-exams/bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(exams),
+  });
+  if (!resp.ok) throw new Error(`Local cache POST error: ${resp.status}`);
+  return resp.json();
+}
+
+export async function clearLocalMockExams() {
+  const resp = await fetch('/api/mock-exams', { method: 'DELETE' });
+  if (!resp.ok) throw new Error(`Local cache DELETE error: ${resp.status}`);
+  return true;
+}
